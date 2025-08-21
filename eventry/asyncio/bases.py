@@ -16,10 +16,12 @@ import inspect
 from typing import TYPE_CHECKING, Any, Type
 from dataclasses import field, dataclass
 from collections.abc import Callable, Awaitable
+from eventry.utils import prepare_args, prepare_kwargs
 
 
 if TYPE_CHECKING:
     from eventry.asyncio.handler_manager import HandlerManager
+    from eventry.config import Config
 
     from ..event import Event
 
@@ -76,13 +78,19 @@ class CallableInfo:
         self.has_double_star_kwargs = specs.varkw is not None
         self.param_names = set(specs.args + specs.kwonlyargs)
 
-    async def __call__(self, **workflow_data: Any) -> Any:
+    async def __call__(self, call_args: dict[str, Any], config: Config | None = None) -> Any:
+        call_args = call_args.copy()
+        args = []
+        if config:
+            prepare_kwargs(call_args, config)
+            args = prepare_args(call_args, config)
+
         if not self.has_double_star_kwargs:
-            workflow_data = {k: v for k, v in workflow_data.items() if k in self.param_names}
+            call_args = {k: v for k, v in call_args.items() if k in self.param_names}
 
         if self.is_awaitable:
-            return await self.callable(**workflow_data)
-        return await asyncio.to_thread(self.callable, **workflow_data)
+            return await self.callable(*args, **call_args)
+        return await asyncio.to_thread(self.callable, *args, **call_args)
 
 
 @dataclass(frozen=True)
