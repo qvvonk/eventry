@@ -2,7 +2,7 @@
 name = "eventry"
 version = "0.0.1dev1"
 description = "sync/async event bus implementation."
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 
 authors = [
     {name = "Qvvonk", email="qvvonk@gmail.com"}
