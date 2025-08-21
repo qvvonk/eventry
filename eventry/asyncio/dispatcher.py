@@ -20,6 +20,7 @@ from eventry.asyncio.router import Router
 if TYPE_CHECKING:
     from eventry.asyncio.bases import HandlerInfo
     from eventry.asyncio.event import Event
+    from eventry.config import Config
 
 
 class Dispatcher(Router):
@@ -27,6 +28,7 @@ class Dispatcher(Router):
         super().__init__(name='Dispatcher')
 
         self._workflow_data = workflow_data or {}
+        self._config: Config = getattr(self, 'config', None) or {}
 
     async def propagate_event(
         self,
@@ -141,3 +143,17 @@ class Dispatcher(Router):
         )
 
         return handler_with_pre_middlewares
+
+    def prepare_kwargs(self, kwargs: dict[str, Any]):
+        for old_name, new_name in self._config.get('builtin_names_remap', {}):
+            if old_name in kwargs:
+                kwargs[new_name] = kwargs[old_name]
+                del kwargs[old_name]
+
+        for excluded_name in self._config.get('exclude', []):
+            if excluded_name in kwargs:
+                del kwargs[excluded_name]
+
+    def prepare_positional_only_args(self, kwargs: dict[str, Any]) -> list[Any]:
+        return [v for i, v in kwargs.items() if v in self._config.get('positional_only_args', [])]
+        # todo: exception?
