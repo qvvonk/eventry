@@ -1,0 +1,89 @@
+[project]
+name = "eventry"
+version = "0.0.1dev1"
+description = "sync/async event bus implementation."
+requires-python = ">=3.13"
+
+authors = [
+    {name = "Qvvonk", email="qvvonk@gmail.com"}
+]
+
+maintainers = [
+    {name = "Qvvonk", email="qvvonk@gmail.com"}
+]
+
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+]
+
+[project.urls]
+Repository = "https://github.com/qvvonk/eventry"
+Issues = "https://github.com/qvvonk/eventry/issues"
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.17.1",
+    "ruff",
+]
+
+[tool.mypy]
+plugins = "pydantic.mypy"
+python_version = '3.10'
+warn_redundant_casts = true
+warn_unused_ignores = true
+strict = true
+pretty = true
+exclude = [
+    "docs",
+    ".venv",
+]
+
+[tool.ruff]
+line-length = 99
+exclude = [
+    ".git",
+    "build",
+    "dist",
+    "venv",
+    ".venv",
+    "docs",
+    "*.egg-info"
+]
+
+
+[tool.ruff.format]
+quote-style = "single"
+line-ending = "lf"
+indent-style = "space"
+
+
+[tool.ruff.lint]
+select = [
+    "I",
+    "N",
+    "C4",
+    "E",
+    "F",
+    "T20",
+    "RET",
+    "COM"
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F403"]
+
+[tool.ruff.lint.isort]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+required-imports = ["from __future__ import annotations"]
+force-to-top = ["typing", "dataclasses"]
+length-sort = true
+lines-between-types = 0
+lines-after-imports = 2
+split-on-trailing-comma = true
+combine-as-imports = true
