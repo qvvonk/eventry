@@ -79,9 +79,9 @@ class CallableInfo:
         self.param_names = set(specs.args + specs.kwonlyargs)
 
     async def __call__(self, call_args: dict[str, Any], config: Config | None = None) -> Any:
-        call_args = call_args.copy()
         args = []
         if config:
+            call_args = call_args.copy()
             prepare_kwargs(call_args, config)
             args = prepare_args(call_args, config)
 
