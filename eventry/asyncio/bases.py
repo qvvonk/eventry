@@ -78,8 +78,14 @@ class CallableInfo:
         self.has_double_star_kwargs = specs.varkw is not None
         self.param_names = set(specs.args + specs.kwonlyargs)
 
-    async def __call__(self, call_args: dict[str, Any], config: Config | None = None) -> Any:
+    async def __call__(
+        self,
+        call_args: dict[str, Any] | None = None,
+        config: Config | None = None,
+        **workflow_data: Any  # todo: delete
+    ) -> Any:
         args = []
+        call_args = (call_args or {}) | workflow_data
         if config:
             call_args = call_args.copy()
             prepare_kwargs(call_args, config)
