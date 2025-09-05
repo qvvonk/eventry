@@ -41,17 +41,16 @@ class Dispatcher(Router):
 
         executed_handlers: dict[str, bool] = {}
         awaiting_handlers: list[HandlerInfo] = []
-
         async for handler, e in self.get_matching_handlers(event, workflow_data=workflow_data):
             if e is not None:
-                if silent:
-                    continue
-
                 dispatcher_logger.debug(
                     f'({id(event)}) An error occurred while executing '
                     f"handler '{handler.name}' filter.",
                     exc_info=e,
                 )
+
+                if silent:
+                    continue
                 await self.propagate_event(
                     ErrorEvent(e),
                     additional_workflow_data={},
@@ -67,17 +66,8 @@ class Dispatcher(Router):
                 awaiting_handlers.append(handler)
                 continue
 
-            try:
-                r = await self.execute_handler(event, handler, workflow_data=workflow_data)
-                executed_handlers[handler.name] = r
-            except Exception as e:
-                executed_handlers[handler.name] = False
-                if not silent:
-                    await self.propagate_event(
-                        ErrorEvent(e),
-                        additional_workflow_data={},
-                        silent=True
-                    )
+            r = await self._execute_handler_wrapper(event, handler, workflow_data, silent)
+            executed_handlers[handler.name] = r
 
             if event.propagation_stopped:
                 dispatcher_logger.debug(f'({id(event)}) Event propagation stopped.')
@@ -89,13 +79,33 @@ class Dispatcher(Router):
                         continue
 
                     awaiting_handlers.remove(awaiting_handler)
-                    r = await self.execute_handler(event, awaiting_handler, workflow_data)
+                    r = await self._execute_handler_wrapper(event, handler, workflow_data, silent)
                     executed_handlers[awaiting_handler.name] = r
                     break
                 else:
                     break
 
-    async def execute_handler(
+    async def _execute_handler_wrapper(
+        self,
+        event: Event[Any],
+        handler: HandlerInfo,
+        workflow_data: dict[str, Any],
+        silent: bool
+    ) -> bool:
+        try:
+            r = await self._execute_handler(event, handler, workflow_data=workflow_data)
+            return r
+        except Exception as e:
+            if not silent:
+                await self.propagate_event(
+                    ErrorEvent(e),
+                    additional_workflow_data={},
+                    silent=True
+                )
+            return False
+
+
+    async def _execute_handler(
         self,
         event: Event[Any],
         handler: HandlerInfo,
@@ -130,7 +140,7 @@ class Dispatcher(Router):
             dispatcher_logger.debug(
                 f"({id(event)}) Handler '{handler.name}' executed in {time.time() - start} seconds.",
             )
-            return result
+        return result
 
     def _wrap_handler_with_middlewares(
         self,

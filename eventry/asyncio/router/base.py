@@ -28,7 +28,7 @@ class Router:
         self._parent_router: Router | None = None
         self._inner_routers: dict[str, Router] = {}
 
-        if default_handler_manager is ellipsis:
+        if default_handler_manager is Ellipsis:
             self._default_handler_manager = HandlerManager(self, 'default', None)
         elif default_handler_manager is None:
             self._default_handler_manager = None
