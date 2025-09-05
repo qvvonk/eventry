@@ -10,7 +10,7 @@ EventObjectType = TypeVar('EventObjectType', bound=Any)
 
 
 class Event(Generic[EventObjectType]):
-    def __init__(self, object):
+    def __init__(self, object: EventObjectType) -> None:
         self._object = object
         self._data = {}
         self._propagation_stopped = False
