@@ -21,7 +21,7 @@ from eventry.utils import prepare_args, prepare_kwargs
 
 if TYPE_CHECKING:
     from eventry.asyncio.handler_manager import HandlerManager
-    from eventry.config import DispatcherConfig
+    from eventry.config import Config
 
     from ..event import Event
 
@@ -80,13 +80,19 @@ class CallableInfo:
 
     async def __call__(
         self,
-        args: tuple[Any, ...],
-        kwargs: dict[str, Any],
+        call_args: dict[str, Any] | None = None,
+        config: Config | None = None,
         **workflow_data: Any  # todo: delete
     ) -> Any:
-        call_args = kwargs | workflow_data
+        args = []
+        call_args = (call_args or {}) | workflow_data
+        if config:
+            call_args = call_args.copy()
+            prepare_kwargs(call_args, config)
+            args = prepare_args(call_args, config)
+
         if not self.has_double_star_kwargs:
-            call_args = {k: v for k, v in kwargs.items() if k in self.param_names}
+            call_args = {k: v for k, v in call_args.items() if k in self.param_names}
 
         if self.is_awaitable:
             return await self.callable(*args, **call_args)
@@ -144,8 +150,6 @@ class HandlerInfo(CallableInfo):
     """List of middlewares."""
 
     ensure_after: dict[str, Any] = field(default_factory=dict)
-
-    _dispatcher_config: DispatcherConfig | None = field(init=False, default=None)
 
     def can_be_executed(self, executed_handlers: dict[str, Any]) -> bool:
         if not self.ensure_after:

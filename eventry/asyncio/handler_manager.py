@@ -13,11 +13,10 @@ from types import MappingProxyType
 from collections.abc import Callable, AsyncGenerator
 
 from eventry.loggers import router_logger
-from eventry.asyncio.bases import HandlerInfo, HandlerMeta, CallableInfo
+from eventry.asyncio.bases import HandlerInfo, HandlerMeta, CallableInfo, HandlerCallableType
 from eventry.asyncio.event import Event
 from eventry.asyncio.filters import Filter, CallableFilter, AwaitableFilter
 from eventry.asyncio.middleware_manager import MiddlewareManager
-from eventry.config import HandlerManagerConfig
 
 
 if TYPE_CHECKING:
@@ -25,10 +24,11 @@ if TYPE_CHECKING:
     from eventry.asyncio.router import Router
 
 
-HandlerType = TypeVar('HandlerType', bound=Callable)
+EventType = TypeVar('EventType', bound=Any)
+F = TypeVar('F', bound=HandlerCallableType)
 
 
-class HandlerManager(Generic[HandlerType]):
+class HandlerManager(Generic[EventType]):
     """
     Manages the registration and filtering of event handlers for a specific event type.
 
@@ -56,23 +56,19 @@ class HandlerManager(Generic[HandlerType]):
         self,
         router: Router,
         name: str,
-        event_type_filter: Type[Event] | None = None,
-        config: HandlerManagerConfig | None = None
+        event_type_filter: Type[EventType] | None = None,
     ) -> None:
         self._handlers: dict[str, HandlerInfo] = {}
         self._router = router
         self._event_type_filter = event_type_filter
         self._name = name
-        self._config = config or HandlerManagerConfig()
 
-        self._outer_middlewares = MiddlewareManager()
         self._filtering_middlewares = MiddlewareManager()
         self._handler_middlewares = MiddlewareManager()
-        self._total_handlers_middlewares = MiddlewareManager()
 
     def register_handler(
         self,
-        handler: HandlerType,
+        handler: HandlerCallableType,
         *,
         event_type: Type[Event[Any]] | None = None,
         name: str | None = None,
@@ -232,7 +228,7 @@ class HandlerManager(Generic[HandlerType]):
                 )
 
     @overload
-    def __call__(self, func: HandlerType, /) -> HandlerType: ...
+    def __call__(self, func: F, /) -> F: ...
 
     @overload
     def __call__(
@@ -244,11 +240,11 @@ class HandlerManager(Generic[HandlerType]):
         as_task: bool = False,
         middlewares: list[MiddlewareCallableType] | None = None,
         ensure_after: dict[str, Any] | None = None,
-    ) -> Callable[[HandlerType], HandlerType]: ...
+    ) -> Callable[[F], F]: ...
 
     def __call__(
         self,
-        func: HandlerType | None = None,
+        func: F | None = None,
         *,
         event_type: Type[Event[Any]] | None = None,
         name: str | None = None,
@@ -256,8 +252,8 @@ class HandlerManager(Generic[HandlerType]):
         as_task: bool = False,
         middlewares: list[MiddlewareCallableType] | None = None,
         ensure_after: dict[str, Any] | None = None,
-    ) -> HandlerType | Callable[[HandlerType], HandlerType]:
-        def inner(handler: HandlerType) -> HandlerType:
+    ) -> F | Callable[[F], F]:
+        def inner(handler: F) -> F:
             self.register_handler(
                 handler=handler,
                 event_type=event_type,
@@ -302,10 +298,6 @@ class HandlerManager(Generic[HandlerType]):
         return self._name
 
     @property
-    def outer_middlewares(self) -> MiddlewareManager:
-        return self._outer_middlewares
-
-    @property
     def filtering_middlewares(self) -> MiddlewareManager:
         return self._filtering_middlewares
 
@@ -313,14 +305,9 @@ class HandlerManager(Generic[HandlerType]):
     def handler_middlewares(self) -> MiddlewareManager:
         return self._handler_middlewares
 
-    @property
-    def config(self) -> HandlerManagerConfig:
-        return self._config
-
-
 
 def gen_default_handler_id(
-    handler: HandlerType,
+    handler: HandlerCallableType,
     manager: HandlerManager[Any],
 ) -> str:
     is_class_instance = not (
