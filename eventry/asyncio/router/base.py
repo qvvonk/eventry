@@ -5,7 +5,7 @@ __all__ = [
     'Router',
 ]
 
-from typing import TYPE_CHECKING, Any, Generator, AsyncGenerator
+from typing import TYPE_CHECKING, Any, Generator, AsyncGenerator, Type, TypeVar
 
 from eventry.loggers import router_logger
 from eventry.asyncio.event import Event
@@ -15,12 +15,25 @@ from eventry.asyncio.handler_manager import HandlerManager
 if TYPE_CHECKING:
     from eventry.asyncio.bases import HandlerInfo
 
+E = TypeVar('E', bound=Event[Any])
+
 
 class Router:
-    def __init__(self, name: str | None = None) -> None:
+    def __init__(
+        self,
+        name: str | None = None,
+        default_handler_manager: HandlerManager[Event[Any]] | None = ...,
+    ) -> None:
         self._name = name or f'Router{id(self)}'
         self._parent_router: Router | None = None
         self._inner_routers: dict[str, Router] = {}
+
+        if default_handler_manager is ellipsis:
+            self._default_handler_manager = HandlerManager(self, 'default', None)
+        elif default_handler_manager is None:
+            self._default_handler_manager = None
+        else:
+            self._default_handler_manager = default_handler_manager
 
         self._managers = {}
 
@@ -30,6 +43,11 @@ class Router:
     def connect_routers(self, *routers: Router) -> None:
         for i in routers:
             self.connect_router(i)
+
+    def add_manager(self, event_type: Type[E], name: str) -> HandlerManager[E]:
+        manager = HandlerManager(self, event_type_filter=event_type, name=name)
+        self._managers[event_type] = manager
+        return manager
 
     def get_handler_by_id(self, handler_id: str, /) -> HandlerInfo | None:
         for manager in self._managers.values():
@@ -62,11 +80,9 @@ class Router:
         for t, m in self._managers.items():
             if isinstance(event, t):
                 return m
-        return self.on_event
-
-    @property
-    def on_event(self) -> HandlerManager[Event[Any]]:
-        return self._managers[Event]
+        if self._default_handler_manager is None:
+            raise RuntimeError(f'Unable to find handler manager for {event.__class__.__name__}.')
+        return self._default_handler_manager
 
     @property
     def root_router(self) -> Router:

@@ -1,0 +1,1 @@
+raise NotImplementedError('Synchronous eventry is not implemented yet.')

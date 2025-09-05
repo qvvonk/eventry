@@ -80,8 +80,8 @@ class HandlerManager(Generic[EventType]):
     ) -> None:
         if self.event_type_filter is not None and event_type is not None:
             raise ValueError(
-                f'Cannot specify event type when using this handler manager.\n'
-                f'Use @<Router>.on_event(event_type={event_type.__name__}) instead.',
+                f'Event type specification is not allowed in handler managers with '
+                f'event type filter.\n'
             )
 
         handler_obj = HandlerInfo(

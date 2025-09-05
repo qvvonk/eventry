@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+__all__ = ['Event', 'ErrorEvent', 'EventObjectType']
+
+
 from typing import Any, Generic, TypeVar
 
 
@@ -53,5 +56,22 @@ class Event(Generic[EventObjectType]):
     def workflow_dict(self) -> dict[str, Any]:
         return {}
 
+    @property
+    def object(self) -> EventObjectType:
+        return self._object
+
     def __hash__(self) -> int:
         return id(self)
+
+
+class ErrorEvent(Event[Exception]):
+    def __init__(self, object: Exception) -> None:
+        super().__init__(object=object)
+
+    @property
+    def workflow_dict(self) -> dict[str, Any]:
+        return {'exception': self.object}
+
+    @property
+    def exception(self) -> Exception:
+        return self.object
