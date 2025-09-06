@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-__all__ = ['Event']
+
+__all__ = ['Event', 'ExtendedEvent']
+
 
 from types import MappingProxyType
 from typing import Any
