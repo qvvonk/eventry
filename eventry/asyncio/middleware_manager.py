@@ -75,7 +75,7 @@ class WrappedWithMiddlewaresCallable(Generic[R]):
         return state
 
 
-class MiddlewareManager(Generic[MiddlewareType], Sequence[MiddlewareType], ABC):
+class MiddlewareManager(Generic[MiddlewareType], Sequence[MiddlewareType]):
     def __init__(self) -> None:
         self._middlewares: list[MiddlewareType] = []
 
