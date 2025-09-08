@@ -3,9 +3,10 @@ from __future__ import annotations
 
 __all__ = [
     'HandlerManager',
+    'MiddlewareManagerTypes'
 ]
 
-import sys
+
 import inspect
 import pathlib
 from typing import TYPE_CHECKING, Any, Type, Generic, TypeVar, overload
