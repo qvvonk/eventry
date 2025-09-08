@@ -66,14 +66,14 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
     def __init__(
         self,
         router: Router,
-        hanlder_manager_id: str,
+        handler_manager_id: str,
         event_type_filter: Type[EventType] | None = None,
         config: HandlerManagerConfig | None = None
     ) -> None:
         self._handlers: dict[str, Handler[Any, Any]] = {}
         self._router = router
         self._event_type_filter = event_type_filter
-        self._handler_manager_id = hanlder_manager_id
+        self._handler_manager_id = handler_manager_id
         self._config = config or HandlerManagerConfig()
         self._middleware_managers: dict[MiddlewareManagerTypes, MiddlewareManager[Any]] = {}
 
