@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import TypedDict, Any
 from dataclasses import field, dataclass
 
 
@@ -34,4 +34,4 @@ class DispatcherConfig:
 
 @dataclass(frozen=True)
 class HandlerManagerConfig:
-    positional_only_args: list[str] = field(default_factory=list)
+    positional_only_args: tuple[Any, ...] = field(default_factory=tuple)

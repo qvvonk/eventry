@@ -5,6 +5,7 @@ from collections.abc import Callable, Awaitable
 from eventry.asyncio.filter import Filter
 from eventry.asyncio.router import Router
 from eventry.asyncio.middleware_manager import MiddlewareManager
+from .config import handler_manager_config
 
 
 HandlerType = Callable[[MyEvent], Any]
@@ -15,7 +16,8 @@ class MyHandlerManager(HandlerManager[Filter, HandlerType]):
         super().__init__(
             router=router,
             handler_manager_id=handler_manager_id,
-            event_type_filter=event_type_filter
+            event_type_filter=event_type_filter,
+            config=handler_manager_config
         )
 
         self._add_middleware_manager(
