@@ -18,7 +18,6 @@ from collections.abc import Callable
 
 from eventry.config import HandlerManagerConfig
 from eventry.loggers import router_logger
-from eventry.asyncio.event import Event
 
 from ..filter import _convert_filters
 from ..callable_wrappers import Handler, HandlerMeta
@@ -31,7 +30,6 @@ if TYPE_CHECKING:
     from ..middleware_manager import MiddlewareManager
 
 
-EventType = TypeVar('EventType', bound=Type[Event] | None)
 HandlerType = TypeVar('HandlerType', bound=Callable[..., Any])
 FilterType = TypeVar('FilterType', bound=Filter)
 
@@ -70,7 +68,7 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
         self,
         router: Router,
         handler_manager_id: str,
-        event_type_filter: Type[EventType] | None = None,
+        event_type_filter: Type[Event] | None = None,
         config: HandlerManagerConfig | None = None,
     ) -> None:
         self._handlers: dict[str, Handler[Any, Any]] = {}

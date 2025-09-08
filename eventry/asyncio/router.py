@@ -4,7 +4,7 @@ from __future__ import annotations
 __all__ = ['Router']
 
 
-from typing import Any
+from typing import Any, TypeVar, Type, TYPE_CHECKING
 from collections.abc import Generator
 
 from eventry.loggers import router_logger
@@ -13,12 +13,20 @@ from .handler_manager import HandlerManager
 from .callable_wrappers import Handler
 
 
+if TYPE_CHECKING:
+    from eventry.asyncio.event import Event
+
+
+E = TypeVar('E', bound=HandlerManager[Any, Any])
+
+
 class Router:
     def __init__(self, router_id: str):
         self._router_id = router_id
         self._parent: Router | None = None
         self._children: dict[str, Router] = {}
-        self._managers: dict[str, HandlerManager[Any, Any]] = {}
+        self._managers: dict[type[Event], HandlerManager[Any, Any]] = {}
+        self._default_handler_manager: HandlerManager[Any, Any] | None = None
 
     def get_handler_by_id(self, handler_id: str, /) -> Handler[Any, Any] | None:
         for manager in self._managers.values():
@@ -30,6 +38,17 @@ class Router:
             if result is not None:
                 return result
         return None
+
+    def _add_handler_manager(self, handler_manager: E, /) -> E:
+        if not handler_manager.event_type_filter:
+            raise ValueError('Cannot add handler manager without event type filter. '
+                             'Assign it as default handler manager.')  # todo: improve
+
+        if handler_manager.event_type_filter in self._managers:
+            raise RuntimeError('Router already has a manager with this event type.')  # todo
+
+        self._managers[handler_manager.event_type_filter] = handler_manager
+        return handler_manager
 
     @property
     def id(self) -> str:
