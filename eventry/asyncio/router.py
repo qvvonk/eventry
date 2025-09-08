@@ -8,6 +8,7 @@ from typing import Any
 from collections.abc import Generator
 from .handler_manager import HandlerManager
 from eventry.loggers import router_logger
+from .callable_wrappers import Handler
 
 
 class Router:
@@ -16,6 +17,17 @@ class Router:
         self._parent: Router | None = None
         self._children: dict[str, Router] = {}
         self._managers: dict[str, HandlerManager[Any, Any]] = {}
+
+    def get_handler_by_id(self, handler_id: str, /) -> Handler[Any, Any] | None:
+        for manager in self._managers.values():
+            if handler_id in manager.handlers:
+                return manager.handlers[handler_id]
+
+        for router in self._children.values():
+            result = router.get_handler_by_id(handler_id)
+            if result is not None:
+                return result
+        return None
 
     @property
     def id(self) -> str:

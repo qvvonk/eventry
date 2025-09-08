@@ -140,7 +140,7 @@ class Handler(Generic[P, R], CallableWrapper[P, R]):
         self,
         _callable: Callable[P, R],
         handler_id: str,
-        handler_manager: HandlerManager,
+        handler_manager: HandlerManager[Any, Any],
         filter: Filter | None,
         as_task: bool,
         meta: HandlerMeta,
@@ -153,11 +153,11 @@ class Handler(Generic[P, R], CallableWrapper[P, R]):
         self._as_task = as_task
 
     @property
-    def handler_manager(self) -> HandlerManager:
+    def handler_manager(self) -> HandlerManager[Any, Any]:
         return self._handler_manager
 
     @property
-    def filter(self) -> Filter:
+    def filter(self) -> Filter | None:
         return self._filter
 
     @property

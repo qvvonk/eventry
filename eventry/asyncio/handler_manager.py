@@ -14,12 +14,15 @@ from collections.abc import Callable, AsyncGenerator
 
 from eventry.loggers import router_logger
 from eventry.asyncio.event import Event
+from eventry.config import HandlerManagerConfig
 from .callable_wrappers import Handler, HandlerMeta
 from .filter import _convert_filters
+import sys
 
 if TYPE_CHECKING:
     from .router import Router
     from .filter import Filter
+
 
 
 EventType = TypeVar('EventType', bound=Any)
@@ -56,11 +59,13 @@ class HandlerManager(Generic[HandlerCallableType, FilterType]):
         router: Router,
         name: str,
         event_type_filter: Type[EventType] | None = None,
+        config: HandlerManagerConfig | None = None
     ) -> None:
         self._handlers: dict[str, Handler[Any, Any]] = {}
         self._router = router
         self._event_type_filter = event_type_filter
         self._name = name
+        self._config = config or HandlerManagerConfig()
 
     def register_handler(
         self,
@@ -70,7 +75,6 @@ class HandlerManager(Generic[HandlerCallableType, FilterType]):
         handler_id: str | None = None,
         filter: FilterType | None = None,
         as_task: bool = False,
-        meta: HandlerMeta | None = None,
     ) -> None:
         if self.event_type_filter is not None and event_type is not None:
             raise ValueError(
@@ -78,6 +82,26 @@ class HandlerManager(Generic[HandlerCallableType, FilterType]):
                 f'event type filter.\n'
             )
 
+        meta = HandlerMeta.from_callable(handler, registration_frame=inspect.stack()[1])
+        handler_obj = self._create_handler_obj(
+            handler=handler,
+            handler_id=handler_id,
+            event_type=event_type,
+            filter=filter,
+            as_task=as_task,
+            meta=meta
+        )
+        self._register_handler(handler_obj)
+
+    def _create_handler_obj(
+        self,
+        handler: HandlerCallableType,
+        event_type: Type[Event] | None = None,
+        handler_id: str | None = None,
+        filter: FilterType | None = None,
+        as_task: bool = False,
+        meta: HandlerMeta | None = None
+    ):
         handler_obj = Handler(
             handler,
             handler_id=handler_id or gen_default_handler_id(handler, self),
@@ -89,7 +113,8 @@ class HandlerManager(Generic[HandlerCallableType, FilterType]):
                 registration_frame=inspect.stack()[1]
             ),
         )
-        self._register_handler(handler_obj)
+        return handler_obj
+
 
     def _register_handler(self, handler: Handler[Any, Any]) -> None:
         """
@@ -113,7 +138,7 @@ class HandlerManager(Generic[HandlerCallableType, FilterType]):
                 f'{exists_handler.meta.definition_lineno}"\n'
                 f'    Registered in {exists_handler.meta.registration_filename}:'
                 f'{exists_handler.meta.registration_lineno}\n\n'
-                f"Duplicate handler in router '{handler.handler_manager.router.name}':\n"
+                f"Duplicate handler in router '{handler.handler_manager.router.id}':\n"
                 f'    Defined in "{handler.meta.definition_filename}:'
                 f'{handler.meta.definition_lineno}"\n'
                 f'    Registered in {handler.meta.registration_filename}:'
