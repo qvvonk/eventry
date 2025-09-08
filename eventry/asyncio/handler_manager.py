@@ -57,7 +57,7 @@ class HandlerManager(Generic[HandlerCallableType, FilterType]):
         name: str,
         event_type_filter: Type[EventType] | None = None,
     ) -> None:
-        self._handlers: dict[str, Handler] = {}
+        self._handlers: dict[str, Handler[Any, Any]] = {}
         self._router = router
         self._event_type_filter = event_type_filter
         self._name = name
@@ -91,7 +91,7 @@ class HandlerManager(Generic[HandlerCallableType, FilterType]):
         )
         self._register_handler(handler_obj)
 
-    def _register_handler(self, handler: Handler) -> None:
+    def _register_handler(self, handler: Handler[Any, Any]) -> None:
         """
         Registers handler to this handler manager.
 
@@ -121,10 +121,10 @@ class HandlerManager(Generic[HandlerCallableType, FilterType]):
             )
         self._handlers[handler.handler_id] = handler
         router_logger.info(
-            f'[{self.router.name} -> {self.name}] Registered handler \'{handler.handler_id}\'.',
+            f'[{self.router.id} -> {self.name}] Registered handler \'{handler.handler_id}\'.',
         )
 
-    def remove_handler(self, handler_id: str) -> Handler | None:
+    def remove_handler(self, handler_id: str) -> Handler[Any, Any] | None:
         """
         Removes handler from this handler manager.
 
@@ -173,7 +173,7 @@ class HandlerManager(Generic[HandlerCallableType, FilterType]):
         return inner(func)
 
     @property
-    def handlers(self) -> MappingProxyType[str, Handler]:
+    def handlers(self) -> MappingProxyType[str, Handler[Any, Any]]:
         """
         A read-only mapping of handler IDs to their corresponding ``Handler`` instances,
         registered in this manager.
