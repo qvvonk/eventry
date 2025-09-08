@@ -50,6 +50,20 @@ class Router:
         self._managers[handler_manager.event_type_filter] = handler_manager
         return handler_manager
 
+    def _get_handler_manager(self, event: Event | Type[Event], /) -> HandlerManager[Any, Any]:
+        event_type = event if isinstance(event, type) else event.__class__
+        if event_type in self._managers:
+            return self._managers[event_type]
+
+        for i in self._managers:
+            if issubclass(event_type, i):
+                return self._managers[i]
+
+        if self._default_handler_manager:
+            return self._default_handler_manager
+
+        raise RuntimeError('No handler manager with this event type.')  # todo
+
     @property
     def id(self) -> str:
         return self._router_id
