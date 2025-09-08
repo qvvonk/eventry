@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 
 EventType = TypeVar('EventType', bound=Any)
-HandlerCallableType = TypeVar('HandlerCallableType', bound=Callable[..., Any])
+HandlerType = TypeVar('HandlerType', bound=Callable[..., Any])
 FilterType = TypeVar('FilterType', bound=Filter)
 
 
@@ -38,7 +38,7 @@ class MiddlewareManagerTypes(Enum):
     INNER = auto()
 
 
-class HandlerManager(Generic[HandlerCallableType, FilterType], ABC):
+class HandlerManager(Generic[FilterType, HandlerType], ABC):
     """
     Manages the registration and filtering of event handlers for a specific event type.
 
@@ -78,19 +78,13 @@ class HandlerManager(Generic[HandlerCallableType, FilterType], ABC):
 
     def register_handler(
         self,
-        handler: HandlerCallableType,
+        handler: HandlerType,
         *,
         event_type: Type[Event] | None = None,
         handler_id: str | None = None,
         filter: FilterType | None = None,
         as_task: bool = False,
     ) -> None:
-        if self.event_type_filter is not None and event_type is not None:
-            raise ValueError(
-                f'Event type specification is not allowed in handler managers with '
-                f'event type filter.\n'
-            )
-
         meta = HandlerMeta.from_callable(handler, registration_frame=inspect.stack()[1])
         handler_obj = self._create_handler_obj(
             handler=handler,
@@ -104,19 +98,26 @@ class HandlerManager(Generic[HandlerCallableType, FilterType], ABC):
 
     def _create_handler_obj(
         self,
-        handler: HandlerCallableType,
+        handler: HandlerType,
         event_type: Type[Event] | None = None,
         handler_id: str | None = None,
         filter: FilterType | None = None,
         as_task: bool = False,
         meta: HandlerMeta | None = None
     ):
+        if self.event_type_filter is not None and event_type is not None:
+            raise ValueError(
+                f'Event type specification is not allowed in handler managers with '
+                f'event type filter.\n'
+            )
+
         handler_obj = Handler(
             handler,
             handler_id=handler_id or gen_default_handler_id(handler, self),
             handler_manager=self,
             filter=_convert_filters(filter)[0] if filter is not None else None,
             as_task=as_task,
+            on_event=event_type,
             meta=meta or HandlerMeta.from_callable(
                 _callable=handler,
                 registration_frame=inspect.stack()[1]
@@ -179,7 +180,7 @@ class HandlerManager(Generic[HandlerCallableType, FilterType], ABC):
         return self._middleware_managers.get(_type)
 
     @overload
-    def __call__(self, func: HandlerCallableType, /) -> HandlerCallableType: ...
+    def __call__(self, func: HandlerType, /) -> HandlerType: ...
 
     @overload
     def __call__(
@@ -189,18 +190,18 @@ class HandlerManager(Generic[HandlerCallableType, FilterType], ABC):
         handler_id: str | None = None,
         filter: FilterType | None = None,
         as_task: bool = False,
-    ) -> Callable[[HandlerCallableType], HandlerCallableType]: ...
+    ) -> Callable[[HandlerType], HandlerType]: ...
 
     def __call__(
         self,
-        func: HandlerCallableType | None = None,
+        func: HandlerType | None = None,
         *,
         event_type: Type[Event] | None = None,
         handler_id: str | None = None,
         filter: FilterType | None = None,
         as_task: bool = False,
-    ) -> HandlerCallableType | Callable[[HandlerCallableType], HandlerCallableType]:
-        def inner(handler: HandlerCallableType) -> HandlerCallableType:
+    ) -> HandlerType | Callable[[HandlerType], HandlerType]:
+        def inner(handler: HandlerType) -> HandlerType:
             meta = HandlerMeta.from_callable(
                 handler,
                 registration_frame=inspect.stack()[2 if func is not None else 1]
@@ -246,7 +247,7 @@ class HandlerManager(Generic[HandlerCallableType, FilterType], ABC):
 
 
 def gen_default_handler_id(
-    handler: HandlerCallableType,
+    handler: HandlerType,
     manager: HandlerManager[Any, Any],
 ) -> str:
     is_class_instance = not (
@@ -266,4 +267,4 @@ def gen_default_handler_id(
 
     module_path = '.'.join(rel_path.parts)
 
-    return f'{manager.router.name}.{manager.name}--{module_path}.{handler.__qualname__}'
+    return f'{manager.router.id}.{manager.name}--{module_path}.{handler.__qualname__}'
