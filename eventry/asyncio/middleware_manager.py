@@ -1,0 +1,1 @@
+class MiddlewareManager: pass

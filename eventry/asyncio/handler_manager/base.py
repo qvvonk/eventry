@@ -15,13 +15,16 @@ from collections.abc import Callable, AsyncGenerator
 from eventry.loggers import router_logger
 from eventry.asyncio.event import Event
 from eventry.config import HandlerManagerConfig
-from .callable_wrappers import Handler, HandlerMeta
-from .filter import _convert_filters
+from ..callable_wrappers import Handler, HandlerMeta
+from ..filter import _convert_filters
+from abc import ABC, abstractmethod
+from enum import Enum, auto
 import sys
 
 if TYPE_CHECKING:
-    from .router import Router
-    from .filter import Filter
+    from ..router import Router
+    from ..filter import Filter
+    from ..middleware_manager import MiddlewareManager
 
 
 
@@ -30,7 +33,12 @@ HandlerCallableType = TypeVar('HandlerCallableType', bound=Callable[..., Any])
 FilterType = TypeVar('FilterType', bound=Filter)
 
 
-class HandlerManager(Generic[HandlerCallableType, FilterType]):
+class MiddlewareManagerTypes(Enum):
+    OUTER = auto()
+    INNER = auto()
+
+
+class HandlerManager(Generic[HandlerCallableType, FilterType], ABC):
     """
     Manages the registration and filtering of event handlers for a specific event type.
 
@@ -66,6 +74,7 @@ class HandlerManager(Generic[HandlerCallableType, FilterType]):
         self._event_type_filter = event_type_filter
         self._name = name
         self._config = config or HandlerManagerConfig()
+        self._middleware_managers: dict[MiddlewareManagerTypes, MiddlewareManager] = {}
 
     def register_handler(
         self,
@@ -133,7 +142,7 @@ class HandlerManager(Generic[HandlerCallableType, FilterType]):
         if (exists_handler := root_router.get_handler_by_id(handler.handler_id)) is not None:
             raise ValueError(
                 f'Handler with ID {handler.handler_id} already exists.\n'
-                f"Original handler registered in router '{exists_handler.manager.router.name}':\n"
+                f"Original handler registered in router '{exists_handler.handler_manager.router.id}':\n"
                 f'    Defined in "{exists_handler.meta.definition_filename}:'
                 f'{exists_handler.meta.definition_lineno}"\n'
                 f'    Registered in {exists_handler.meta.registration_filename}:'
@@ -157,6 +166,18 @@ class HandlerManager(Generic[HandlerCallableType, FilterType]):
         """
         return self._handlers.pop(handler_id, None)
 
+    def _add_middleware_manager(
+        self,
+        _type: MiddlewareManagerTypes,
+        middleware_manager: MiddlewareManager
+    ) -> None:
+        if self._middleware_managers.get(_type):
+            raise RuntimeError(f'{_type} middleware manager is already registered.')
+        self._middleware_managers[_type] = middleware_manager
+
+    def middleware_manager(self, _type: MiddlewareManagerTypes) -> MiddlewareManager | None:
+        return self._middleware_managers.get(_type)
+
     @overload
     def __call__(self, func: HandlerCallableType, /) -> HandlerCallableType: ...
 
@@ -165,7 +186,7 @@ class HandlerManager(Generic[HandlerCallableType, FilterType]):
         self,
         *,
         event_type: Type[Event] | None = None,
-        name: str | None = None,
+        handler_id: str | None = None,
         filter: FilterType | None = None,
         as_task: bool = False,
     ) -> Callable[[HandlerCallableType], HandlerCallableType]: ...
@@ -175,22 +196,24 @@ class HandlerManager(Generic[HandlerCallableType, FilterType]):
         func: HandlerCallableType | None = None,
         *,
         event_type: Type[Event] | None = None,
-        name: str | None = None,
+        handler_id: str | None = None,
         filter: FilterType | None = None,
         as_task: bool = False,
     ) -> HandlerCallableType | Callable[[HandlerCallableType], HandlerCallableType]:
         def inner(handler: HandlerCallableType) -> HandlerCallableType:
-            self.register_handler(
+            meta = HandlerMeta.from_callable(
+                handler,
+                registration_frame=inspect.stack()[2 if func is not None else 1]
+            )
+            handler_obj = self._create_handler_obj(
                 handler=handler,
+                handler_id=handler_id,
                 event_type=event_type,
-                handler_id=name,
                 filter=filter,
                 as_task=as_task,
-                meta=HandlerMeta.from_callable(
-                    handler,
-                    registration_frame=inspect.stack()[2 if func is not None else 1]
-                )
+                meta=meta
             )
+            self._register_handler(handler_obj)
             return handler
 
         if func is None:
