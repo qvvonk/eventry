@@ -2,6 +2,15 @@ from dataclasses import dataclass, field
 from typing import TypedDict
 
 
+class FromKwargs:
+    def __init__(self, kwargs_param_name: str, /):
+        self._val = kwargs_param_name
+
+    @property
+    def name(self) -> str:
+        return self._val
+
+
 class DefaultNamesRemap(TypedDict, total=False):
     dispatcher: str
     router: str
@@ -9,6 +18,7 @@ class DefaultNamesRemap(TypedDict, total=False):
     workflow_data: str
     handler: str
     next_call: str
+    local_workflow_data: str
 
 
 @dataclass(frozen=True)

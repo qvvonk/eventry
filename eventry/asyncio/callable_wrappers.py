@@ -49,11 +49,14 @@ class CallableWrapper(Generic[P, R]):
             exclude.update(self._params_names[:len(positional_only_args)])
 
         if not self.has_varkw or exclude:
-            kwargs = {
-                k: v for k, v in kwargs.items()
-                if (not self.has_varkw and k in self._kwargs_names) or
-                   (exclude and k not in exclude)
-            }
+            new_kwargs = {}
+            for k, v in kwargs.items():
+                if exclude and k in exclude:
+                    continue
+                elif not self.has_varkw and k not in self._kwargs_names:
+                    continue
+                new_kwargs[k] = v
+            kwargs = new_kwargs
 
         if self.is_awaitable:
             return await self.callable(*positional_only_args, **kwargs)
