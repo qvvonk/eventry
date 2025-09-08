@@ -9,8 +9,9 @@ from collections.abc import Generator
 
 from eventry.loggers import router_logger
 
-from .handler_manager import HandlerManager
-from .callable_wrappers import Handler
+from eventry.asyncio.handler_manager import HandlerManager
+from eventry.asyncio.callable_wrappers import Handler
+from abc import ABC
 
 
 if TYPE_CHECKING:
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
 E = TypeVar('E', bound=HandlerManager[Any, Any])
 
 
-class Router:
+class Router(ABC):
     def __init__(self, router_id: str):
         self._router_id = router_id
         self._parent: Router | None = None
