@@ -25,10 +25,11 @@ if TYPE_CHECKING:
     from ..router import Router
     from ..filter import Filter
     from ..middleware_manager import MiddlewareManager
+    from ..event import Event
 
 
 
-EventType = TypeVar('EventType', bound=Any)
+EventType = TypeVar('EventType', bound=Type[Event] | None)
 HandlerType = TypeVar('HandlerType', bound=Callable[..., Any])
 FilterType = TypeVar('FilterType', bound=Filter)
 
