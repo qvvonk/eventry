@@ -1,5 +1,7 @@
-from dataclasses import dataclass, field
+from __future__ import annotations
+
 from typing import TypedDict
+from dataclasses import field, dataclass
 
 
 class FromKwargs:

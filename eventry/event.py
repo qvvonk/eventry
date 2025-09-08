@@ -4,14 +4,15 @@ from __future__ import annotations
 __all__ = ['Event', 'ExtendedEvent']
 
 
-from types import MappingProxyType
 from typing import Any
+from types import MappingProxyType
 
 
 class Event:
     """
     Base event class.
     """
+
     def __init__(self) -> None:
         self._propagation_stopped = False
 

@@ -4,21 +4,21 @@ from __future__ import annotations
 __all__ = [
     'CallableWrapper',
     'HandlerMeta',
-    'Handler'
+    'Handler',
 ]
 
 
 import asyncio
 import inspect
-from typing import TYPE_CHECKING, Any, TypeVar, Generic, ParamSpec, Type
-from collections.abc import Callable, Awaitable, Sequence
+from typing import TYPE_CHECKING, Any, Type, Generic, TypeVar, ParamSpec
 from dataclasses import dataclass
+from collections.abc import Callable, Sequence
 
 
 if TYPE_CHECKING:
-    from .handler_manager import HandlerManager
-    from .filter import Filter
     from .event import Event
+    from .filter import Filter
+    from .handler_manager import HandlerManager
 
 
 R = TypeVar('R', bound=Any)
@@ -42,18 +42,18 @@ class CallableWrapper(Generic[P, R]):
     async def __call__(
         self,
         positional_only_args: Sequence[Any],
-        kwargs: dict[str, Any]
+        kwargs: dict[str, Any],
     ) -> R:
         exclude: set[str] = set()
         if positional_only_args:
-            exclude.update(self._params_names[:len(positional_only_args)])
+            exclude.update(self._params_names[: len(positional_only_args)])
 
         if not self.has_varkw or exclude:
             new_kwargs = {}
             for k, v in kwargs.items():
                 if exclude and k in exclude:
                     continue
-                elif not self.has_varkw and k not in self._kwargs_names:
+                if not self.has_varkw and k not in self._kwargs_names:
                     continue
                 new_kwargs[k] = v
             kwargs = new_kwargs
@@ -126,7 +126,9 @@ class HandlerMeta:
         registration_frame: inspect.FrameInfo,
     ) -> HandlerMeta:
         is_user_defined_class_instance = not (
-            inspect.isfunction(_callable) or inspect.ismethod(_callable) or inspect.isclass(_callable)
+            inspect.isfunction(_callable)
+            or inspect.ismethod(_callable)
+            or inspect.isclass(_callable)
         )
 
         obj = _callable.__class__ if is_user_defined_class_instance else _callable
@@ -158,7 +160,7 @@ class Handler(Generic[P, R], CallableWrapper[P, R]):
         self._as_task = as_task
 
         if self._handler_manager.event_type_filter and on_event:
-            raise ValueError('') # todo: err message
+            raise ValueError('')  # todo: err message
         self._on_event = on_event
 
     @property

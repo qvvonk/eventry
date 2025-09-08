@@ -6,8 +6,10 @@ __all__ = ['Router']
 
 from typing import Any
 from collections.abc import Generator
-from .handler_manager import HandlerManager
+
 from eventry.loggers import router_logger
+
+from .handler_manager import HandlerManager
 from .callable_wrappers import Handler
 
 
@@ -60,8 +62,7 @@ class Router:
     def parent_router(self, router: Router) -> None:
         if self.parent_router:
             raise RuntimeError(
-                f"Router '{self.id}' is already connected to router "
-                f"'{self.parent_router.id}'.",
+                f"Router '{self.id}' is already connected to router '{self.parent_router.id}'.",
             )
 
         if not isinstance(router, Router):

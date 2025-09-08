@@ -1,24 +1,26 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any, Type, Generic, TypeVar
+from collections.abc import Callable
 
 from .base import HandlerManager, MiddlewareManagerTypes
-from ..middleware_manager import  MiddlewareManager
-from typing import Generic, TypeVar, Any, TYPE_CHECKING
-from collections.abc import Callable
 from ..filter import Filter
-from typing import Type
+from ..middleware_manager import MiddlewareManager
 
 
 if TYPE_CHECKING:
-    from ..router import Router
     from eventry.asyncio.event import Event
+
+    from ..router import Router
 
 
 HandlerType = TypeVar('HandlerType', bound=Callable[..., Any])
 FilterType = TypeVar('FilterType', bound=Filter)
 
 
-class DefaultHandlerManager(HandlerManager[FilterType, HandlerType], Generic[FilterType, HandlerType]):
+class DefaultHandlerManager(
+    HandlerManager[FilterType, HandlerType], Generic[FilterType, HandlerType]
+):
     def __init__(
         self,
         router: Router,

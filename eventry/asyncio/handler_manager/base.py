@@ -3,31 +3,32 @@ from __future__ import annotations
 
 __all__ = [
     'HandlerManager',
-    'MiddlewareManagerTypes'
+    'MiddlewareManagerTypes',
 ]
 
 
+import sys
 import inspect
 import pathlib
 from typing import TYPE_CHECKING, Any, Type, Generic, TypeVar, overload
+from abc import ABC
+from enum import Enum, auto
 from types import MappingProxyType
-from collections.abc import Callable, AsyncGenerator
+from collections.abc import Callable
 
+from eventry.config import HandlerManagerConfig
 from eventry.loggers import router_logger
 from eventry.asyncio.event import Event
-from eventry.config import HandlerManagerConfig
-from ..callable_wrappers import Handler, HandlerMeta
+
 from ..filter import _convert_filters
-from abc import ABC, abstractmethod
-from enum import Enum, auto
-import sys
+from ..callable_wrappers import Handler, HandlerMeta
+
 
 if TYPE_CHECKING:
-    from ..router import Router
-    from ..filter import Filter
-    from ..middleware_manager import MiddlewareManager
     from ..event import Event
-
+    from ..filter import Filter
+    from ..router import Router
+    from ..middleware_manager import MiddlewareManager
 
 
 EventType = TypeVar('EventType', bound=Type[Event] | None)
@@ -70,7 +71,7 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
         router: Router,
         handler_manager_id: str,
         event_type_filter: Type[EventType] | None = None,
-        config: HandlerManagerConfig | None = None
+        config: HandlerManagerConfig | None = None,
     ) -> None:
         self._handlers: dict[str, Handler[Any, Any]] = {}
         self._router = router
@@ -95,7 +96,7 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
             event_type=event_type,
             filter=filter,
             as_task=as_task,
-            meta=meta
+            meta=meta,
         )
         self._register_handler(handler_obj)
 
@@ -106,12 +107,12 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
         handler_id: str | None = None,
         filter: FilterType | None = None,
         as_task: bool = False,
-        meta: HandlerMeta | None = None
+        meta: HandlerMeta | None = None,
     ):
         if self._event_type_filter is not None and event_type is not None:
             raise ValueError(
-                f'Event type specification is not allowed in handler managers with '
-                f'event type filter.\n'
+                'Event type specification is not allowed in handler managers with '
+                'event type filter.\n',
             )
 
         handler_obj = Handler(
@@ -121,13 +122,13 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
             filter=_convert_filters(filter)[0] if filter is not None else None,
             as_task=as_task,
             on_event=event_type,
-            meta=meta or HandlerMeta.from_callable(
+            meta=meta
+            or HandlerMeta.from_callable(
                 _callable=handler,
-                registration_frame=inspect.stack()[1]
+                registration_frame=inspect.stack()[1],
             ),
         )
         return handler_obj
-
 
     def _register_handler(self, handler: Handler[Any, Any]) -> None:
         """
@@ -159,7 +160,7 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
             )
         self._handlers[handler.handler_id] = handler
         router_logger.info(
-            f'[{self.router.id} -> {self.handler_manager_id}] Registered handler \'{handler.handler_id}\'.',
+            f"[{self.router.id} -> {self.handler_manager_id}] Registered handler '{handler.handler_id}'.",
         )
 
     def remove_handler(self, handler_id: str) -> Handler[Any, Any] | None:
@@ -173,7 +174,7 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
     def _add_middleware_manager(
         self,
         _type: MiddlewareManagerTypes,
-        middleware_manager: MiddlewareManager[Any]
+        middleware_manager: MiddlewareManager[Any],
     ) -> None:
         if self._middleware_managers.get(_type):
             raise RuntimeError(f'{_type} middleware manager is already registered.')
@@ -207,7 +208,7 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
         def inner(handler: HandlerType) -> HandlerType:
             meta = HandlerMeta.from_callable(
                 handler,
-                registration_frame=inspect.stack()[2 if func is not None else 1]
+                registration_frame=inspect.stack()[2 if func is not None else 1],
             )
             handler_obj = self._create_handler_obj(
                 handler=handler,
@@ -215,7 +216,7 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
                 event_type=event_type,
                 filter=filter,
                 as_task=as_task,
-                meta=meta
+                meta=meta,
             )
             self._register_handler(handler_obj)
             return handler
@@ -270,4 +271,6 @@ def gen_default_handler_id(
 
     module_path = '.'.join(rel_path.parts)
 
-    return f'{manager.router.id}.{manager.handler_manager_id}--{module_path}.{handler.__qualname__}'
+    return (
+        f'{manager.router.id}.{manager.handler_manager_id}--{module_path}.{handler.__qualname__}'
+    )

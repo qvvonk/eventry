@@ -8,14 +8,14 @@ __all__ = [
 ]
 
 
-from typing import Any, TypeVar, Callable, Awaitable, overload, Generic, ParamSpec, Protocol
+from typing import Any, Generic, TypeVar, Callable, Awaitable, overload
 from dataclasses import field, dataclass
 from functools import wraps
 from collections.abc import Sequence
-from .callable_wrappers import CallableWrapper
-from eventry.config import DefaultNamesRemap, FromKwargs
-from abc import ABC
 
+from eventry.config import FromKwargs, DefaultNamesRemap
+
+from .callable_wrappers import CallableWrapper
 
 
 MiddlewareType = TypeVar('MiddlewareType', bound=Callable[..., Any])
@@ -159,10 +159,14 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[MiddlewareType]):
         async def last_call(state: CallState[R]) -> Any:
             nonlocal wrapped_callable
             kwargs = workflow_data | {
-                default_names_remap.get('local_workflow_data', 'local_workflow_data'):
-                    state.local_scope_workflow_data
+                default_names_remap.get(
+                    'local_workflow_data', 'local_workflow_data'
+                ): state.local_scope_workflow_data,
             }
-            args = tuple(kwargs[i.name] if isinstance(i, FromKwargs) else i for i in callable_positional_only_args)
+            args = tuple(
+                kwargs[i.name] if isinstance(i, FromKwargs) else i
+                for i in callable_positional_only_args
+            )
             result = await wrapped_callable(args, kwargs)
 
             state._callable_executed = True
@@ -176,7 +180,7 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[MiddlewareType]):
                 middleware,
                 middlewares_positional_only_args,
                 workflow_data,
-                default_names_remap
+                default_names_remap,
             )
 
         return WrappedWithMiddlewaresCallable(current)
@@ -201,10 +205,13 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[MiddlewareType]):
 
             kwargs = workflow_data | {
                 default_names_remap.get('next_call', 'next_call'): next_call,
-                default_names_remap.get('local_workflow_data',
-                                        'local_workflow_data'): state.local_scope_workflow_data,
+                default_names_remap.get(
+                    'local_workflow_data', 'local_workflow_data'
+                ): state.local_scope_workflow_data,
             }
-            args = tuple(kwargs[i.name] if isinstance(i, FromKwargs) else i for i in positional_only_args)
+            args = tuple(
+                kwargs[i.name] if isinstance(i, FromKwargs) else i for i in positional_only_args
+            )
 
             result = await middleware_obj(args, kwargs)
             return result
