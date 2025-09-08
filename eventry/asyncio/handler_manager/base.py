@@ -173,13 +173,13 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
     def _add_middleware_manager(
         self,
         _type: MiddlewareManagerTypes,
-        middleware_manager: MiddlewareManager
+        middleware_manager: MiddlewareManager[Any]
     ) -> None:
         if self._middleware_managers.get(_type):
             raise RuntimeError(f'{_type} middleware manager is already registered.')
         self._middleware_managers[_type] = middleware_manager
 
-    def middleware_manager(self, _type: MiddlewareManagerTypes) -> MiddlewareManager | None:
+    def middleware_manager(self, _type: MiddlewareManagerTypes) -> MiddlewareManager[Any] | None:
         return self._middleware_managers.get(_type)
 
     @overload
@@ -243,6 +243,10 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
     @property
     def handler_manager_id(self) -> str:
         return self._handler_manager_id
+
+    @property
+    def event_type_filter(self) -> Type[Event] | None:
+        return self._event_type_filter
 
 
 def gen_default_handler_id(
