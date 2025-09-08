@@ -36,6 +36,7 @@ FilterType = TypeVar('FilterType', bound=Filter)
 class MiddlewareManagerTypes(Enum):
     OUTER = auto()
     INNER = auto()
+    PER_HANDLER = auto()
 
 
 class HandlerManager(Generic[FilterType, HandlerType], ABC):
@@ -65,14 +66,14 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
     def __init__(
         self,
         router: Router,
-        name: str,
+        hanlder_manager_id: str,
         event_type_filter: Type[EventType] | None = None,
         config: HandlerManagerConfig | None = None
     ) -> None:
         self._handlers: dict[str, Handler[Any, Any]] = {}
         self._router = router
         self._event_type_filter = event_type_filter
-        self._name = name
+        self._handler_manager_id = hanlder_manager_id
         self._config = config or HandlerManagerConfig()
         self._middleware_managers: dict[MiddlewareManagerTypes, MiddlewareManager] = {}
 
@@ -105,7 +106,7 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
         as_task: bool = False,
         meta: HandlerMeta | None = None
     ):
-        if self.event_type_filter is not None and event_type is not None:
+        if self._event_type_filter is not None and event_type is not None:
             raise ValueError(
                 f'Event type specification is not allowed in handler managers with '
                 f'event type filter.\n'
@@ -156,7 +157,7 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
             )
         self._handlers[handler.handler_id] = handler
         router_logger.info(
-            f'[{self.router.id} -> {self.name}] Registered handler \'{handler.handler_id}\'.',
+            f'[{self.router.id} -> {self.handler_manager_id}] Registered handler \'{handler.handler_id}\'.',
         )
 
     def remove_handler(self, handler_id: str) -> Handler[Any, Any] | None:
@@ -238,12 +239,8 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
         return self._router
 
     @property
-    def event_type_filter(self) -> Type[Event] | None:
-        return self._event_type_filter
-
-    @property
-    def name(self) -> str:
-        return self._name
+    def handler_manager_id(self) -> str:
+        return self._handler_manager_id
 
 
 def gen_default_handler_id(
@@ -267,4 +264,4 @@ def gen_default_handler_id(
 
     module_path = '.'.join(rel_path.parts)
 
-    return f'{manager.router.id}.{manager.name}--{module_path}.{handler.__qualname__}'
+    return f'{manager.router.id}.{manager.handler_manager_id}--{module_path}.{handler.__qualname__}'
