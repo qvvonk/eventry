@@ -16,5 +16,5 @@ class MyRouter(Router):
 
     @property
     def on_my_event(self) -> MyHandlerManager[Filter, MyHandlerManager]:
-        return self._managers[MyEvent]
+        return self._managers[MyEvent]  # type: ignore
 
