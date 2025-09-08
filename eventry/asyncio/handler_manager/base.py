@@ -75,7 +75,7 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
         self._event_type_filter = event_type_filter
         self._handler_manager_id = hanlder_manager_id
         self._config = config or HandlerManagerConfig()
-        self._middleware_managers: dict[MiddlewareManagerTypes, MiddlewareManager] = {}
+        self._middleware_managers: dict[MiddlewareManagerTypes, MiddlewareManager[Any]] = {}
 
     def register_handler(
         self,
