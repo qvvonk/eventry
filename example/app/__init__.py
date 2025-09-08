@@ -6,5 +6,5 @@ r = MyRouter(router_id='router')
 
 
 @r.on_my_event
-def my_handler(e: MyEvent):
+def my_handler(e: MyEvent) -> None:
     print(e.object)
