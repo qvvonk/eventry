@@ -10,7 +10,7 @@ __all__ = [
 
 import asyncio
 import inspect
-from typing import TYPE_CHECKING, Any, TypeVar, Generic, ParamSpec
+from typing import TYPE_CHECKING, Any, TypeVar, Generic, ParamSpec, Type
 from collections.abc import Callable, Awaitable, Sequence
 from dataclasses import dataclass
 
@@ -18,6 +18,7 @@ from dataclasses import dataclass
 if TYPE_CHECKING:
     from .handler_manager import HandlerManager
     from .filter import Filter
+    from .event import Event
 
 
 R = TypeVar('R', bound=Any)
@@ -43,7 +44,7 @@ class CallableWrapper(Generic[P, R]):
         positional_only_args: Sequence[Any],
         kwargs: dict[str, Any]
     ) -> R:
-        exclude = set()
+        exclude: set[str] = set()
         if positional_only_args:
             exclude.update(self._params_names[:len(positional_only_args)])
 
@@ -141,6 +142,7 @@ class Handler(Generic[P, R], CallableWrapper[P, R]):
         _callable: Callable[P, R],
         handler_id: str,
         handler_manager: HandlerManager[Any, Any],
+        on_event: Type[Event] | None,
         filter: Filter | None,
         as_task: bool,
         meta: HandlerMeta,
@@ -151,6 +153,10 @@ class Handler(Generic[P, R], CallableWrapper[P, R]):
         self._filter = filter
         self._meta = meta
         self._as_task = as_task
+
+        if self._handler_manager.event_type_filter and on_event:
+            raise ValueError('') # todo: err message
+        self._on_event = on_event
 
     @property
     def handler_manager(self) -> HandlerManager[Any, Any]:
@@ -171,3 +177,7 @@ class Handler(Generic[P, R], CallableWrapper[P, R]):
     @property
     def handler_id(self) -> str:
         return self._handler_id
+
+    @property
+    def on_event(self) -> Type[Event] | None:
+        return self.handler_manager.event_type_filter or self._on_event
