@@ -1,9 +1,9 @@
 from typing import Any
 
-from eventry.asyncio.event import Event
+from eventry.asyncio.event import ExtendedEvent
 
 
-class MyEvent(Event):
+class MyEvent(ExtendedEvent):
     def __init__(self, object: str):
         super().__init__()
         self._object: str = object
