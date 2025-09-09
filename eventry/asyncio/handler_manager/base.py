@@ -245,6 +245,8 @@ class HandlerManager(Generic[FilterType, HandlerType, RouterType], ABC):
                     f'{handler.id}: handler has no filter.',
                 )
                 yield handler, None
+                if single_handler:
+                    return
                 continue
 
             try:
@@ -265,6 +267,8 @@ class HandlerManager(Generic[FilterType, HandlerType, RouterType], ABC):
                     f'yielded handler {handler.id}: handler filter result is {filter_result}.',
                 )
                 yield handler, None
+                if single_handler:
+                    return
             else:
                 router_logger.debug(
                     f'Handler manager {self.router.id}.{self.id} '
