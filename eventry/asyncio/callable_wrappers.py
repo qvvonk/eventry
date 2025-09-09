@@ -60,7 +60,7 @@ class CallableWrapper(Generic[Params, ReturnType]):
             kwargs = new_kwargs
 
         if self.is_awaitable:
-            return await self.callable(*positional_only_args, **kwargs)
+            return await self.callable(*positional_only_args, **kwargs)  # type: ignore
         return await asyncio.to_thread(self.callable, *positional_only_args, **kwargs)
 
     @property

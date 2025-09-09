@@ -1,4 +1,4 @@
-from typing import TypeVar, TYPE_CHECKING, Union
+from typing import TypeVar, TYPE_CHECKING, Union, Any
 from collections.abc import Callable, Awaitable
 
 if TYPE_CHECKING:
@@ -13,3 +13,4 @@ FilterType = TypeVar('FilterType', bound=Union[
 )
 
 RouterType = TypeVar('RouterType', bound='Router')
+HandlerType = TypeVar('HandlerType', bound=Callable[..., Any])

@@ -23,7 +23,7 @@ from ..filter import _convert_filters
 from ..callable_wrappers import Handler, HandlerMeta
 from typing_extensions import Self
 
-from eventry.asyncio.default_types import FilterType
+from eventry.asyncio.default_types import FilterType, RouterType, HandlerType
 
 
 if TYPE_CHECKING:
@@ -33,9 +33,9 @@ if TYPE_CHECKING:
     from ..middleware_manager import MiddlewareManager
 
 
-HandlerType = TypeVar('HandlerType', bound=Callable[..., Any])
+HandlerType = HandlerType
 FilterType = FilterType
-RouterType = TypeVar('RouterType', bound=Router)
+RouterType = RouterType
 
 
 class MiddlewareManagerTypes(Enum):

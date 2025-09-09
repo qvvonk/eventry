@@ -13,6 +13,7 @@ __all__ = [
 
 from typing import Any, Callable, Iterable, Awaitable
 from abc import ABC, abstractmethod
+from collections import Sequence
 
 from .callable_wrappers import CallableWrapper
 
@@ -80,7 +81,7 @@ class AndFilter(Filter):
     def __init__(self, *filters: Filter) -> None:
         self._filters = [CallableWrapper(i) for i in filters]
 
-    async def __call__(self, positional_only_args, kwargs) -> bool:
+    async def __call__(self, positional_only_args: Sequence[Any], kwargs: dict[str, Any]) -> bool:
         for i in self._filters:
             if not await i(*positional_only_args, **kwargs):
                 return False
@@ -97,7 +98,7 @@ class OrFilter(Filter):
     def __init__(self, *filters: Filter) -> None:
         self._filters = [CallableWrapper(i) for i in filters]
 
-    async def __call__(self, positional_only_args, kwargs: Any) -> bool:
+    async def __call__(self, positional_only_args: Sequence[Any], kwargs: dict[str, Any]) -> bool:
         for i in self._filters:
             if await i(*positional_only_args, **kwargs):
                 return True
@@ -114,8 +115,8 @@ class NotFilter(Filter):
     def __init__(self, filter: Filter) -> None:
         self._filter = CallableWrapper(filter)
 
-    async def __call__(self, positional_only_args, kwargs: Any) -> bool:
-        return not (await self._filter(**kwargs))
+    async def __call__(self, positional_only_args: Sequence[Any], kwargs: dict[str, Any]) -> bool:
+        return not (await self._filter(*positional_only_args, **kwargs))
 
 
 class FilterFromFunction(Filter):
@@ -128,8 +129,8 @@ class FilterFromFunction(Filter):
     def __init__(self, function: CallableFilter | AwaitableFilter) -> None:
         self._function = CallableWrapper(function)
 
-    async def __call__(self, positional_only_args, kwargs: Any) -> bool:
-        return bool(await self._function(**positional_only_args, **kwargs))
+    async def __call__(self, positional_only_args: Sequence[Any], kwargs: dict[str, Any]) -> bool:
+        return bool(await self._function(*positional_only_args, **kwargs))
 
 
 def _convert_filters(

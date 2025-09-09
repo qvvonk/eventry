@@ -25,7 +25,7 @@ class DefaultNamesRemap(TypedDict, total=False):
 
 @dataclass(frozen=True)
 class DispatcherConfig:
-    default_names_remap: DefaultNamesRemap = field(default_factory=dict)
+    default_names_remap: DefaultNamesRemap = field(default_factory=dict)  # type: ignore
     exclude_names_from_handler_call: list[str] = field(default_factory=list)
     exclude_names_from_filter_call: list[str] = field(default_factory=list)
     exclude_names_from_middleware_call: list[str] = field(default_factory=list)
