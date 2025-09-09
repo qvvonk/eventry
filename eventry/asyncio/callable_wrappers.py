@@ -181,7 +181,7 @@ class Handler(Generic[Params, ReturnType, HandlerManagerType], CallableWrapper[P
         return self._as_task
 
     @property
-    def handler_id(self) -> str:
+    def id(self) -> str:
         return self._handler_id
 
     @property

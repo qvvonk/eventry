@@ -23,13 +23,13 @@ from ..filter import _convert_filters
 from ..callable_wrappers import Handler, HandlerMeta
 from typing_extensions import Self
 from eventry.asyncio.filter import Filter, LogicalFilter
+from collections.abc import AsyncGenerator
 
 
 if TYPE_CHECKING:
     from eventry.asyncio.event import Event
     from eventry.asyncio.router import Router
-    from ..middleware_manager import MiddlewareManager
-
+    from ..middleware_manager import MiddlewareManager, WrappedWithMiddlewaresCallable
 
 HandlerType = TypeVar('HandlerType', bound=Callable[..., Any])
 FilterType = TypeVar('FilterType', bound=Union[
@@ -149,9 +149,9 @@ class HandlerManager(Generic[FilterType, HandlerType, RouterType], ABC):
         """
         root_router = self.router.root_router
 
-        if (exists_handler := root_router.get_handler_by_id(handler.handler_id)) is not None:
+        if (exists_handler := root_router.get_handler_by_id(handler.id)) is not None:
             raise ValueError(
-                f'Handler with ID {handler.handler_id} already exists.\n'
+                f'Handler with ID {handler.id} already exists.\n'
                 f"Original handler registered in router '{exists_handler.handler_manager.router.id}':\n"
                 f'    Defined in "{exists_handler.meta.definition_filename}:'
                 f'{exists_handler.meta.definition_lineno}"\n'
@@ -163,10 +163,13 @@ class HandlerManager(Generic[FilterType, HandlerType, RouterType], ABC):
                 f'    Registered in {handler.meta.registration_filename}:'
                 f'{handler.meta.registration_lineno}',
             )
-        self._handlers[handler.handler_id] = handler
+        self._handlers[handler.id] = handler
         router_logger.info(
-            f"[{self.router.id} -> {self.handler_manager_id}] Registered handler '{handler.handler_id}'.",
+            f"[{self.router.id} -> {self.id}] Registered handler '{handler.id}'.",
         )
+
+    def get_handler_by_id(self, handler_id: str) -> Handler[Any, Any, Self] | None:
+        return self._handlers.get(handler_id, None)
 
     def remove_handler(self, handler_id: str) -> Handler[Any, Any, Self] | None:
         """
@@ -175,6 +178,98 @@ class HandlerManager(Generic[FilterType, HandlerType, RouterType], ABC):
         :returns: deleted ``Handler`` instance or ``None``, if ID was not found.
         """
         return self._handlers.pop(handler_id, None)
+
+    async def get_matching_handlers(
+        self,
+        event: Event,
+        single_handler: bool,
+        workflow_data: dict[str, Any],
+    ) -> AsyncGenerator[tuple[Handler[Any, Any, Self], Exception | None], None]:
+        """
+        Executes the chain of pre-filter middlewares and yields handlers
+        whose filters match the given event.
+
+        :param event: The event object to be checked against handler filters.
+        :param workflow_data: A dictionary containing data related to the current workflow.
+
+        :return: An async generator of ``HandlerInfo`` objects with matching filters.
+        """
+        outer_middlewares_manager = self._middleware_managers.get(MiddlewareManagerTypes.OUTER)
+
+        if not outer_middlewares_manager:
+            result: AsyncGenerator[tuple[Handler[Any, Any, Self], Exception | None], None] = self._inner_get_matching_handlers(event, single_handler, workflow_data)
+        else:
+            wrapped_get_matching_handlers: WrappedWithMiddlewaresCallable[AsyncGenerator[tuple[Handler[Any, Any, Self], Exception | None], None]] = MiddlewareManager.wrap_callable_with_middlewares(
+                middlewares=outer_middlewares_manager,
+                callable_to_wrap=self._inner_get_matching_handlers,
+                workflow_data=workflow_data,
+                callable_positional_only_args=(event, single_handler, workflow_data),
+                middlewares_positional_only_args=self._config.middleware_positional_only_args,
+            )
+            state = await wrapped_get_matching_handlers()
+            if not state.callable_executed:
+                return
+            result = state.callable_return
+
+        async for handler, e in result:
+            yield handler, e
+
+    async def _inner_get_matching_handlers(
+        self,
+        event: Event,
+        single_handler: bool,
+        workflow_data: dict[str, Any],
+    ) -> AsyncGenerator[tuple[Handler[Any, Any, Self], Exception | None], None]:
+        """
+        Iterates through all registered handlers and yields those whose filters
+        match the given event.
+
+        :param event: The incoming event to check against handler filters.
+
+        :return: An async generator yielding handlers that should handle the event.
+        """
+
+        for handler in self._handlers.values():
+            if handler.on_event is not None and type(event) != handler.on_event:
+                router_logger.debug(
+                    f'Handler manager {self.router.id}.{self.id} '
+                    f'skipped handler {handler.id}: '
+                    f'event type {type(event)} is not {handler.on_event} '
+                    f'(from handler event type filter).',
+                )
+                continue
+
+            if handler.filter is None:
+                router_logger.debug(
+                    f'Handler manager {self.router.id}.{self.id} yielded handler '
+                    f'{handler.id}: handler has no filter.',
+                )
+                yield handler, None
+                continue
+
+            try:
+                filter_result = await handler.filter(**workflow_data)
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:
+                router_logger.debug(
+                    f'An error occurred in handler manager {self.router.id}.{self.id} while '
+                    f'executing filters of handler {handler.id}. An exception yielded.',
+                )
+                yield handler, e
+                continue
+
+            if filter_result:
+                router_logger.debug(
+                    f'Handler manager {self.router.id}.{self.id} '
+                    f'yielded handler {handler.id}: handler filter result is {filter_result}.',
+                )
+                yield handler, None
+            else:
+                router_logger.debug(
+                    f'Handler manager {self.router.id}.{self.id} '
+                    f'skipped handler {handler.id}: handler filter result is {filter_result}.',
+                )
 
     def _add_middleware_manager(
         self,
@@ -247,7 +342,7 @@ class HandlerManager(Generic[FilterType, HandlerType, RouterType], ABC):
         return self._router
 
     @property
-    def handler_manager_id(self) -> str:
+    def id(self) -> str:
         return self._handler_manager_id
 
     @property
@@ -277,5 +372,5 @@ def gen_default_handler_id(
     module_path = '.'.join(rel_path.parts)
 
     return (
-        f'{manager.router.id}.{manager.handler_manager_id}--{module_path}.{handler.__qualname__}'
+        f'{manager.router.id}.{manager.id}--{module_path}.{handler.__qualname__}'
     )

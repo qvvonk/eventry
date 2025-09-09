@@ -8,7 +8,7 @@ __all__ = [
 ]
 
 
-from typing import Any, Generic, TypeVar, Callable, Awaitable, overload
+from typing import Any, Generic, TypeVar, Callable, Awaitable, overload, Union
 from dataclasses import field, dataclass
 from functools import wraps
 from collections.abc import Sequence
@@ -33,10 +33,10 @@ class CallState(Generic[R]):
         return self._callable_executed
 
     @property
-    def callable_return(self) -> R | None:
+    def callable_return(self) -> R:
         if not self.callable_executed:
             raise RuntimeError('Callable is not executed yet.')
-        return self._callable_return
+        return self._callable_return  # type: ignore
 
     @property
     def local_scope_workflow_data(self) -> dict[str, Any]:
@@ -111,10 +111,10 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[MiddlewareType]):
     @staticmethod
     def wrap_callable_with_middlewares(
         middlewares: Sequence[MiddlewareType],
-        callable_to_wrap: Callable[..., R],
+        callable_to_wrap: Callable[..., Union[R, Awaitable[R]]],
         workflow_data: dict[str, Any],
-        callable_positional_only_args: tuple[str, ...],
-        middlewares_positional_only_args: tuple[str, ...],
+        callable_positional_only_args: tuple[Any, ...],
+        middlewares_positional_only_args: tuple[Any, ...],
         first_to_last: bool = True,
         default_names_remap: DefaultNamesRemap | None = None,
     ) -> WrappedWithMiddlewaresCallable[R]:
@@ -152,7 +152,7 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[MiddlewareType]):
         original callable and can be called with ``async obj()``.
         """
         default_names_remap = default_names_remap or {}
-        wrapped_callable = CallableWrapper(callable_to_wrap)
+        wrapped_callable: CallableWrapper[..., R] = CallableWrapper(callable_to_wrap)
 
         @wraps(callable_to_wrap)
         async def last_call(state: CallState[R]) -> Any:
