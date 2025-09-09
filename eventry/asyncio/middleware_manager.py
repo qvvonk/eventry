@@ -165,7 +165,7 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[MiddlewareType]):
             args = tuple(
                 kwargs[i.name] if isinstance(i, FromKwargs) else i
                 for i in callable_positional_only_args
-            )
+            ) if callable_positional_only_args else callable_positional_only_args
             result = await wrapped_callable(args, kwargs)
 
             state._callable_executed = True
