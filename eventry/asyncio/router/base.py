@@ -19,14 +19,14 @@ if TYPE_CHECKING:
     from eventry.asyncio.event import Event
 
 
-E = TypeVar('E', bound=HandlerManager[Any, Any, Any])
+HandlerManagerType = TypeVar('HandlerManagerType', bound=HandlerManager[Any, Any, Any])
 
 
 class Router(ABC):
     def __init__(self, router_id: str):
         self._router_id = router_id
         self._parent: Self | None = None
-        self._children: dict[str, Router] = {}
+        self._children: dict[str, Self] = {}
         self._managers: dict[type[Event], HandlerManager[Any, Any, Self]] = {}
         self._default_handler_manager: HandlerManager[Any, Any, Self] | None = None
 
@@ -41,7 +41,7 @@ class Router(ABC):
                 return result
         return None
 
-    def _add_handler_manager(self, handler_manager: E, /) -> E:
+    def _add_handler_manager(self, handler_manager: HandlerManagerType, /) -> HandlerManagerType:
         if not handler_manager.event_type_filter:
             raise ValueError('Cannot add handler manager without event type filter. '
                              'Assign it as default handler manager.')  # todo: improve
@@ -77,14 +77,14 @@ class Router(ABC):
         return self.parent_router.root_router
 
     @property
-    def chain_to_root_router(self) -> Generator[Router, None, None]:
-        curr_router: Router | None = self
+    def chain_to_root_router(self) -> Generator[Self, None, None]:
+        curr_router: Self | None = self
         while curr_router is not None:
             yield curr_router
             curr_router = curr_router.parent_router
 
     @property
-    def chain_to_last_router(self) -> Generator[Router, None, None]:
+    def chain_to_last_router(self) -> Generator[Self, None, None]:
         yield self
         for r in self._children.values():
             yield from r.chain_to_last_router
@@ -94,7 +94,7 @@ class Router(ABC):
         return self._parent
 
     @parent_router.setter
-    def parent_router(self, router: Router) -> None:
+    def parent_router(self, router: Self) -> None:
         if type(router) is not type(self):
             raise TypeError(
                 f'Parent router must be of the same class as this router '

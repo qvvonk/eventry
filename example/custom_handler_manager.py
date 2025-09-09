@@ -6,13 +6,14 @@ from eventry.asyncio.filter import Filter
 from eventry.asyncio.router import Router
 from eventry.asyncio.middleware_manager import MiddlewareManager
 from .config import handler_manager_config
+from .custom_router import MyRouter
 
 
 HandlerType = Callable[[MyEvent], Any]
 NextMiddlewareType = Callable[[], Awaitable[Any]]
 
-class MyHandlerManager(HandlerManager[Filter, HandlerType]):
-    def __init__(self, router: Router, handler_manager_id: str, event_type_filter: Type[MyEvent] | None = None):
+class MyHandlerManager(HandlerManager[Filter, HandlerType, MyRouter]):
+    def __init__(self, router: MyRouter, handler_manager_id: str, event_type_filter: Type[MyEvent] | None = None):
         super().__init__(
             router=router,
             handler_manager_id=handler_manager_id,

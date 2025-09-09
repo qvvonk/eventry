@@ -14,12 +14,12 @@ from ..middleware_manager import MiddlewareManager
 
 if TYPE_CHECKING:
     from eventry.asyncio.event import Event
-
+    from eventry.asyncio.default_types import FilterType
     from ..router import Router
 
 
 HandlerType = TypeVar('HandlerType', bound=Callable[..., Any])
-FilterType = TypeVar('FilterType', bound=Filter)
+FilterType = FilterType
 
 
 class DefaultHandlerManager(

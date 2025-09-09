@@ -5,6 +5,6 @@ from ..custom_event import MyEvent
 r = MyRouter(router_id='router')
 
 
-@r.on_my_event
+@r.on_my_event(filter=lambda e: bool(e))
 def my_handler(e: MyEvent) -> None:
     print(e.object)

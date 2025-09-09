@@ -23,16 +23,18 @@ from ..filter import _convert_filters
 from ..callable_wrappers import Handler, HandlerMeta
 from typing_extensions import Self
 
+from eventry.asyncio.default_types import FilterType
+
 
 if TYPE_CHECKING:
-    from ..event import Event
-    from ..filter import Filter
-    from ..router import Router
+    from eventry.asyncio.event import Event
+    from eventry.asyncio.filter import Filter
+    from eventry.asyncio.router import Router
     from ..middleware_manager import MiddlewareManager
 
 
 HandlerType = TypeVar('HandlerType', bound=Callable[..., Any])
-FilterType = TypeVar('FilterType', bound=Filter)
+FilterType = FilterType
 RouterType = TypeVar('RouterType', bound=Router)
 
 
@@ -73,7 +75,7 @@ class HandlerManager(Generic[FilterType, HandlerType, RouterType], ABC):
         event_type_filter: Type[Event] | None = None,
         config: HandlerManagerConfig | None = None,
     ) -> None:
-        self._handlers: dict[str, Handler[Any, Any]] = {}
+        self._handlers: dict[str, Handler[Any, Any, Self]] = {}
         self._router = router
         self._event_type_filter = event_type_filter
         self._handler_manager_id = handler_manager_id
@@ -108,7 +110,7 @@ class HandlerManager(Generic[FilterType, HandlerType, RouterType], ABC):
         filter: FilterType | None = None,
         as_task: bool = False,
         meta: HandlerMeta | None = None,
-    ):
+    ) -> Handler[Any, Any, Self]:
         if self._event_type_filter is not None and event_type is not None:
             raise ValueError(
                 'Event type specification is not allowed in handler managers with '
@@ -142,7 +144,7 @@ class HandlerManager(Generic[FilterType, HandlerType, RouterType], ABC):
 
         :raises ValueError: if a handler with the same ID already exists in the router network.
         """
-        root_router = self._router.root_router
+        root_router = self.router.root_router
 
         if (exists_handler := root_router.get_handler_by_id(handler.handler_id)) is not None:
             raise ValueError(
@@ -163,7 +165,7 @@ class HandlerManager(Generic[FilterType, HandlerType, RouterType], ABC):
             f"[{self.router.id} -> {self.handler_manager_id}] Registered handler '{handler.handler_id}'.",
         )
 
-    def remove_handler(self, handler_id: str) -> Handler[Any, Any] | None:
+    def remove_handler(self, handler_id: str) -> Handler[Any, Any, Self] | None:
         """
         Removes handler from this handler manager.
 
