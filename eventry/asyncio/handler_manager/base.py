@@ -21,6 +21,7 @@ from eventry.loggers import router_logger
 
 from ..filter import _convert_filters
 from ..callable_wrappers import Handler, HandlerMeta
+from typing_extensions import Self
 
 
 if TYPE_CHECKING:
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
 
 HandlerType = TypeVar('HandlerType', bound=Callable[..., Any])
 FilterType = TypeVar('FilterType', bound=Filter)
+RouterType = TypeVar('RouterType', bound=Router)
 
 
 class MiddlewareManagerTypes(Enum):
@@ -40,7 +42,7 @@ class MiddlewareManagerTypes(Enum):
     PER_HANDLER = auto()
 
 
-class HandlerManager(Generic[FilterType, HandlerType], ABC):
+class HandlerManager(Generic[FilterType, HandlerType, RouterType], ABC):
     """
     Manages the registration and filtering of event handlers for a specific event type.
 
@@ -66,7 +68,7 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
 
     def __init__(
         self,
-        router: Router,
+        router: RouterType,
         handler_manager_id: str,
         event_type_filter: Type[Event] | None = None,
         config: HandlerManagerConfig | None = None,
@@ -128,7 +130,7 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
         )
         return handler_obj
 
-    def _register_handler(self, handler: Handler[Any, Any]) -> None:
+    def _register_handler(self, handler: Handler[Any, Any, Self]) -> None:
         """
         Registers handler to this handler manager.
 
@@ -224,7 +226,7 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
         return inner(func)
 
     @property
-    def handlers(self) -> MappingProxyType[str, Handler[Any, Any]]:
+    def handlers(self) -> MappingProxyType[str, Handler[Any, Any, Self]]:
         """
         A read-only mapping of handler IDs to their corresponding ``Handler`` instances,
         registered in this manager.
@@ -232,7 +234,7 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
         return MappingProxyType(self._handlers)
 
     @property
-    def router(self) -> Router:
+    def router(self) -> RouterType:
         """
         An instance of ``Router`` to which this manager is attached.
         :return:
@@ -250,7 +252,7 @@ class HandlerManager(Generic[FilterType, HandlerType], ABC):
 
 def gen_default_handler_id(
     handler: HandlerType,
-    manager: HandlerManager[Any, Any],
+    manager: HandlerManager[Any, Any, Any],
 ) -> str:
     is_class_instance = not (
         inspect.isfunction(handler) or inspect.ismethod(handler) or inspect.isclass(handler)

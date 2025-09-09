@@ -5,6 +5,7 @@ __all__ = ['Router']
 
 
 from typing import Any, TypeVar, Type, TYPE_CHECKING
+from typing_extensions import Self
 from collections.abc import Generator
 
 from eventry.loggers import router_logger
@@ -18,18 +19,18 @@ if TYPE_CHECKING:
     from eventry.asyncio.event import Event
 
 
-E = TypeVar('E', bound=HandlerManager[Any, Any])
+E = TypeVar('E', bound=HandlerManager[Any, Any, Any])
 
 
 class Router(ABC):
     def __init__(self, router_id: str):
         self._router_id = router_id
-        self._parent: Router | None = None
+        self._parent: Self | None = None
         self._children: dict[str, Router] = {}
-        self._managers: dict[type[Event], HandlerManager[Any, Any]] = {}
-        self._default_handler_manager: HandlerManager[Any, Any] | None = None
+        self._managers: dict[type[Event], HandlerManager[Any, Any, Self]] = {}
+        self._default_handler_manager: HandlerManager[Any, Any, Self] | None = None
 
-    def get_handler_by_id(self, handler_id: str, /) -> Handler[Any, Any] | None:
+    def get_handler_by_id(self, handler_id: str, /) -> Handler[Any, Any, Any] | None:
         for manager in self._managers.values():
             if handler_id in manager.handlers:
                 return manager.handlers[handler_id]
@@ -51,7 +52,7 @@ class Router(ABC):
         self._managers[handler_manager.event_type_filter] = handler_manager
         return handler_manager
 
-    def _get_handler_manager(self, event: Event | Type[Event], /) -> HandlerManager[Any, Any]:
+    def _get_handler_manager(self, event: Event | Type[Event], /) -> HandlerManager[Any, Any, Self]:
         event_type = event if isinstance(event, type) else event.__class__
         if event_type in self._managers:
             return self._managers[event_type]
@@ -70,7 +71,7 @@ class Router(ABC):
         return self._router_id
 
     @property
-    def root_router(self) -> Router:
+    def root_router(self) -> Self:
         if self.parent_router is None:
             return self
         return self.parent_router.root_router
@@ -89,11 +90,16 @@ class Router(ABC):
             yield from r.chain_to_last_router
 
     @property
-    def parent_router(self) -> Router | None:
+    def parent_router(self) -> Self | None:
         return self._parent
 
     @parent_router.setter
     def parent_router(self, router: Router) -> None:
+        if type(router) is not type(self):
+            raise TypeError(
+                f'Parent router must be of the same class as this router '
+                f'(expected {self.__class__.__name__}, got {router.__class__.__name__}).'
+            )
         if self.parent_router:
             raise RuntimeError(
                 f"Router '{self.id}' is already connected to router '{self.parent_router.id}'.",

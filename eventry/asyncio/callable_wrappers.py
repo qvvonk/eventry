@@ -21,12 +21,13 @@ if TYPE_CHECKING:
     from .handler_manager import HandlerManager
 
 
-R = TypeVar('R', bound=Any)
-P = ParamSpec('P')
+ReturnType = TypeVar('ReturnType', bound=Any)
+Params = ParamSpec('Params')
+HandlerManagerType = TypeVar('HandlerManagerType', bound='HandlerManager[Any, Any, Any]')
 
 
-class CallableWrapper(Generic[P, R]):
-    def __init__(self, _callable: Callable[P, R], /):
+class CallableWrapper(Generic[Params, ReturnType]):
+    def __init__(self, _callable: Callable[Params, ReturnType], /):
         self._callable = _callable
         self._specs = inspect.getfullargspec(_callable)
         self._is_awaitable = (
@@ -43,7 +44,7 @@ class CallableWrapper(Generic[P, R]):
         self,
         positional_only_args: Sequence[Any],
         kwargs: dict[str, Any],
-    ) -> R:
+    ) -> ReturnType:
         exclude: set[str] = set()
         if positional_only_args:
             exclude.update(self._params_names[: len(positional_only_args)])
@@ -63,7 +64,7 @@ class CallableWrapper(Generic[P, R]):
         return await asyncio.to_thread(self.callable, *positional_only_args, **kwargs)
 
     @property
-    def callable(self) -> Callable[P, R]:
+    def callable(self) -> Callable[Params, ReturnType]:
         """
         The original callable object.
         """
@@ -141,12 +142,12 @@ class HandlerMeta:
         )
 
 
-class Handler(Generic[P, R], CallableWrapper[P, R]):
+class Handler(Generic[Params, ReturnType, HandlerManagerType], CallableWrapper[Params, ReturnType]):
     def __init__(
         self,
-        _callable: Callable[P, R],
+        _callable: Callable[Params, ReturnType],
         handler_id: str,
-        handler_manager: HandlerManager[Any, Any],
+        handler_manager: HandlerManagerType,
         on_event: Type[Event] | None,
         filter: Filter | None,
         as_task: bool,
@@ -164,7 +165,7 @@ class Handler(Generic[P, R], CallableWrapper[P, R]):
         self._on_event = on_event
 
     @property
-    def handler_manager(self) -> HandlerManager[Any, Any]:
+    def handler_manager(self) -> HandlerManagerType:
         return self._handler_manager
 
     @property

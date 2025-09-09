@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+
+__all__ = ['DefaultHandlerManager']
+
+
 from typing import TYPE_CHECKING, Any, Type, Generic, TypeVar
 from collections.abc import Callable
 

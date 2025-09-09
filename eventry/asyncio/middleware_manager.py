@@ -19,7 +19,6 @@ from .callable_wrappers import CallableWrapper
 
 
 MiddlewareType = TypeVar('MiddlewareType', bound=Callable[..., Any])
-F = TypeVar('F', bound=MiddlewareType)
 R = TypeVar('R', bound=Any)
 
 
@@ -79,17 +78,17 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[MiddlewareType]):
     def __init__(self) -> None:
         self._middlewares: list[MiddlewareType] = []
 
-    def register_middleware(self, middleware: F) -> F:
+    def register_middleware(self, middleware: MiddlewareType) -> MiddlewareType:
         self._middlewares.append(middleware)
         return middleware
 
     @overload
-    def __call__(self, middleware: F, /) -> F: ...
+    def __call__(self, middleware: MiddlewareType, /) -> MiddlewareType: ...
 
     @overload
-    def __call__(self) -> Callable[[F], F]: ...
+    def __call__(self) -> Callable[[MiddlewareType], MiddlewareType]: ...
 
-    def __call__(self, middleware: F | None = None) -> F | Callable[[F], F]:
+    def __call__(self, middleware: MiddlewareType | None = None) -> MiddlewareType | Callable[[MiddlewareType], MiddlewareType]:
         if middleware is None:
             return self.register_middleware
         return self.register_middleware(middleware)
