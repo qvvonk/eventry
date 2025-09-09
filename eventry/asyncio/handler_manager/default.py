@@ -28,7 +28,7 @@ class DefaultHandlerManager(
 ):
     def __init__(
         self,
-        router: Router,
+        router: RouterType,
         handler_manager_id: str,
         event_type_filter: Type[Event] | None = None,
     ):

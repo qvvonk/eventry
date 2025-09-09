@@ -27,7 +27,7 @@ HandlerManagerType = TypeVar('HandlerManagerType', bound='HandlerManager[Any, An
 
 
 class CallableWrapper(Generic[Params, ReturnType]):
-    def __init__(self, _callable: Callable[Params, ReturnType], /):
+    def __init__(self, _callable: Callable[..., Any], /):
         self._callable = _callable
         self._specs = inspect.getfullargspec(_callable)
         self._is_awaitable = (

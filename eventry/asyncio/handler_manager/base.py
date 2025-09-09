@@ -10,11 +10,11 @@ __all__ = [
 import sys
 import inspect
 import pathlib
-from typing import TYPE_CHECKING, Any, Type, Generic, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Type, Generic, TypeVar, overload, Union
 from abc import ABC
 from enum import Enum, auto
 from types import MappingProxyType
-from collections.abc import Callable
+from collections.abc import Callable, Awaitable
 
 from eventry.config import HandlerManagerConfig
 from eventry.loggers import router_logger
@@ -22,20 +22,22 @@ from eventry.loggers import router_logger
 from ..filter import _convert_filters
 from ..callable_wrappers import Handler, HandlerMeta
 from typing_extensions import Self
-
-from eventry.asyncio.default_types import FilterType, RouterType, HandlerType
+from eventry.asyncio.filter import Filter
 
 
 if TYPE_CHECKING:
     from eventry.asyncio.event import Event
-    from eventry.asyncio.filter import Filter
     from eventry.asyncio.router import Router
     from ..middleware_manager import MiddlewareManager
 
 
-HandlerType = HandlerType
-FilterType = FilterType
-RouterType = RouterType
+HandlerType = TypeVar('HandlerType', bound=Callable[..., Any])
+FilterType = TypeVar('FilterType', bound=Union[
+    Callable[..., bool | Awaitable[bool]],
+    Filter
+    ]
+)
+RouterType = TypeVar('RouterType', bound='Router')
 
 
 class MiddlewareManagerTypes(Enum):
