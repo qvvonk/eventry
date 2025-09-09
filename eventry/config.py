@@ -26,12 +26,16 @@ class DefaultNamesRemap(TypedDict, total=False):
 @dataclass(frozen=True)
 class DispatcherConfig:
     default_names_remap: DefaultNamesRemap = field(default_factory=dict)  # type: ignore
-    exclude_names_from_handler_call: list[str] = field(default_factory=list)
-    exclude_names_from_filter_call: list[str] = field(default_factory=list)
-    exclude_names_from_middleware_call: list[str] = field(default_factory=list)
     single_handler_mode: bool = False
 
 
 @dataclass(frozen=True)
 class HandlerManagerConfig:
     positional_only_args: tuple[Any, ...] = field(default_factory=tuple)
+    exclude_from_handler_call: frozenset[str] = field(default_factory=frozenset)
+
+    middleware_positional_only_args: tuple[Any, ...] = field(default_factory=tuple)
+    exclude_from_middleware_call: frozenset[str] = field(default_factory=frozenset)
+
+    filter_call_positional_only_args: tuple[Any, ...] = field(default_factory=tuple)
+    exclude_from_filter_call: frozenset[str] = field(default_factory=frozenset)
