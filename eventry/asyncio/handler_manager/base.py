@@ -22,7 +22,7 @@ from eventry.loggers import router_logger
 from ..filter import _convert_filters
 from ..callable_wrappers import Handler, HandlerMeta
 from typing_extensions import Self
-from eventry.asyncio.filter import Filter
+from eventry.asyncio.filter import Filter, LogicalFilter
 
 
 if TYPE_CHECKING:
@@ -34,7 +34,8 @@ if TYPE_CHECKING:
 HandlerType = TypeVar('HandlerType', bound=Callable[..., Any])
 FilterType = TypeVar('FilterType', bound=Union[
     Callable[..., bool | Awaitable[bool]],
-    Filter
+    Filter,
+    LogicalFilter
     ]
 )
 RouterType = TypeVar('RouterType', bound='Router')

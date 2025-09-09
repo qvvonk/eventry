@@ -5,6 +5,7 @@ __all__ = [
     'Filter',
     'CallableFilter',
     'AwaitableFilter',
+    'LogicalFilter',
     'any_of',
     'all_of',
     'not_',
@@ -13,7 +14,7 @@ __all__ = [
 
 from typing import Any, Callable, Iterable, Awaitable
 from abc import ABC, abstractmethod
-from collections import Sequence
+from collections.abc import Sequence
 
 from .callable_wrappers import CallableWrapper
 
@@ -22,7 +23,7 @@ CallableFilter = Callable[..., bool]
 AwaitableFilter = Callable[..., Awaitable[bool]]
 
 
-class Filter(ABC):
+class Filter:
     """
     Abstract base class for all filters.
 
@@ -71,27 +72,27 @@ class Filter(ABC):
         return NotFilter(self)
 
 
-class _LogicalFilter(Filter, ABC):
+class LogicalFilter(Filter, ABC):
     @abstractmethod
     async def execute(self, positional_only_args: Sequence[Any], kwargs: dict[str, Any]) -> bool:
         pass
 
 
-class AndFilter(_LogicalFilter):
+class AndFilter(LogicalFilter):
     """
     Composite filter that succeeds only if all wrapped filters succeed.
 
     Typically, created using the ``&`` operator or ``all_of()`` function.
     """
 
-    def __init__(self, *filters: Filter | _LogicalFilter) -> None:
-        self._filters: list[_LogicalFilter | CallableWrapper[Any, bool]] = [
-            i if isinstance(i, _LogicalFilter) else CallableWrapper(i) for i in filters
+    def __init__(self, *filters: Filter | LogicalFilter) -> None:
+        self._filters: list[LogicalFilter | CallableWrapper[Any, bool]] = [
+            i if isinstance(i, LogicalFilter) else CallableWrapper(i) for i in filters
         ]
 
     async def execute(self, positional_only_args: Sequence[Any], kwargs: dict[str, Any]) -> bool:
         for i in self._filters:
-            if isinstance(i, _LogicalFilter):
+            if isinstance(i, LogicalFilter):
                 result = await i.execute(positional_only_args, kwargs)
             else:
                 result = await i(positional_only_args, kwargs)
@@ -107,14 +108,14 @@ class OrFilter(Filter):
     Typically, created using the ``|`` operator or ``any_of()`` function.
     """
 
-    def __init__(self, *filters: Filter | _LogicalFilter) -> None:
-        self._filters: list[_LogicalFilter | CallableWrapper[Any, bool]] = [
-            i if isinstance(i, _LogicalFilter) else CallableWrapper(i) for i in filters
+    def __init__(self, *filters: Filter | LogicalFilter) -> None:
+        self._filters: list[LogicalFilter | CallableWrapper[Any, bool]] = [
+            i if isinstance(i, LogicalFilter) else CallableWrapper(i) for i in filters
         ]
 
     async def execute(self, positional_only_args: Sequence[Any], kwargs: dict[str, Any]) -> bool:
         for i in self._filters:
-            if isinstance(i, _LogicalFilter):
+            if isinstance(i, LogicalFilter):
                 result = await i.execute(positional_only_args, kwargs)
             else:
                 result = await i(positional_only_args, kwargs)
@@ -130,13 +131,13 @@ class NotFilter(Filter):
     Typically, created using the ``~`` operator.
     """
 
-    def __init__(self, filter: Filter | _LogicalFilter) -> None:
-        self._filter: _LogicalFilter | CallableWrapper[Any, bool] = (
-            filter if isinstance(filter, _LogicalFilter) else CallableWrapper(filter)
+    def __init__(self, filter: Filter | LogicalFilter) -> None:
+        self._filter: LogicalFilter | CallableWrapper[Any, bool] = (
+            filter if isinstance(filter, LogicalFilter) else CallableWrapper(filter)
         )
 
     async def execute(self, positional_only_args: Sequence[Any], kwargs: dict[str, Any]) -> bool:
-        if isinstance(self._filter, _LogicalFilter):
+        if isinstance(self._filter, LogicalFilter):
             result = await self._filter.execute(positional_only_args, kwargs)
         else:
             result = await self._filter(positional_only_args, kwargs)
