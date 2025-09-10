@@ -8,3 +8,6 @@ r = MyRouter(router_id='router')
 @r.on_my_event(filter=lambda e: bool(e))
 def my_handler(e: MyEvent) -> None:
     print(e.object)
+
+
+my_handler()

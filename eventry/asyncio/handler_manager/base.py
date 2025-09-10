@@ -10,7 +10,7 @@ __all__ = [
 import sys
 import inspect
 import pathlib
-from typing import TYPE_CHECKING, Any, Type, Generic, TypeVar, overload, Union
+from typing import TYPE_CHECKING, Any, Type, Generic, TypeVar, overload, Union, ParamSpec
 from abc import ABC
 from enum import Enum, auto
 from types import MappingProxyType
