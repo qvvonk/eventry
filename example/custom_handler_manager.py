@@ -1,18 +1,26 @@
+from __future__ import annotations
+
 from eventry.asyncio.handler_manager import HandlerManager, MiddlewareManagerTypes
 from .custom_event import MyEvent
-from typing import Any, Type
-from collections.abc import Callable, Awaitable
+from typing import Any, Type, Protocol, TypeVar, Union
+from collections.abc import Callable, Awaitable, Coroutine
 from eventry.asyncio.filter import Filter
-from eventry.asyncio.router import Router
 from eventry.asyncio.middleware_manager import MiddlewareManager
 from .config import handler_manager_config
-from .custom_router import MyRouter
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from .custom_router import MyRouter
 
 
-HandlerType = Callable[[MyEvent], Any]
 NextMiddlewareType = Callable[[], Awaitable[Any]]
+R = TypeVar('R', bound=Any)
 
-class MyHandlerManager(HandlerManager[Filter, HandlerType, MyRouter]):
+class HandlerProtocol(Protocol):
+    async def __call__(self, __event: MyEvent, *__args: Any, **__kwargs: Any) -> Any: ...
+
+
+class MyHandlerManager(HandlerManager[Filter, HandlerProtocol, 'MyRouter']):
     def __init__(self, router: MyRouter, handler_manager_id: str, event_type_filter: Type[MyEvent] | None = None):
         super().__init__(
             router=router,

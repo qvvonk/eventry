@@ -1,5 +1,5 @@
 from eventry.asyncio.router import Router
-from .custom_handler_manager import MyHandlerManager, HandlerType
+from .custom_handler_manager import MyHandlerManager
 from eventry.asyncio.filter import Filter
 from .custom_event import MyEvent
 

@@ -4,13 +4,13 @@ from __future__ import annotations
 __all__ = ['DefaultHandlerManager']
 
 
-from typing import TYPE_CHECKING, Any, Type, Generic, TypeVar
-from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Type, Generic, TypeVar, Union
+from collections.abc import Callable, Awaitable
 
 from .base import HandlerManager, MiddlewareManagerTypes
-from ..filter import Filter
+from eventry.asyncio.filter import Filter, LogicalFilter
 from ..middleware_manager import MiddlewareManager
-from eventry.asyncio.default_types import FilterType, HandlerType, RouterType
+from eventry.asyncio.default_types import HandlerType as HandlerTypeAlias
 
 if TYPE_CHECKING:
     from eventry.asyncio.event import Event
@@ -18,14 +18,17 @@ if TYPE_CHECKING:
     from ..router import Router
 
 
-HandlerType = HandlerType
-FilterType = FilterType
-RouterType = RouterType
+HandlerType = TypeVar('HandlerType', bound=HandlerTypeAlias)
+FilterType = TypeVar('FilterType', bound=Union[
+    Callable[..., bool | Awaitable[bool]],
+    Filter,
+    LogicalFilter
+    ]
+)
+RouterType = TypeVar('RouterType', bound='Router')
 
 
-class DefaultHandlerManager(
-    HandlerManager[FilterType, HandlerType, RouterType], Generic[FilterType, HandlerType, RouterType]
-):
+class DefaultHandlerManager(HandlerManager[FilterType, HandlerType, RouterType]):
     def __init__(
         self,
         router: RouterType,
