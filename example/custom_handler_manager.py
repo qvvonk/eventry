@@ -16,8 +16,13 @@ if TYPE_CHECKING:
 NextMiddlewareType = Callable[[], Awaitable[Any]]
 R = TypeVar('R', bound=Any)
 
+
 class HandlerProtocol(Protocol):
     def __call__(self, __event: MyEvent, *__args: Any, **__kwargs: Any) -> Any: pass
+
+
+class MiddlewareProtocol(Protocol):
+    def __call__(self, __next_call: NextMiddlewareType, *__args: Any, **__kwargs: Any) -> Any: pass
 
 
 class MyHandlerManager(HandlerManager[Filter, HandlerProtocol, 'MyRouter']):
@@ -42,13 +47,13 @@ class MyHandlerManager(HandlerManager[Filter, HandlerProtocol, 'MyRouter']):
         )
 
     @property
-    def outer_middleware(self) -> MiddlewareManager[Callable[[NextMiddlewareType], Any]]:
+    def outer_middleware(self) -> MiddlewareManager[MiddlewareProtocol]:
         return self._middleware_managers[MiddlewareManagerTypes.OUTER]
 
     @property
-    def inner_middleware(self) -> MiddlewareManager[Callable[[NextMiddlewareType], Any]]:
+    def inner_middleware(self) -> MiddlewareManager[MiddlewareProtocol]:
         return self._middleware_managers[MiddlewareManagerTypes.INNER]
 
     @property
-    def per_handler_middleware(self) -> MiddlewareManager[Callable[[NextMiddlewareType], Any]]:
+    def per_handler_middleware(self) -> MiddlewareManager[MiddlewareProtocol]:
         return self._middleware_managers[MiddlewareManagerTypes.PER_HANDLER]

@@ -314,7 +314,7 @@ class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):
         handler_id: str | None = None,
         filter: FilterT | None = None,
         as_task: bool = False,
-    ) -> A | Callable[[HandlerT], HandlerT]:
+    ) -> HandlerT | Callable[[HandlerT], HandlerT]:
         def inner(handler: HandlerT) -> HandlerT:
             meta = HandlerMeta.from_callable(
                 handler,
