@@ -162,9 +162,9 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[CallableWrapper[..., A
             nonlocal wrapped_callable
             kwargs = workflow_data | {
                 default_names_remap.get(
-                    'local_workflow_data', 'local_workflow_data'
+                    'workflow_data_injection', 'workflow_data_injection'
                 ): state.local_scope_workflow_data,
-            }
+            } | state.local_scope_workflow_data
             args = tuple(
                 kwargs[i.name] if isinstance(i, FromKwargs) else i
                 for i in callable_positional_only_args
@@ -212,9 +212,9 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[CallableWrapper[..., A
             kwargs = workflow_data | {
                 default_names_remap.get('next_call', 'next_call'): next_call,
                 default_names_remap.get(
-                    'local_workflow_data', 'local_workflow_data'
+                    'workflow_data_injection', 'workflow_data_injection'
                 ): state.local_scope_workflow_data,
-            }
+            } | state.local_scope_workflow_data
             args = tuple(
                 kwargs[i.name] if isinstance(i, FromKwargs) else i for i in positional_only_args
             )

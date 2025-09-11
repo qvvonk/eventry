@@ -20,7 +20,7 @@ class DefaultNamesRemap(TypedDict, total=False):
     workflow_data: str
     handler: str
     next_call: str
-    local_workflow_data: str
+    workflow_data_injection: str
 
 
 @dataclass(frozen=True)
