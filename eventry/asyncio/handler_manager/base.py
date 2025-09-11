@@ -23,7 +23,7 @@ from eventry.asyncio.callable_wrappers import Handler, HandlerMeta, CallableWrap
 from typing_extensions import Self, TypeVar
 from collections.abc import AsyncGenerator
 from eventry.asyncio.default_types import HandlerType, FilterType
-
+from eventry.asyncio._exceptions import HandlerFound
 
 if TYPE_CHECKING:
     from eventry.asyncio.event import Event
@@ -115,7 +115,7 @@ class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):
             )
 
         if filter:
-            f_obj = _convert_filters(filter)[0]  # if its just a function
+            f_obj = _convert_filters([filter])[0]  # if it is a function
             if not isinstance(f_obj, LogicalFilter):
                 f: CallableWrapper[..., bool] | LogicalFilter | None = CallableWrapper(f_obj)
             else:
@@ -249,14 +249,14 @@ class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):
                 )
                 yield handler, None
                 if single_handler:
-                    return
+                    raise HandlerFound()
                 continue
 
             try:
                 if isinstance(handler.filter, LogicalFilter):
-                    filter_result = await handler.filter(self._config.filter_call_positional_only_args, workflow_data)
+                    filter_result = await handler.filter.execute(self._config.filter_call_positional_only_args, workflow_data)
                 else:
-                    filter_result = await handler.filter(*self._config.positional_only_args, **workflow_data)
+                    filter_result = await handler.filter(self._config.positional_only_args, workflow_data)
             except KeyboardInterrupt:
                 raise
             except Exception as e:
@@ -265,6 +265,8 @@ class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):
                     f'executing filters of handler {handler.id}. An exception yielded.',
                 )
                 yield handler, e
+                if single_handler:
+                    raise HandlerFound()
                 continue
 
             if filter_result:
@@ -274,7 +276,7 @@ class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):
                 )
                 yield handler, None
                 if single_handler:
-                    return
+                    raise HandlerFound()
             else:
                 router_logger.debug(
                     f'Handler manager {self.router.id}.{self.id} '

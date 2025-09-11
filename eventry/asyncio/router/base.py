@@ -6,12 +6,13 @@ __all__ = ['Router']
 
 from typing import Any, TypeVar, Type, TYPE_CHECKING
 from typing_extensions import Self
-from collections.abc import Generator
+from collections.abc import Generator, AsyncGenerator
 
 from eventry.loggers import router_logger
 
 from eventry.asyncio.handler_manager import HandlerManager
 from eventry.asyncio.callable_wrappers import Handler
+from eventry.asyncio._exceptions import HandlerFound
 from abc import ABC
 
 
@@ -40,6 +41,24 @@ class Router(ABC):
             if result is not None:
                 return result
         return None
+
+    async def _get_matching_handlers(
+        self,
+        event: Event,
+        single_handler: bool,
+        workflow_data: dict[str, Any],
+    ) -> AsyncGenerator[tuple[Handler[..., Any, Any], Exception | None], None]:
+        manager = self._get_handler_manager(event)
+
+        try:
+            async for handler, e in manager.get_matching_handlers(event, single_handler, workflow_data):
+                yield handler, e
+
+            for router in self._children.values():
+                async for handler, e in router._get_matching_handlers(event, single_handler, workflow_data):
+                    yield handler, e
+        except HandlerFound:
+            return
 
     def _add_handler_manager(self, handler_manager: HandlerManagerType, /) -> HandlerManagerType:
         if not handler_manager.event_type_filter:
