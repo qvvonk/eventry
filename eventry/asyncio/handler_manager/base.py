@@ -18,8 +18,8 @@ from collections.abc import Callable
 from eventry.config import HandlerManagerConfig
 from eventry.loggers import router_logger
 
-from ..filter import _convert_filters
-from eventry.asyncio.callable_wrappers import Handler, HandlerMeta
+from ..filter import _convert_filters, LogicalFilter
+from eventry.asyncio.callable_wrappers import Handler, HandlerMeta, CallableWrapper
 from typing_extensions import Self, TypeVar
 from collections.abc import AsyncGenerator
 from eventry.asyncio.default_types import HandlerType, FilterType
@@ -114,11 +114,20 @@ class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):
                 'event type filter.\n',
             )
 
+        if filter:
+            f_obj = _convert_filters(filter)[0]  # if its just a function
+            if not isinstance(f_obj, LogicalFilter):
+                f: CallableWrapper[..., bool] | LogicalFilter | None = CallableWrapper(f_obj)
+            else:
+                f = f_obj
+        else:
+            f = None
+
         handler_obj = Handler(
             handler,
             handler_id=handler_id or gen_default_handler_id(handler, self),
             handler_manager=self,
-            filter=_convert_filters(filter)[0] if filter is not None else None,
+            filter=f,
             as_task=as_task,
             on_event=event_type,
             meta=meta
@@ -244,7 +253,10 @@ class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):
                 continue
 
             try:
-                filter_result = await handler.filter(**workflow_data)
+                if isinstance(handler.filter, LogicalFilter):
+                    filter_result = await handler.filter(self._config.filter_call_positional_only_args, workflow_data)
+                else:
+                    filter_result = await handler.filter(*self._config.positional_only_args, **workflow_data)
             except KeyboardInterrupt:
                 raise
             except Exception as e:

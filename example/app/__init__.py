@@ -7,8 +7,11 @@ from example.custom_handler_manager import HandlerProtocol
 r = MyRouter(router_id='router')
 
 
-async def my_handler_z(e: MyEvent) -> None:
-    print('nother')
+@r.on_my_event
+def my_handler(e: MyEvent) -> Any:
+    print(e.object)
 
 
-a = r.on_my_event(my_handler_z)
+
+async def main():
+    event = MyEvent(

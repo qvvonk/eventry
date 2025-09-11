@@ -17,7 +17,7 @@ from collections.abc import Callable, Sequence
 
 if TYPE_CHECKING:
     from .event import Event
-    from .filter import Filter
+    from .filter import Filter, LogicalFilter
     from .handler_manager import HandlerManager
 
 
@@ -149,7 +149,7 @@ class Handler(Generic[Params, ReturnType, HandlerManagerType], CallableWrapper[P
         handler_id: str,
         handler_manager: HandlerManagerType,
         on_event: Type[Event] | None,
-        filter: Filter | None,
+        filter: LogicalFilter | CallableWrapper[..., bool] | None,
         as_task: bool,
         meta: HandlerMeta,
     ):
@@ -169,7 +169,7 @@ class Handler(Generic[Params, ReturnType, HandlerManagerType], CallableWrapper[P
         return self._handler_manager
 
     @property
-    def filter(self) -> Filter | None:
+    def filter(self) -> LogicalFilter | CallableWrapper[..., bool] | None:
         return self._filter
 
     @property
