@@ -28,20 +28,23 @@ class Dispatcher(Router):
 
         self._workflow_data = workflow_data or {}
 
-    async def propagate_event(self, event: Event, additional_workflow_data: dict[str, Any], silent: bool = False) -> None:
+    async def propagate_event(self, event: Event, workflow_injection: dict[str, Any] | None = None, silent: bool = False) -> None:
         dispatcher_logger.debug(f'New event {id(event)}: {type(event)}')
 
-        workflow_data = {
+        workflow_injection = workflow_injection or {}
+
+        data = {
             **self._workflow_data,
-            **additional_workflow_data,
+            **workflow_injection,
             **event.workflow_injection,
             'event': event,
             'dispatcher': self,
         }
+        data['data'] = data
 
         executed_handlers: dict[str, bool] = {}
         awaiting_handlers: list[HandlerInfo] = []
-        async for handler, e in self.get_matching_handlers(event, workflow_data=workflow_data):
+        async for handler, e in self.get_matching_handlers(event, workflow_data=data):
             if e is not None:
                 dispatcher_logger.debug(
                     f'({id(event)}) An error occurred while executing '
@@ -51,11 +54,7 @@ class Dispatcher(Router):
 
                 if silent:
                     continue
-                await self.propagate_event(
-                    ErrorEvent(e),
-                    additional_workflow_data={},
-                    silent=True
-                )
+                await self.propagate_event(ErrorEvent(e), workflow_injection={}, silent=True)
                 continue
 
             if not handler.can_be_executed(executed_handlers):
@@ -66,7 +65,7 @@ class Dispatcher(Router):
                 awaiting_handlers.append(handler)
                 continue
 
-            r = await self._execute_handler_wrapper(event, handler, workflow_data, silent)
+            r = await self._execute_handler_wrapper(event, handler, data, silent)
             executed_handlers[handler.name] = r
 
             if event.propagation_stopped:
@@ -79,7 +78,7 @@ class Dispatcher(Router):
                         continue
 
                     awaiting_handlers.remove(awaiting_handler)
-                    r = await self._execute_handler_wrapper(event, handler, workflow_data, silent)
+                    r = await self._execute_handler_wrapper(event, handler, data, silent)
                     executed_handlers[awaiting_handler.name] = r
                     break
                 else:
@@ -97,13 +96,8 @@ class Dispatcher(Router):
             return r
         except Exception as e:
             if not silent:
-                await self.propagate_event(
-                    ErrorEvent(e),
-                    additional_workflow_data={},
-                    silent=True
-                )
+                await self.propagate_event(ErrorEvent(e), workflow_injection={}, silent=True)
             return False
-
 
     async def _execute_handler(
         self,
@@ -145,7 +139,7 @@ class Dispatcher(Router):
     def _wrap_handler_with_middlewares(
         self,
         handler: HandlerInfo,
-        event: Event[Any],
+        event: Event,
         workflow_data: dict[str, Any],
     ) -> WrappedWithMiddlewaresCallable:
         pre_execution_middlewares: list[MiddlewareCallableType] = list(
