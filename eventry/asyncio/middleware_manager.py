@@ -160,16 +160,20 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[CallableWrapper[..., A
         @wraps(callable_to_wrap)
         async def last_call(state: CallState[R]) -> Any:
             nonlocal wrapped_callable
-            kwargs = workflow_data | {
-                default_names_remap.get(
-                    'workflow_data_injection', 'workflow_data_injection'
-                ): state.local_scope_workflow_data,
-            } | state.local_scope_workflow_data
+
+            workflow_data.update(
+                {
+                    default_names_remap.get(
+                        'workflow_data_injection', 'workflow_data_injection'
+                    ): state.local_scope_workflow_data,
+                    **state.local_scope_workflow_data,
+                }
+            )
             args = tuple(
-                kwargs[i.name] if isinstance(i, FromKwargs) else i
+                workflow_data[i.name] if isinstance(i, FromKwargs) else i
                 for i in callable_positional_only_args
             ) if callable_positional_only_args else callable_positional_only_args
-            result = await wrapped_callable(args, kwargs)
+            result = await wrapped_callable(args, workflow_data)
 
             state._callable_executed = True
             state._callable_return = result
@@ -209,17 +213,20 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[CallableWrapper[..., A
             async def next_call() -> Any:
                 return await next_middleware_to_wrap(state)
 
-            kwargs = workflow_data | {
-                default_names_remap.get('next_call', 'next_call'): next_call,
-                default_names_remap.get(
-                    'workflow_data_injection', 'workflow_data_injection'
-                ): state.local_scope_workflow_data,
-            } | state.local_scope_workflow_data
+            workflow_data.update(
+                {
+                    default_names_remap.get('next_call', 'next_call'): next_call,
+                    default_names_remap.get(
+                        'workflow_data_injection', 'workflow_data_injection'
+                    ): state.local_scope_workflow_data,
+                    **state.local_scope_workflow_data,
+                }
+            )
             args = tuple(
-                kwargs[i.name] if isinstance(i, FromKwargs) else i for i in positional_only_args
+                workflow_data[i.name] if isinstance(i, FromKwargs) else i for i in positional_only_args
             )
 
-            result = await middleware_obj(args, kwargs)
+            result = await middleware_obj(args, workflow_data)
             return result
 
         return wrapped
