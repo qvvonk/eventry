@@ -18,7 +18,7 @@ from eventry.config import FromKwargs, DefaultNamesRemap
 from .callable_wrappers import CallableWrapper
 
 
-MiddlewareType = TypeVar('MiddlewareType', bound=Callable[..., Any])
+MiddlewareType = TypeVar('MiddlewareType', bound=Callable[..., Any], default=Callable[..., Any])
 R = TypeVar('R', bound=Any)
 
 
@@ -74,12 +74,12 @@ class WrappedWithMiddlewaresCallable(Generic[R]):
         return state
 
 
-class MiddlewareManager(Generic[MiddlewareType], Sequence[MiddlewareType]):
+class MiddlewareManager(Generic[MiddlewareType], Sequence[CallableWrapper[..., Any]]):
     def __init__(self) -> None:
-        self._middlewares: list[MiddlewareType] = []
+        self._middlewares: list[CallableWrapper[..., Any]] = []
 
     def register_middleware(self, middleware: MiddlewareType) -> MiddlewareType:
-        self._middlewares.append(middleware)
+        self._middlewares.append(CallableWrapper(middleware))
         return middleware
 
     @overload
@@ -94,15 +94,15 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[MiddlewareType]):
         return self.register_middleware(middleware)
 
     @overload
-    def __getitem__(self, index: int) -> MiddlewareType: ...
+    def __getitem__(self, index: int) -> CallableWrapper[..., Any]: ...
 
     @overload
-    def __getitem__(self, index: slice) -> list[MiddlewareType]: ...
+    def __getitem__(self, index: slice) -> list[CallableWrapper[..., Any]]: ...
 
     def __getitem__(
         self,
         index: int | slice,
-    ) -> MiddlewareType | list[MiddlewareType]:
+    ) -> CallableWrapper[..., Any] | list[CallableWrapper[..., Any]]:
         return self._middlewares[index]
 
     def __len__(self) -> int:
@@ -110,8 +110,8 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[MiddlewareType]):
 
     @staticmethod
     def wrap_callable_with_middlewares(
-        middlewares: Sequence[MiddlewareType],
-        callable_to_wrap: Callable[..., Union[R, Awaitable[R]]],
+        middlewares: Sequence[MiddlewareType | CallableWrapper[..., Any]],
+        callable_to_wrap: Callable[..., Union[R, Awaitable[R]]] | CallableWrapper[..., Any],
         workflow_data: dict[str, Any],
         callable_positional_only_args: tuple[Any, ...],
         middlewares_positional_only_args: tuple[Any, ...],
@@ -152,7 +152,10 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[MiddlewareType]):
         original callable and can be called with ``async obj()``.
         """
         default_names_remap = default_names_remap or {}
-        wrapped_callable: CallableWrapper[..., R] = CallableWrapper(callable_to_wrap)
+        if not isinstance(callable_to_wrap, CallableWrapper):
+            wrapped_callable: CallableWrapper[..., R] = CallableWrapper(callable_to_wrap)
+        else:
+            wrapped_callable = callable_to_wrap
 
         @wraps(callable_to_wrap)
         async def last_call(state: CallState[R]) -> Any:
@@ -187,12 +190,16 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[MiddlewareType]):
     @staticmethod
     def _wrap_with_middleware(
         next_middleware_to_wrap: Callable[[CallState[R]], Any],
-        middleware: MiddlewareType,
+        middleware: MiddlewareType | CallableWrapper[..., Any],
         positional_only_args: tuple[str, ...],
         workflow_data: dict[str, Any],
         default_names_remap: DefaultNamesRemap,
     ) -> Callable[[CallState[R]], Awaitable[Any]]:
-        middleware_obj = CallableWrapper(middleware)
+
+        if not isinstance(middleware, CallableWrapper):
+            middleware_obj: CallableWrapper[..., Any] = CallableWrapper(middleware)
+        else:
+            middleware_obj = middleware
 
         @wraps(middleware)
         async def wrapped(state: CallState[R]) -> Any:

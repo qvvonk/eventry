@@ -7,6 +7,8 @@ from example.custom_handler_manager import HandlerProtocol
 r = MyRouter(router_id='router')
 
 
-@r.on_my_event
-async def my_handler_z() -> None:
+async def my_handler_z(e: MyEvent) -> None:
     print('nother')
+
+
+a = r.on_my_event(my_handler_z)

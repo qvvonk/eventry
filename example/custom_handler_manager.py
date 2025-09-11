@@ -17,7 +17,7 @@ NextMiddlewareType = Callable[[], Awaitable[Any]]
 R = TypeVar('R', bound=Any)
 
 class HandlerProtocol(Protocol):
-    async def __call__(self, __event: MyEvent, *__args: Any, **__kwargs: Any) -> Any: ...
+    def __call__(self, __event: MyEvent, *__args: Any, **__kwargs: Any) -> Any: pass
 
 
 class MyHandlerManager(HandlerManager[Filter, HandlerProtocol, 'MyRouter']):

@@ -9,11 +9,11 @@ __all__ = [
 import sys
 import inspect
 import pathlib
-from typing import TYPE_CHECKING, Any, Type, Generic, overload, Union, ParamSpec, Annotated
+from typing import TYPE_CHECKING, Any, Type, Generic, overload
 from abc import ABC
 from enum import Enum, auto
 from types import MappingProxyType
-from collections.abc import Callable, Awaitable
+from collections.abc import Callable
 
 from eventry.config import HandlerManagerConfig
 from eventry.loggers import router_logger
@@ -21,9 +21,8 @@ from eventry.loggers import router_logger
 from ..filter import _convert_filters
 from eventry.asyncio.callable_wrappers import Handler, HandlerMeta
 from typing_extensions import Self, TypeVar
-from eventry.asyncio.filter import Filter, LogicalFilter
 from collections.abc import AsyncGenerator
-from eventry.asyncio.default_types import HandlerType
+from eventry.asyncio.default_types import HandlerType, FilterType
 
 
 if TYPE_CHECKING:
@@ -31,14 +30,9 @@ if TYPE_CHECKING:
     from eventry.asyncio.router import Router
     from ..middleware_manager import MiddlewareManager, WrappedWithMiddlewaresCallable
 
-HandlerTypeT = TypeVar('HandlerTypeT', bound=HandlerType)
-FilterType = TypeVar('FilterType', bound=Union[
-    Callable[..., bool | Awaitable[bool]],
-    Filter,
-    LogicalFilter
-    ]
-)
-RouterType = TypeVar('RouterType', bound='Router')
+HandlerT = TypeVar('HandlerT', bound=HandlerType, default=HandlerType)
+FilterT = TypeVar('FilterT', bound=FilterType, default=FilterType)
+RouterT = TypeVar('RouterT', bound='Router', default='Router')
 
 
 class MiddlewareManagerTypes(Enum):
@@ -47,7 +41,7 @@ class MiddlewareManagerTypes(Enum):
     PER_HANDLER = auto()
 
 
-class HandlerManager(Generic[FilterType, HandlerTypeT, RouterType], ABC):
+class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):
     """
     Manages the registration and filtering of event handlers for a specific event type.
 
@@ -70,11 +64,10 @@ class HandlerManager(Generic[FilterType, HandlerTypeT, RouterType], ABC):
         If set, only events of this exact type (``type(event) is event_type_filter``)
         will be processed.
     """
-    HandlerT = TypeVar('HandlerT')
 
     def __init__(
         self,
-        router: RouterType,
+        router: RouterT,
         handler_manager_id: str,
         event_type_filter: Type[Event] | None = None,
         config: HandlerManagerConfig | None = None,
@@ -88,11 +81,11 @@ class HandlerManager(Generic[FilterType, HandlerTypeT, RouterType], ABC):
 
     def register_handler(
         self,
-        handler: HandlerTypeT,
+        handler: HandlerT,
         *,
         event_type: Type[Event] | None = None,
         handler_id: str | None = None,
-        filter: FilterType | None = None,
+        filter: FilterT | None = None,
         as_task: bool = False,
     ) -> None:
         meta = HandlerMeta.from_callable(handler, registration_frame=inspect.stack()[1])
@@ -108,10 +101,10 @@ class HandlerManager(Generic[FilterType, HandlerTypeT, RouterType], ABC):
 
     def _create_handler_obj(
         self,
-        handler: HandlerTypeT,
+        handler: HandlerT,
         event_type: Type[Event] | None = None,
         handler_id: str | None = None,
-        filter: FilterType | None = None,
+        filter: FilterT | None = None,
         as_task: bool = False,
         meta: HandlerMeta | None = None,
     ) -> Handler[Any, Any, Self]:
@@ -297,7 +290,7 @@ class HandlerManager(Generic[FilterType, HandlerTypeT, RouterType], ABC):
         *,
         event_type: Type[Event] | None = None,
         handler_id: str | None = None,
-        filter: FilterType | None = None,
+        filter: FilterT | None = None,
         as_task: bool = False,
     ) -> Callable[[HandlerT], HandlerT]: pass
 
@@ -308,7 +301,7 @@ class HandlerManager(Generic[FilterType, HandlerTypeT, RouterType], ABC):
         /, *,
         event_type: Type[Event] | None = None,
         handler_id: str | None = None,
-        filter: FilterType | None = None,
+        filter: FilterT | None = None,
         as_task: bool = False,
 
     ) -> HandlerT: pass
@@ -319,10 +312,10 @@ class HandlerManager(Generic[FilterType, HandlerTypeT, RouterType], ABC):
         *,
         event_type: Type[Event] | None = None,
         handler_id: str | None = None,
-        filter: FilterType | None = None,
+        filter: FilterT | None = None,
         as_task: bool = False,
-    ) -> HandlerT | Callable[[HandlerT], HandlerT]:
-        def inner(handler: HandlerTypeT) -> HandlerTypeT:
+    ) -> A | Callable[[HandlerT], HandlerT]:
+        def inner(handler: HandlerT) -> HandlerT:
             meta = HandlerMeta.from_callable(
                 handler,
                 registration_frame=inspect.stack()[2 if func is not None else 1],
@@ -351,7 +344,7 @@ class HandlerManager(Generic[FilterType, HandlerTypeT, RouterType], ABC):
         return MappingProxyType(self._handlers)
 
     @property
-    def router(self) -> RouterType:
+    def router(self) -> RouterT:
         """
         An instance of ``Router`` to which this manager is attached.
         :return:
@@ -368,7 +361,7 @@ class HandlerManager(Generic[FilterType, HandlerTypeT, RouterType], ABC):
 
 
 def gen_default_handler_id(
-    handler: HandlerTypeT,
+    handler: HandlerT,
     manager: HandlerManager[Any, Any, Any],
 ) -> str:
     is_class_instance = not (

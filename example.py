@@ -1,20 +1,25 @@
-from __future__ import annotations
-
-import time
-
-
-def my_function():
-    print('This is my_function')
-    time.sleep(1)
+from collections.abc import Callable
+from typing_extensions import TypeVarTuple, Protocol
+from typing import ParamSpec, TypeVar, Generic, Concatenate
 
 
-def count_time_execution(func):
-    print(f'STarting counting execution time of {func}')
-    start_time = time.time()
-    func()
-    end_time = time.time()
-    print(f'Total execution time: {end_time - start_time}')
+
+MustHaveParams = TypeVarTuple('MustHaveParams')
+UserDefinedT = ParamSpec('UserDefinedT')
+ReturnType = TypeVar('ReturnType')
 
 
-if __name__ == '__main__':
-    count_time_execution(my_function)
+class SomeClass(Generic[*MustHaveParams, ReturnType]):
+    P = ParamSpec('P', bound=MustHaveParams)
+
+    def method(self, func: Callable[P, ReturnType]) -> Callable[P, ReturnType]:
+        return func
+
+
+a: SomeClass[int, str, bool] = SomeClass()
+
+
+def my_handler(arg1: int) -> bool: return True
+
+
+test = a.method(my_handler)
