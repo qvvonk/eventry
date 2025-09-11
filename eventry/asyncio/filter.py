@@ -101,7 +101,7 @@ class AndFilter(LogicalFilter):
         return True
 
 
-class OrFilter(Filter):
+class OrFilter(LogicalFilter):
     """
     Composite filter that succeeds if at least one wrapped filter succeeds.
 
@@ -124,7 +124,7 @@ class OrFilter(Filter):
         return False
 
 
-class NotFilter(Filter):
+class NotFilter(LogicalFilter):
     """
     Inverted filter that negates the result of another filter.
 
@@ -145,7 +145,7 @@ class NotFilter(Filter):
         return not result
 
 
-class FilterFromFunction(Filter):
+class FilterFromFunction(LogicalFilter):
     """
     Wrapper that turns a regular function (sync or async) into a ``Filter``.
 
