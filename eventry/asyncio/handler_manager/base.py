@@ -38,7 +38,6 @@ RouterT = TypeVar('RouterT', bound='Router', default='Router')
 class MiddlewareManagerTypes(Enum):
     OUTER = auto()
     INNER = auto()
-    PER_HANDLER = auto()
 
 
 class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):

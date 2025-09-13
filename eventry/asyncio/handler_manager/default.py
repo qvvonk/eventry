@@ -4,31 +4,24 @@ from __future__ import annotations
 __all__ = ['DefaultHandlerManager']
 
 
-from typing import TYPE_CHECKING, Any, Type, Generic, TypeVar, Union
-from collections.abc import Callable, Awaitable
+from typing import TYPE_CHECKING, Any, Type, TypeVar
+from collections.abc import Callable
 
 from .base import HandlerManager, MiddlewareManagerTypes
-from eventry.asyncio.filter import Filter, LogicalFilter
 from ..middleware_manager import MiddlewareManager
-from eventry.asyncio.default_types import HandlerType as HandlerTypeAlias
+from eventry.asyncio.default_types import HandlerType, FilterType
 
 if TYPE_CHECKING:
     from eventry.asyncio.event import Event
-
     from ..router import Router
 
 
-HandlerType = TypeVar('HandlerType', bound=HandlerTypeAlias)
-FilterType = TypeVar('FilterType', bound=Union[
-    Callable[..., bool | Awaitable[bool]],
-    Filter,
-    LogicalFilter
-    ]
-)
-RouterType = TypeVar('RouterType', bound='Router')
+HandlerTypeT = TypeVar('HandlerTypeT', bound=HandlerType, default=HandlerType)
+FilterTypeT = TypeVar('FilterTypeT', bound=FilterType, default=FilterType)
+RouterType = TypeVar('RouterType', bound='Router', default='Router')
 
 
-class DefaultHandlerManager(HandlerManager[FilterType, HandlerType, RouterType]):
+class DefaultHandlerManager(HandlerManager[FilterTypeT, HandlerTypeT, RouterType]):
     def __init__(
         self,
         router: RouterType,
@@ -43,7 +36,6 @@ class DefaultHandlerManager(HandlerManager[FilterType, HandlerType, RouterType])
 
         self._add_middleware_manager(MiddlewareManagerTypes.OUTER, MiddlewareManager())
         self._add_middleware_manager(MiddlewareManagerTypes.INNER, MiddlewareManager())
-        self._add_middleware_manager(MiddlewareManagerTypes.PER_HANDLER, MiddlewareManager())
 
     @property
     def outer_middleware(self) -> MiddlewareManager[Callable[..., Any]]:
@@ -52,7 +44,3 @@ class DefaultHandlerManager(HandlerManager[FilterType, HandlerType, RouterType])
     @property
     def inner_middleware(self) -> MiddlewareManager[Callable[..., Any]]:
         return self._middleware_managers[MiddlewareManagerTypes.INNER]
-
-    @property
-    def per_handler_middleware(self) -> MiddlewareManager[Callable[..., Any]]:
-        return self._middleware_managers[MiddlewareManagerTypes.PER_HANDLER]

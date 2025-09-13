@@ -130,7 +130,6 @@ class HandlerMeta:
 
 
 class Handler(Generic[ReturnTypeT, HandlerManagerTypeT], CallableWrapper[ReturnTypeT]):
-
     def __init__(
         self,
         __obj: Callable[..., Union[Awaitable[ReturnTypeT], ReturnTypeT]],
@@ -139,6 +138,7 @@ class Handler(Generic[ReturnTypeT, HandlerManagerTypeT], CallableWrapper[ReturnT
         handler_manager: HandlerManagerTypeT,
         on_event: Type[Event] | None,
         filter: Union[Filter, None],
+        middlewares: list[...],
         as_task: bool,
         meta: HandlerMeta,
     ):
@@ -147,6 +147,7 @@ class Handler(Generic[ReturnTypeT, HandlerManagerTypeT], CallableWrapper[ReturnT
         self._handler_id = handler_id
         self._filter = filter
         self._meta = meta
+        self._middlewares = middlewares
         self._as_task = as_task
 
         if self._handler_manager.event_type_filter and on_event:
@@ -176,3 +177,7 @@ class Handler(Generic[ReturnTypeT, HandlerManagerTypeT], CallableWrapper[ReturnT
     @property
     def on_event(self) -> Type[Event] | None:
         return self.handler_manager.event_type_filter or self._on_event
+
+    @property
+    def middlewares(self) -> list[...]:
+        return self._middlewares

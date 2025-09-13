@@ -79,7 +79,7 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[CallableWrapper[Any]])
         self._middlewares: list[CallableWrapper[Any]] = []
 
     def register_middleware(self, middleware: MiddlewareType) -> MiddlewareType:
-        self._middlewares.append(CallableWrapper(middleware))
+        self._middlewares.insert(0, CallableWrapper(middleware))
         return middleware
 
     @overload

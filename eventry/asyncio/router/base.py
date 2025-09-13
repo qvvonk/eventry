@@ -28,8 +28,8 @@ class Router(ABC):
         self._router_id = router_id
         self._parent: Self | None = None
         self._children: dict[str, Self] = {}
-        self._managers: dict[type[Event], HandlerManager[Any, Any, Self]] = {}
-        self._default_handler_manager: HandlerManager[Any, Any, Self] | None = None
+        self._managers: dict[type[Event], HandlerManager] = {}
+        self._default_handler_manager: HandlerManager | None = None
 
     def get_handler_by_id(self, handler_id: str, /) -> Handler[Any, Any] | None:
         for manager in self._managers.values():
