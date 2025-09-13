@@ -9,7 +9,7 @@ __all__ = [
 
 
 import inspect
-from typing import TYPE_CHECKING, Any, Type, Generic, TypeVar, ParamSpec, Union, overload, NoReturn
+from typing import TYPE_CHECKING, Any, Type, Generic, TypeVar, Union
 from dataclasses import dataclass
 from collections.abc import Callable, Sequence, Awaitable
 
@@ -22,8 +22,8 @@ if TYPE_CHECKING:
 ReturnTypeT = TypeVar('ReturnTypeT')
 HandlerManagerTypeT = TypeVar(
     'HandlerManagerTypeT',
-    default='HandlerManager',
-    bound='HandlerManager'
+    default='HandlerManager[Any, Any, Any]',
+    bound='HandlerManager[Any, Any, Any]'
 )
 
 

@@ -25,9 +25,5 @@ class AsyncHandlerProtocol(Protocol):
     async def __call__(self, *__args: Any, **__kwargs: Any) -> Any: pass
 
 
-class FilterProtocol(Protocol):
-    def __call__(self, *__args: Any, **__kwargs: Any) -> bool | Coroutine[Any, Any, bool]: pass
-
-
 HandlerType: TypeAlias = HandlerProtocol | AsyncHandlerProtocol
-FilterType: TypeAlias = Union['Filter', 'LogicalFilter', FilterProtocol]
+FilterType: TypeAlias = Union['Filter', Callable[..., bool | Awaitable[bool]]]

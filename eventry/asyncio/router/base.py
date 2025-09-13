@@ -51,7 +51,8 @@ class Router(ABC):
         manager = self._get_handler_manager(event)
 
         try:
-            async for handler, e in manager.get_matching_handlers(event, single_handler, workflow_data):
+            async for handler, e in manager.get_matching_handlers(event, single_handler,
+                                                                  workflow_data):
                 yield handler, e
 
             for router in self._children.values():
