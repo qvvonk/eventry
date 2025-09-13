@@ -4,7 +4,6 @@ from __future__ import annotations
 __all__ = [
     'Filter',
     'CallableFilter',
-    'AwaitableFilter',
     'LogicalFilter',
     'any_of',
     'all_of',
@@ -12,15 +11,14 @@ __all__ = [
 ]
 
 
-from typing import Any, Callable, Iterable, Awaitable
-from abc import ABC, abstractmethod
+from typing import Any, Callable, Iterable, Awaitable, TypeAlias
+from abc import ABC
 from collections.abc import Sequence
 
 from .callable_wrappers import CallableWrapper
 
 
-CallableFilter = Callable[..., bool]
-AwaitableFilter = Callable[..., Awaitable[bool]]
+CallableFilter: TypeAlias = Callable[..., bool | Awaitable[bool]]
 
 
 class Filter:
@@ -35,11 +33,14 @@ class Filter:
         - ``|`` (OR) creates an ``OrFilter``
         - ``~`` (NOT) creates a ``NotFilter``
     """
+    def __init__(self) -> None:
+        self._call_id = id(self.__call__)
+        self._call_wrapper: CallableWrapper[bool] = CallableWrapper(self.__call__)
 
     async def __call__(self, *args: Any, **kwargs: Any) -> bool:
         return True
 
-    def __and__(self, other: Filter | CallableFilter | AwaitableFilter) -> AndFilter:
+    def __and__(self, other: CallableFilter | Filter) -> AndFilter:
         """
         Combines this filter with another using logical AND.
 
@@ -47,10 +48,10 @@ class Filter:
         """
 
         if not isinstance(other, Filter):
-            other = _convert_filters([other])[0]
+            other = convert_filters([other])[0]
         return AndFilter(self, other)
 
-    def __or__(self, other: Filter | CallableFilter | AwaitableFilter) -> OrFilter:
+    def __or__(self, other: CallableFilter | Filter) -> OrFilter:
         """
         Combines this filter with another using logical OR.
 
@@ -58,7 +59,7 @@ class Filter:
         """
 
         if not isinstance(other, Filter):
-            other = _convert_filters([other])[0]
+            other = convert_filters([other])[0]
         return OrFilter(self, other)
 
     def __invert__(self) -> NotFilter:
@@ -71,11 +72,16 @@ class Filter:
 
         return NotFilter(self)
 
+    async def execute(self, args: Sequence[Any], data: dict[str, Any]) -> bool:
+        if id(self.__call__) != self._call_id:
+            self._call_id = id(self.__call__)
+            self._call_wrapper = CallableWrapper(self.__call__)
+
+        return await self._call_wrapper(args, data)
+
 
 class LogicalFilter(Filter, ABC):
-    @abstractmethod
-    async def execute(self, positional_only_args: Sequence[Any], kwargs: dict[str, Any]) -> bool:
-        pass
+    ...
 
 
 class AndFilter(LogicalFilter):
@@ -85,18 +91,15 @@ class AndFilter(LogicalFilter):
     Typically, created using the ``&`` operator or ``all_of()`` function.
     """
 
-    def __init__(self, *filters: Filter | LogicalFilter) -> None:
-        self._filters: list[LogicalFilter | CallableWrapper[Any, bool]] = [
-            i if isinstance(i, LogicalFilter) else CallableWrapper(i) for i in filters
+    def __init__(self, *filters: CallableFilter | Filter) -> None:
+        super().__init__()
+        self._filters: list[Filter] = [
+            i if isinstance(i, Filter) else FilterFromFunction(i) for i in filters
         ]
 
-    async def execute(self, positional_only_args: Sequence[Any], kwargs: dict[str, Any]) -> bool:
+    async def execute(self, args: Sequence[Any], data: dict[str, Any]) -> bool:
         for i in self._filters:
-            if isinstance(i, LogicalFilter):
-                result = await i.execute(positional_only_args, kwargs)
-            else:
-                result = await i(positional_only_args, kwargs)
-            if not result:
+            if not (await i.execute(args, data)):
                 return False
         return True
 
@@ -108,18 +111,15 @@ class OrFilter(LogicalFilter):
     Typically, created using the ``|`` operator or ``any_of()`` function.
     """
 
-    def __init__(self, *filters: Filter | LogicalFilter) -> None:
-        self._filters: list[LogicalFilter | CallableWrapper[Any, bool]] = [
-            i if isinstance(i, LogicalFilter) else CallableWrapper(i) for i in filters
+    def __init__(self, *filters: CallableFilter | Filter) -> None:
+        super().__init__()
+        self._filters: list[Filter] = [
+            i if isinstance(i, Filter) else FilterFromFunction(i) for i in filters
         ]
 
-    async def execute(self, positional_only_args: Sequence[Any], kwargs: dict[str, Any]) -> bool:
+    async def execute(self, args: Sequence[Any], data: dict[str, Any]) -> bool:
         for i in self._filters:
-            if isinstance(i, LogicalFilter):
-                result = await i.execute(positional_only_args, kwargs)
-            else:
-                result = await i(positional_only_args, kwargs)
-            if result:
+            if await i.execute(args, data):
                 return True
         return False
 
@@ -131,18 +131,12 @@ class NotFilter(LogicalFilter):
     Typically, created using the ``~`` operator.
     """
 
-    def __init__(self, filter: Filter | LogicalFilter) -> None:
-        self._filter: LogicalFilter | CallableWrapper[Any, bool] = (
-            filter if isinstance(filter, LogicalFilter) else CallableWrapper(filter)
-        )
+    def __init__(self, filter: CallableFilter | Filter) -> None:
+        super().__init__()
+        self._filter: Filter = filter if isinstance(filter, Filter) else FilterFromFunction(filter)
 
-    async def execute(self, positional_only_args: Sequence[Any], kwargs: dict[str, Any]) -> bool:
-        if isinstance(self._filter, LogicalFilter):
-            result = await self._filter.execute(positional_only_args, kwargs)
-        else:
-            result = await self._filter(positional_only_args, kwargs)
-
-        return not result
+    async def execute(self, args: Sequence[Any], data: dict[str, Any]) -> bool:
+        return not (await self._filter(args, data))
 
 
 class FilterFromFunction(LogicalFilter):
@@ -152,33 +146,22 @@ class FilterFromFunction(LogicalFilter):
     Used internally to adapt user-defined callables into the filter system.
     """
 
-    def __init__(self, function: CallableFilter | AwaitableFilter) -> None:
-        self._function: CallableWrapper[..., bool] = CallableWrapper(function)
-
-    async def execute(self, positional_only_args: Sequence[Any], kwargs: dict[str, Any]) -> bool:
-        return bool(await self._function(positional_only_args, kwargs))
+    def __init__(self, function: CallableFilter) -> None:
+        setattr(self, '__call__', function)
+        super().__init__()
 
 
-def _convert_filters(
-    filters: Iterable[CallableFilter | AwaitableFilter | Filter],
-) -> list[Filter]:
+def convert_filters(filters: Iterable[CallableFilter | Filter]) -> list[Filter]:
     """
     Converts all function filters to ``FilterFromFunction`` objects.
 
     :param filters: iterable of filters to convert.
     :return: list of converted filters.
     """
-    converted_filters: list[Filter] = []
-    for i in filters:
-        if isinstance(i, Filter):
-            converted_filters.append(i)
-        else:
-            converted_filters.append(FilterFromFunction(i))
-
-    return converted_filters
+    return [i if isinstance(i, Filter) else FilterFromFunction(i) for i in filters]
 
 
-def any_of(*filters: CallableFilter | AwaitableFilter | Filter) -> OrFilter:
+def any_of(*__filters: CallableFilter | Filter) -> OrFilter:
     """
     Creates a composite filter that returns ``True``
     if at least one of the given filters returns ``True``.
@@ -193,10 +176,10 @@ def any_of(*filters: CallableFilter | AwaitableFilter | Filter) -> OrFilter:
 
     If no filters are provided, the resulting filter always returns ``False``.
     """
-    return OrFilter(*_convert_filters(filters))
+    return OrFilter(*convert_filters(__filters))
 
 
-def all_of(*filters: CallableFilter | AwaitableFilter | Filter) -> AndFilter:
+def all_of(*__filters: CallableFilter | Filter) -> AndFilter:
     """
     Creates a composite filter that returns ``True`` only if all the given filters return ``True``.
 
@@ -209,11 +192,14 @@ def all_of(*filters: CallableFilter | AwaitableFilter | Filter) -> AndFilter:
     - or an asynchronous function returning ``bool``.
 
     If no filters are provided, the resulting filter always returns ``True``.
+
+    Args:
+        /:
     """
-    return AndFilter(*_convert_filters(filters))
+    return AndFilter(*convert_filters(__filters))
 
 
-def not_(filter: CallableFilter | AwaitableFilter | Filter) -> NotFilter:
+def not_(__filter: CallableFilter | Filter, /) -> NotFilter:
     """
     Creates a filter that negates the given filter.
 
@@ -225,4 +211,4 @@ def not_(filter: CallableFilter | AwaitableFilter | Filter) -> NotFilter:
     - a synchronous function returning ``bool``,
     - or an asynchronous function returning ``bool``.
     """
-    return NotFilter(_convert_filters([filter])[0])
+    return NotFilter(convert_filters([__filter])[0])
