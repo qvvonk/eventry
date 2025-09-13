@@ -8,74 +8,69 @@ __all__ = [
 ]
 
 
-import asyncio
 import inspect
-from typing import TYPE_CHECKING, Any, Type, Generic, TypeVar, ParamSpec
+from typing import TYPE_CHECKING, Any, Type, Generic, TypeVar, ParamSpec, Union, overload, NoReturn
 from dataclasses import dataclass
-from collections.abc import Callable, Sequence
-
+from collections.abc import Callable, Sequence, Awaitable
 
 if TYPE_CHECKING:
     from .event import Event
-    from .filter import Filter, LogicalFilter
+    from .filter import Filter
     from .handler_manager import HandlerManager
 
 
-ReturnType = TypeVar('ReturnType', bound=Any)
-Params = ParamSpec('Params')
-HandlerManagerType = TypeVar('HandlerManagerType', bound='HandlerManager[Any, Any, Any]')
+ReturnTypeT = TypeVar('ReturnTypeT')
+HandlerManagerTypeT = TypeVar(
+    'HandlerManagerTypeT',
+    default='HandlerManager',
+    bound='HandlerManager'
+)
 
 
-class CallableWrapper(Generic[Params, ReturnType]):
-    def __init__(self, _callable: Callable[..., Any], /):
-        self._callable = _callable
-        self._specs = inspect.getfullargspec(_callable)
-        self._is_awaitable = (
-            inspect.isawaitable(_callable)
-            or inspect.iscoroutinefunction(_callable)
-            or inspect.iscoroutinefunction(getattr(_callable, '__call__', None))
+class CallableWrapper(Generic[ReturnTypeT]):
+    def __init__(self, __obj: Callable[..., Union[Awaitable[ReturnTypeT], ReturnTypeT]], /) -> None:
+        self._callable = __obj
+        self._specs = inspect.getfullargspec(__obj)
+        self._is_async = (
+            inspect.iscoroutinefunction(__obj) or
+            inspect.iscoroutinefunction(getattr(__obj, '__call__', None))
         )
-
         self._params_names = tuple(self._specs.args)
         self._kwargs_names = tuple(self._specs.kwonlyargs)
         self._total_names = self._params_names + self._kwargs_names
 
     async def __call__(
         self,
-        positional_only_args: Sequence[Any],
-        kwargs: dict[str, Any],
-    ) -> ReturnType:
+        args: Sequence[Any] = tuple(),
+        data: dict[str, Any] | None = None,
+    ) -> ReturnTypeT:
+        data = data if data is not None else {}
+
         exclude: set[str] = set()
-        if positional_only_args:
-            exclude.update(self._params_names[: len(positional_only_args)])
+        if args:
+            exclude.update(self._params_names[:len(args)])
 
         if not self.has_varkw or exclude:
-            new_kwargs = {}
-            for k, v in kwargs.items():
-                if exclude and k in exclude:
+            kwargs = {}
+            for k, v in data.items():
+                if k in exclude:
                     continue
                 if not self.has_varkw and k not in self._kwargs_names:
                     continue
-                new_kwargs[k] = v
-            kwargs = new_kwargs
+                kwargs[k] = v
+            data = kwargs
 
-        if self.is_awaitable:
-            return await self.callable(*positional_only_args, **kwargs)  # type: ignore
-        return await asyncio.to_thread(self.callable, *positional_only_args, **kwargs)
-
-    @property
-    def callable(self) -> Callable[Params, ReturnType]:
-        """
-        The original callable object.
-        """
-        return self._callable
+        result = self._callable(*args, **data)
+        if inspect.isawaitable(result):
+            return await result
+        return result
 
     @property
-    def is_awaitable(self) -> bool:
+    def is_async(self) -> bool:
         """
         Indicates whether the original callable is awaitable.
         """
-        return self._is_awaitable
+        return self._is_async
 
     @property
     def has_varkw(self) -> bool:
@@ -126,34 +121,28 @@ class HandlerMeta:
         _callable: Callable[..., Any],
         registration_frame: inspect.FrameInfo,
     ) -> HandlerMeta:
-        is_user_defined_class_instance = not (
-            inspect.isfunction(_callable)
-            or inspect.ismethod(_callable)
-            or inspect.isclass(_callable)
-        )
-
-        obj = _callable.__class__ if is_user_defined_class_instance else _callable
-
         return HandlerMeta(
-            definition_filename=inspect.getsourcefile(obj),
-            definition_lineno=inspect.getsourcelines(obj)[1],
+            definition_filename=inspect.getsourcefile(_callable),
+            definition_lineno=inspect.getsourcelines(_callable)[1],
             registration_filename=registration_frame.filename,
             registration_lineno=registration_frame.lineno,
         )
 
 
-class Handler(Generic[Params, ReturnType, HandlerManagerType], CallableWrapper[Params, ReturnType]):
+class Handler(Generic[ReturnTypeT, HandlerManagerTypeT], CallableWrapper[ReturnTypeT]):
+
     def __init__(
         self,
-        _callable: Callable[Params, ReturnType],
+        __obj: Callable[..., Union[Awaitable[ReturnTypeT], ReturnTypeT]],
+        /,
         handler_id: str,
-        handler_manager: HandlerManagerType,
+        handler_manager: HandlerManagerTypeT,
         on_event: Type[Event] | None,
-        filter: LogicalFilter | CallableWrapper[..., bool] | None,
+        filter: Union[Filter, None],
         as_task: bool,
         meta: HandlerMeta,
     ):
-        super().__init__(_callable)
+        super().__init__(__obj)
         self._handler_manager = handler_manager
         self._handler_id = handler_id
         self._filter = filter
@@ -165,11 +154,11 @@ class Handler(Generic[Params, ReturnType, HandlerManagerType], CallableWrapper[P
         self._on_event = on_event
 
     @property
-    def handler_manager(self) -> HandlerManagerType:
+    def handler_manager(self) -> HandlerManagerTypeT:
         return self._handler_manager
 
     @property
-    def filter(self) -> LogicalFilter | CallableWrapper[..., bool] | None:
+    def filter(self) -> Union[Filter, None]:
         return self._filter
 
     @property
