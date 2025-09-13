@@ -182,12 +182,11 @@ class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):
             wrapped_get_matching_handlers: WrappedWithMiddlewaresCallable[
                 AsyncGenerator[tuple[Handler[Any, Self], Exception | None], None]
             ] = MiddlewareManager.wrap_callable_with_middlewares(
+                self._inner_get_matching_handlers,
                 middlewares=outer_middlewares_manager,
-                callable_to_wrap=self._inner_get_matching_handlers,
-                workflow_data=data,
+                data=data,
                 callable_positional_only_args=(event, single_handler, data),
-                middlewares_positional_only_args=self._config.middleware_positional_only_args,
-            )
+                middlewares_positional_only_args=self._config.middleware_positional_only_args)
             state = await wrapped_get_matching_handlers()
             if not state.callable_executed:
                 return

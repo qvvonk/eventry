@@ -151,10 +151,8 @@ class Dispatcher(Router):
             pre_execution_middlewares.extend(reversed(manager.handler_middlewares))
 
         handler_with_pre_middlewares = MiddlewareManager.wrap_callable_with_middlewares(
-            middlewares=pre_execution_middlewares,
-            callable_to_wrap=handler.callable,
-            workflow_data=workflow_data,
-            first_to_last=False,
-        )
+            middlewares=pre_execution_middlewares, callable_to_wrap=handler.callable,
+            data=workflow_data, callable_positional_only_args=, middlewares_positional_only_args=,
+            first_to_last=False)
 
         return handler_with_pre_middlewares

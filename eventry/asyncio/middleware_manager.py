@@ -74,9 +74,9 @@ class WrappedWithMiddlewaresCallable(Generic[R]):
         return state
 
 
-class MiddlewareManager(Generic[MiddlewareType], Sequence[CallableWrapper[..., Any]]):
+class MiddlewareManager(Generic[MiddlewareType], Sequence[CallableWrapper[Any]]):
     def __init__(self) -> None:
-        self._middlewares: list[CallableWrapper[..., Any]] = []
+        self._middlewares: list[CallableWrapper[Any]] = []
 
     def register_middleware(self, middleware: MiddlewareType) -> MiddlewareType:
         self._middlewares.append(CallableWrapper(middleware))
@@ -94,15 +94,15 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[CallableWrapper[..., A
         return self.register_middleware(middleware)
 
     @overload
-    def __getitem__(self, index: int) -> CallableWrapper[..., Any]: ...
+    def __getitem__(self, index: int) -> CallableWrapper[Any]: ...
 
     @overload
-    def __getitem__(self, index: slice) -> list[CallableWrapper[..., Any]]: ...
+    def __getitem__(self, index: slice) -> list[CallableWrapper[Any]]: ...
 
     def __getitem__(
         self,
         index: int | slice,
-    ) -> CallableWrapper[..., Any] | list[CallableWrapper[..., Any]]:
+    ) -> CallableWrapper[Any] | list[CallableWrapper[Any]]:
         return self._middlewares[index]
 
     def __len__(self) -> int:
@@ -110,9 +110,10 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[CallableWrapper[..., A
 
     @staticmethod
     def wrap_callable_with_middlewares(
-        middlewares: Sequence[MiddlewareType | CallableWrapper[..., Any]],
-        callable_to_wrap: Callable[..., Union[R, Awaitable[R]]] | CallableWrapper[..., Any],
-        workflow_data: dict[str, Any],
+        callable_to_wrap: Callable[..., Union[R, Awaitable[R]]] | CallableWrapper[R],
+        /,
+        middlewares: Sequence[MiddlewareType | CallableWrapper[Any]],
+        data: dict[str, Any],
         callable_positional_only_args: tuple[Any, ...],
         middlewares_positional_only_args: tuple[Any, ...],
         first_to_last: bool = True,
@@ -141,7 +142,7 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[CallableWrapper[..., A
 
         :param middlewares: list of middlewares.
         :param callable_to_wrap: callable to wrap.
-        :param workflow_data: workflow data, that will be passed to each middleware and
+        :param data: workflow data, that will be passed to each middleware and
         original callable.
 
         :param first_to_last: whether the passed ``middlewares`` has order from first middleware
@@ -153,7 +154,7 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[CallableWrapper[..., A
         """
         default_names_remap = default_names_remap or {}
         if not isinstance(callable_to_wrap, CallableWrapper):
-            wrapped_callable: CallableWrapper[..., R] = CallableWrapper(callable_to_wrap)
+            wrapped_callable: CallableWrapper[R] = CallableWrapper(callable_to_wrap)
         else:
             wrapped_callable = callable_to_wrap
 
@@ -161,7 +162,7 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[CallableWrapper[..., A
         async def last_call(state: CallState[R]) -> Any:
             nonlocal wrapped_callable
 
-            workflow_data.update(
+            data.update(
                 {
                     default_names_remap.get(
                         'workflow_data_injection', 'workflow_data_injection'
@@ -169,11 +170,7 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[CallableWrapper[..., A
                     **state.local_scope_workflow_data,
                 }
             )
-            args = tuple(
-                workflow_data[i.name] if isinstance(i, FromKwargs) else i
-                for i in callable_positional_only_args
-            ) if callable_positional_only_args else callable_positional_only_args
-            result = await wrapped_callable(args, workflow_data)
+            result = await wrapped_callable(callable_positional_only_args, data)
 
             state._callable_executed = True
             state._callable_return = result
@@ -181,27 +178,23 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[CallableWrapper[..., A
         current: Callable[[CallState[R]], Awaitable[Any]] = last_call
 
         for middleware in reversed(middlewares) if first_to_last else middlewares:
-            current = MiddlewareManager._wrap_with_middleware(
-                current,
-                middleware,
-                middlewares_positional_only_args,
-                workflow_data,
-                default_names_remap,
-            )
+            current = MiddlewareManager._wrap_with_middleware(current, middleware,
+                                                              middlewares_positional_only_args,
+                                                              data, default_names_remap)
 
         return WrappedWithMiddlewaresCallable(current)
 
     @staticmethod
     def _wrap_with_middleware(
         next_middleware_to_wrap: Callable[[CallState[R]], Any],
-        middleware: MiddlewareType | CallableWrapper[..., Any],
+        middleware: MiddlewareType | CallableWrapper[Any],
         positional_only_args: tuple[str, ...],
-        workflow_data: dict[str, Any],
+        data: dict[str, Any],
         default_names_remap: DefaultNamesRemap,
     ) -> Callable[[CallState[R]], Awaitable[Any]]:
 
         if not isinstance(middleware, CallableWrapper):
-            middleware_obj: CallableWrapper[..., Any] = CallableWrapper(middleware)
+            middleware_obj: CallableWrapper[Any] = CallableWrapper(middleware)
         else:
             middleware_obj = middleware
 
@@ -213,7 +206,7 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[CallableWrapper[..., A
             async def next_call() -> Any:
                 return await next_middleware_to_wrap(state)
 
-            workflow_data.update(
+            data.update(
                 {
                     default_names_remap.get('next_call', 'next_call'): next_call,
                     default_names_remap.get(
@@ -222,11 +215,6 @@ class MiddlewareManager(Generic[MiddlewareType], Sequence[CallableWrapper[..., A
                     **state.local_scope_workflow_data,
                 }
             )
-            args = tuple(
-                workflow_data[i.name] if isinstance(i, FromKwargs) else i for i in positional_only_args
-            )
-
-            result = await middleware_obj(args, workflow_data)
+            result = await middleware_obj(positional_only_args, data)
             return result
-
         return wrapped

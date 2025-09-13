@@ -31,7 +31,7 @@ class Router(ABC):
         self._managers: dict[type[Event], HandlerManager[Any, Any, Self]] = {}
         self._default_handler_manager: HandlerManager[Any, Any, Self] | None = None
 
-    def get_handler_by_id(self, handler_id: str, /) -> Handler[Any, Any, Any] | None:
+    def get_handler_by_id(self, handler_id: str, /) -> Handler[Any, Any] | None:
         for manager in self._managers.values():
             if handler_id in manager.handlers:
                 return manager.handlers[handler_id]
@@ -47,7 +47,7 @@ class Router(ABC):
         event: Event,
         single_handler: bool,
         workflow_data: dict[str, Any],
-    ) -> AsyncGenerator[tuple[Handler[..., Any, Any], Exception | None], None]:
+    ) -> AsyncGenerator[tuple[Handler[Any, Any], Exception | None], None]:
         manager = self._get_handler_manager(event)
 
         try:
