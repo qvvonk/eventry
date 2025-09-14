@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from eventry.config import FromKwargs, HandlerManagerConfig
+from eventry.config import FromData, HandlerManagerConfig
 
 
 handler_manager_config = HandlerManagerConfig(
-    positional_only_args=(FromKwargs('Event'),),
+    positional_only_args=(FromData('Event'),),
 )

@@ -12,7 +12,7 @@ import inspect
 from typing import TYPE_CHECKING, Any, Type, Union, Generic, TypeVar
 from dataclasses import dataclass
 from collections.abc import Callable, Sequence, Awaitable
-
+from eventry.config import FromData
 from eventry.asyncio.default_types import MiddlewareType
 
 
@@ -55,6 +55,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
         exclude: set[str] = set()
         if args:
             exclude.update(self._params_names[: len(args)])
+            args = [i if not isinstance(i, FromData) else data[i] for i in args]
 
         if not self.has_varkw or exclude:
             kwargs = {}

@@ -4,13 +4,7 @@ from typing import Any, TypedDict
 from dataclasses import field, dataclass
 
 
-class FromKwargs:
-    def __init__(self, kwargs_param_name: str, /):
-        self._val = kwargs_param_name
-
-    @property
-    def name(self) -> str:
-        return self._val
+class FromData(str): ...
 
 
 class DefaultNamesRemap(TypedDict, total=False):

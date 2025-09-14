@@ -178,6 +178,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         whose filters match the given event.
 
         :param event: The event object to be checked against handler filters.
+        :param single_handler: # todo
         :param data: A dictionary containing data related to the current workflow.
 
         :return: An async generator of ``HandlerInfo`` objects with matching filters.
