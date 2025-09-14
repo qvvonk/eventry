@@ -51,7 +51,6 @@ class CallableWrapper(Generic[ReturnTypeT]):
         data: dict[str, Any] | None = None,
     ) -> ReturnTypeT:
         data = data if data is not None else {}
-
         exclude: set[str] = set()
         if args:
             exclude.update(self._params_names[: len(args)])
@@ -62,7 +61,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
             for k, v in data.items():
                 if k in exclude:
                     continue
-                if not self.has_varkw and k not in self._kwargs_names:
+                if not self.has_varkw and k not in self.params_names:
                     continue
                 kwargs[k] = v
             data = kwargs

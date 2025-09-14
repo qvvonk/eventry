@@ -136,7 +136,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         """
         root_router = self.router.root_router
 
-        if (exists_handler := root_router.get_handler(handler.id)) is not None:
+        if (exists_handler := root_router.get_handler_by_id(handler.id)) is not None:
             raise ValueError(
                 f'Handler with ID {handler.id} already exists.\n'
                 f"Original handler registered in router '{exists_handler.handler_manager.router.id}':\n"
