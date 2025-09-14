@@ -31,6 +31,7 @@ if TYPE_CHECKING:
 
     from ..middleware_manager import MiddlewareManager, WrappedWithMiddlewaresCallable
 
+
 HandlerT = TypeVar('HandlerT', bound=HandlerType, default=HandlerType)
 FilterT = TypeVar('FilterT', bound=FilterType, default=FilterType)
 RouterT = TypeVar('RouterT', bound='Router', default='Router')
@@ -370,7 +371,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
 
 def gen_default_handler_id(
     handler: HandlerT,
-    manager: HandlerManager[Any, Any, Any],
+    manager: HandlerManager[Any, Any, Any, Any],
 ) -> str:
     is_class_instance = not (
         inspect.isfunction(handler) or inspect.ismethod(handler) or inspect.isclass(handler)

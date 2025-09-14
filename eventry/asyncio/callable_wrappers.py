@@ -22,12 +22,14 @@ if TYPE_CHECKING:
     from .handler_manager import HandlerManager
 
 
-ReturnTypeT = TypeVar('ReturnTypeT')
+
 HandlerManagerTypeT = TypeVar(
     'HandlerManagerTypeT',
     default='HandlerManager',
-    bound='HandlerManager',
+    bound='HandlerManager[Any, Any, Any, Any]',
 )
+
+ReturnTypeT = TypeVar('ReturnTypeT')
 
 
 class CallableWrapper(Generic[ReturnTypeT]):
