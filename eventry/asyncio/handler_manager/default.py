@@ -7,12 +7,15 @@ __all__ = ['DefaultHandlerManager']
 from typing import TYPE_CHECKING, Any, Type, TypeVar
 from collections.abc import Callable
 
+from eventry.asyncio.default_types import FilterType, HandlerType
+
 from .base import HandlerManager, MiddlewareManagerTypes
 from ..middleware_manager import MiddlewareManager
-from eventry.asyncio.default_types import HandlerType, FilterType
+
 
 if TYPE_CHECKING:
     from eventry.asyncio.event import Event
+
     from ..router import Router
 
 

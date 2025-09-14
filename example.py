@@ -1,7 +1,9 @@
-from collections.abc import Callable
-from typing_extensions import TypeVarTuple, Protocol
-from typing import ParamSpec, TypeVar, Generic, Concatenate
+from __future__ import annotations
 
+from typing import Generic, TypeVar, ParamSpec
+from collections.abc import Callable
+
+from typing_extensions import TypeVarTuple
 
 
 MustHaveParams = TypeVarTuple('MustHaveParams')
@@ -19,7 +21,8 @@ class SomeClass(Generic[*MustHaveParams, ReturnType]):
 a: SomeClass[int, str, bool] = SomeClass()
 
 
-def my_handler(arg1: int) -> bool: return True
+def my_handler(arg1: int) -> bool:
+    return True
 
 
 test = a.method(my_handler)

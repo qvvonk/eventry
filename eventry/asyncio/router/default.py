@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from .base import Router
 from eventry.asyncio.handler_manager import DefaultHandlerManager
+
+from .base import Router
 
 
 class DefaultRouter(Router):
@@ -9,7 +10,9 @@ class DefaultRouter(Router):
         super().__init__(router_id=router_id)
 
         self._default_handler_manager: DefaultHandlerManager = DefaultHandlerManager(
-            self, handler_manager_id='default', event_type_filter=None
+            self,
+            handler_manager_id='default',
+            event_type_filter=None,
         )
 
     @property

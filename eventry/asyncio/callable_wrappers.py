@@ -9,9 +9,12 @@ __all__ = [
 
 
 import inspect
-from typing import TYPE_CHECKING, Any, Type, Generic, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Type, Union, Generic, TypeVar
 from dataclasses import dataclass
 from collections.abc import Callable, Sequence, Awaitable
+
+from eventry.asyncio.default_types import MiddlewareType
+
 
 if TYPE_CHECKING:
     from .event import Event
@@ -22,18 +25,19 @@ if TYPE_CHECKING:
 ReturnTypeT = TypeVar('ReturnTypeT')
 HandlerManagerTypeT = TypeVar(
     'HandlerManagerTypeT',
-    default='HandlerManager[Any, Any, Any]',
-    bound='HandlerManager[Any, Any, Any]'
+    default='HandlerManager',
+    bound='HandlerManager',
 )
 
 
 class CallableWrapper(Generic[ReturnTypeT]):
-    def __init__(self, __obj: Callable[..., Union[Awaitable[ReturnTypeT], ReturnTypeT]], /) -> None:
+    def __init__(
+        self, __obj: Callable[..., Union[Awaitable[ReturnTypeT], ReturnTypeT]], /
+    ) -> None:
         self._callable = __obj
         self._specs = inspect.getfullargspec(__obj)
-        self._is_async = (
-            inspect.iscoroutinefunction(__obj) or
-            inspect.iscoroutinefunction(getattr(__obj, '__call__', None))
+        self._is_async = inspect.iscoroutinefunction(__obj) or inspect.iscoroutinefunction(
+            getattr(__obj, '__call__', None)
         )
         self._params_names = tuple(self._specs.args)
         self._kwargs_names = tuple(self._specs.kwonlyargs)
@@ -48,7 +52,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
 
         exclude: set[str] = set()
         if args:
-            exclude.update(self._params_names[:len(args)])
+            exclude.update(self._params_names[: len(args)])
 
         if not self.has_varkw or exclude:
             kwargs = {}
@@ -129,7 +133,7 @@ class HandlerMeta:
         )
 
 
-class Handler(Generic[ReturnTypeT, HandlerManagerTypeT], CallableWrapper[ReturnTypeT]):
+class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerTypeT]):
     def __init__(
         self,
         __obj: Callable[..., Union[Awaitable[ReturnTypeT], ReturnTypeT]],
@@ -138,7 +142,7 @@ class Handler(Generic[ReturnTypeT, HandlerManagerTypeT], CallableWrapper[ReturnT
         handler_manager: HandlerManagerTypeT,
         on_event: Type[Event] | None,
         filter: Union[Filter, None],
-        middlewares: list[...],
+        middlewares: list[MiddlewareType],
         as_task: bool,
         meta: HandlerMeta,
     ):
@@ -179,5 +183,5 @@ class Handler(Generic[ReturnTypeT, HandlerManagerTypeT], CallableWrapper[ReturnT
         return self.handler_manager.event_type_filter or self._on_event
 
     @property
-    def middlewares(self) -> list[...]:
+    def middlewares(self) -> list[MiddlewareType]:
         return self._middlewares

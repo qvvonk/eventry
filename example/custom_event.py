@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any
 
 from eventry.asyncio.event import ExtendedEvent
@@ -15,4 +17,3 @@ class MyEvent(ExtendedEvent):
     @property
     def workflow_injection(self) -> dict[str, Any]:
         return {'object': self.object}
-

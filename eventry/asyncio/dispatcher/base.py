@@ -6,20 +6,19 @@ __all__ = ('Dispatcher',)
 
 import time
 import asyncio
-from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
+from itertools import chain
+from collections.abc import Iterable
 
-from eventry.asyncio.handler_manager import MiddlewareManagerTypes
+from eventry.config import DispatcherConfig
 from eventry.loggers import dispatcher_logger
+from eventry.asyncio.event import Event, ErrorEvent
+from eventry.asyncio.router import Router
+from eventry.asyncio.handler_manager import MiddlewareManagerTypes
 from eventry.asyncio.middleware_manager import (
     MiddlewareManager,
     WrappedWithMiddlewaresCallable,
 )
-from eventry.asyncio.router import Router
-from eventry.asyncio.event import Event, ErrorEvent
-from eventry.config import DispatcherConfig
-from copy import copy
-from itertools import chain
 
 
 if TYPE_CHECKING:
@@ -27,13 +26,17 @@ if TYPE_CHECKING:
 
 
 class Dispatcher(Router):
-    def __init__(self, workflow_data: dict[str, Any] | None = None, config: DispatcherConfig | None = None) -> None:
+    def __init__(
+        self, workflow_data: dict[str, Any] | None = None, config: DispatcherConfig | None = None
+    ) -> None:
         super().__init__(router_id='Dispatcher')
 
         self._workflow_data = workflow_data or {}
         self._config = config or DispatcherConfig()
 
-    async def propagate_event(self, event: Event, workflow_injection: dict[str, Any] | None = None, silent: bool = False) -> None:
+    async def propagate_event(
+        self, event: Event, workflow_injection: dict[str, Any] | None = None, silent: bool = False
+    ) -> None:
         dispatcher_logger.debug(f'New event {id(event)}: {type(event)}')
 
         workflow_injection = workflow_injection or {}
@@ -47,7 +50,9 @@ class Dispatcher(Router):
         }
         data['data'] = data
 
-        async for handler, e in self._get_matching_handlers(event, self._config.single_handler_mode, data):
+        async for handler, e in self._get_matching_handlers(
+            event, self._config.single_handler_mode, data
+        ):
             if e is not None:
                 dispatcher_logger.debug(
                     f'({id(event)}) An error occurred while executing '
@@ -71,7 +76,7 @@ class Dispatcher(Router):
         event: Event,
         handler: Handler[Any],
         data: dict[str, Any],
-        silent: bool
+        silent: bool,
     ) -> Any:
         try:
             r = await self._execute_handler(event, handler, data=data)
@@ -96,19 +101,18 @@ class Dispatcher(Router):
         )
 
         dispatcher_logger.debug(
-            f"({id(event)}) Executing handler "
-            f"{handler.handler_manager.router.id} -> {handler.handler_manager.id} -> {handler.id}..."
+            f'({id(event)}) Executing handler '
+            f'{handler.handler_manager.router.id} -> {handler.handler_manager.id} -> {handler.id}...',
         )
         start = time.time()
         try:
             if not handler.as_task:
                 return await wrapped_handler()
-            else:
-                asyncio.create_task(wrapped_handler())
+            asyncio.create_task(wrapped_handler())
         except Exception as e:
             dispatcher_logger.debug(
-                f"({id(event)}) An error occurred while executing handler "
-                f"{handler.handler_manager.router.id} -> {handler.handler_manager.id} -> {handler.id}.",
+                f'({id(event)}) An error occurred while executing handler '
+                f'{handler.handler_manager.router.id} -> {handler.handler_manager.id} -> {handler.id}.',
                 exc_info=e,
             )
             raise e
@@ -123,13 +127,16 @@ class Dispatcher(Router):
         event: Event,
         workflow_data: dict[str, Any],
     ) -> WrappedWithMiddlewaresCallable[Any]:
-        middlewares: list[Iterable[CallableWrapper[Any]]] = \
+        middlewares: list[Iterable[CallableWrapper[Any]]] = (
             [reversed(handler.middlewares)] if handler.middlewares else []
+        )
 
         if handler.handler_manager.middleware_manager(MiddlewareManagerTypes.INNER):
             for router in handler.handler_manager.router.chain_to_root_router:
                 manager = router._get_handler_manager(event)
-                middlewares.append(reversed(manager.middleware_manager(MiddlewareManagerTypes.INNER)))
+                middlewares.append(
+                    reversed(manager.middleware_manager(MiddlewareManagerTypes.INNER))
+                )
 
         handler_with_pre_middlewares = MiddlewareManager.wrap_callable_with_middlewares(
             handler._callable,
@@ -137,6 +144,6 @@ class Dispatcher(Router):
             data=workflow_data,
             callable_positional_only_args=handler.handler_manager._config.positional_only_args,
             middlewares_positional_only_args=handler.handler_manager._config.middleware_positional_only_args,
-            default_names_remap=self._config.default_names_remap
+            default_names_remap=self._config.default_names_remap,
         )
         return handler_with_pre_middlewares

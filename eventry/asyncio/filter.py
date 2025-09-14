@@ -33,6 +33,7 @@ class Filter:
         - ``|`` (OR) creates an ``OrFilter``
         - ``~`` (NOT) creates a ``NotFilter``
     """
+
     def __init__(self) -> None:
         self._call_id = id(self.__call__)
         self._call_wrapper: CallableWrapper[bool] = CallableWrapper(self.__call__)
@@ -80,8 +81,7 @@ class Filter:
         return await self._call_wrapper(args, data)
 
 
-class LogicalFilter(Filter, ABC):
-    ...
+class LogicalFilter(Filter, ABC): ...
 
 
 class AndFilter(LogicalFilter):

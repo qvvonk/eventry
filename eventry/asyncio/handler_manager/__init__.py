@@ -4,7 +4,7 @@ from __future__ import annotations
 __all__ = [
     'HandlerManager',
     'MiddlewareManagerTypes',
-    'DefaultHandlerManager'
+    'DefaultHandlerManager',
 ]
 
 

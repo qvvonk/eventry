@@ -4,16 +4,16 @@ from __future__ import annotations
 __all__ = ['Router']
 
 
-from typing import Any, TypeVar, Type, TYPE_CHECKING
-from typing_extensions import Self
+from typing import TYPE_CHECKING, Any, Type, TypeVar
+from abc import ABC
 from collections.abc import Generator, AsyncGenerator
 
-from eventry.loggers import router_logger
+from typing_extensions import Self
 
+from eventry.loggers import router_logger
+from eventry.asyncio._exceptions import HandlerFound
 from eventry.asyncio.handler_manager import HandlerManager
 from eventry.asyncio.callable_wrappers import Handler
-from eventry.asyncio._exceptions import HandlerFound
-from abc import ABC
 
 
 if TYPE_CHECKING:
@@ -51,20 +51,25 @@ class Router(ABC):
         manager = self._get_handler_manager(event)
 
         try:
-            async for handler, e in manager.get_matching_handlers(event, single_handler,
-                                                                  workflow_data):
+            async for handler, e in manager.get_matching_handlers(
+                event, single_handler, workflow_data
+            ):
                 yield handler, e
 
             for router in self._children.values():
-                async for handler, e in router._get_matching_handlers(event, single_handler, workflow_data):
+                async for handler, e in router._get_matching_handlers(
+                    event, single_handler, workflow_data
+                ):
                     yield handler, e
         except HandlerFound:
             return
 
     def _add_handler_manager(self, handler_manager: HandlerManagerType, /) -> HandlerManagerType:
         if not handler_manager.event_type_filter:
-            raise ValueError('Cannot add handler manager without event type filter. '
-                             'Assign it as default handler manager.')  # todo: improve
+            raise ValueError(
+                'Cannot add handler manager without event type filter. '
+                'Assign it as default handler manager.'
+            )  # todo: improve
 
         if handler_manager.event_type_filter in self._managers:
             raise RuntimeError('Router already has a manager with this event type.')  # todo
@@ -72,7 +77,9 @@ class Router(ABC):
         self._managers[handler_manager.event_type_filter] = handler_manager
         return handler_manager
 
-    def _get_handler_manager(self, event: Event | Type[Event], /) -> HandlerManager[Any, Any, Self]:
+    def _get_handler_manager(
+        self, event: Event | Type[Event], /
+    ) -> HandlerManager[Any, Any, Self]:
         event_type = event if isinstance(event, type) else event.__class__
         if event_type in self._managers:
             return self._managers[event_type]
@@ -118,7 +125,7 @@ class Router(ABC):
         if type(router) is not type(self):
             raise TypeError(
                 f'Parent router must be of the same class as this router '
-                f'(expected {self.__class__.__name__}, got {router.__class__.__name__}).'
+                f'(expected {self.__class__.__name__}, got {router.__class__.__name__}).',
             )
         if self.parent_router:
             raise RuntimeError(

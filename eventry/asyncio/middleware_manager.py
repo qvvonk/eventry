@@ -8,14 +8,13 @@ __all__ = [
 ]
 
 
-from typing import Any, Generic, TypeVar, Callable, Awaitable, overload, Union
+from typing import Any, Union, Generic, TypeVar, Callable, Awaitable, overload
 from dataclasses import field, dataclass
 from functools import wraps
-from collections.abc import Sequence, Iterable
+from collections.abc import Iterable, Sequence
 
-from eventry.config import FromKwargs, DefaultNamesRemap
+from eventry.config import DefaultNamesRemap
 from eventry.asyncio.default_types import MiddlewareType
-
 
 from .callable_wrappers import CallableWrapper
 
@@ -90,7 +89,9 @@ class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[CallableWrapper[Any]]
     @overload
     def __call__(self) -> Callable[[MiddlewareTypeT], MiddlewareTypeT]: ...
 
-    def __call__(self, middleware: MiddlewareTypeT | None = None) -> MiddlewareTypeT | Callable[[MiddlewareTypeT], MiddlewareTypeT]:
+    def __call__(
+        self, middleware: MiddlewareTypeT | None = None
+    ) -> MiddlewareTypeT | Callable[[MiddlewareTypeT], MiddlewareTypeT]:
         if middleware is None:
             return self.register_middleware
         return self.register_middleware(middleware)
@@ -162,10 +163,11 @@ class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[CallableWrapper[Any]]
             data.update(
                 {
                     default_names_remap.get(
-                        'workflow_data_injection', 'workflow_data_injection'
+                        'workflow_data_injection',
+                        'workflow_data_injection',
                     ): state.local_scope_workflow_data,
                     **state.local_scope_workflow_data,
-                }
+                },
             )
             result = await wrapped_callable(callable_positional_only_args, data)
 
@@ -180,7 +182,7 @@ class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[CallableWrapper[Any]]
                 middleware,
                 middlewares_positional_only_args,
                 data,
-                default_names_remap
+                default_names_remap,
             )
 
         return WrappedWithMiddlewaresCallable(current)
@@ -193,7 +195,6 @@ class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[CallableWrapper[Any]]
         data: dict[str, Any],
         default_names_remap: DefaultNamesRemap,
     ) -> Callable[[CallState[R]], Awaitable[Any]]:
-
         if not isinstance(middleware, CallableWrapper):
             middleware_obj: CallableWrapper[Any] = CallableWrapper(middleware)
         else:
@@ -211,11 +212,13 @@ class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[CallableWrapper[Any]]
                 {
                     default_names_remap.get('next_call', 'next_call'): next_call,
                     default_names_remap.get(
-                        'workflow_data_injection', 'workflow_data_injection'
+                        'workflow_data_injection',
+                        'workflow_data_injection',
                     ): state.local_scope_workflow_data,
                     **state.local_scope_workflow_data,
-                }
+                },
             )
             result = await middleware_obj(positional_only_args, data)
             return result
+
         return wrapped

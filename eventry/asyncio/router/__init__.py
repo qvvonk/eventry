@@ -3,7 +3,7 @@ from __future__ import annotations
 
 __all__ = [
     'Router',
-    'DefaultRouter'
+    'DefaultRouter',
 ]
 
 

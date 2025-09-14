@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 __all__ = [
     'HandlerManager',
     'MiddlewareManagerTypes',
@@ -9,30 +10,31 @@ __all__ = [
 import sys
 import inspect
 import pathlib
-from typing import TYPE_CHECKING, Any, Type, Generic, overload, Union, Optional
-from abc import ABC
+from typing import TYPE_CHECKING, Any, Type, Union, Generic, Optional, overload
 from enum import Enum, auto
 from types import MappingProxyType
-from collections.abc import Callable
+from collections.abc import Callable, AsyncGenerator
+
+from typing_extensions import Self, TypeVar
 
 from eventry.config import HandlerManagerConfig
 from eventry.loggers import router_logger
-
-from ..filter import convert_filters, LogicalFilter
-from eventry.asyncio.callable_wrappers import Handler, HandlerMeta, CallableWrapper
-from typing_extensions import Self, TypeVar
-from collections.abc import AsyncGenerator
-from eventry.asyncio.default_types import HandlerType, FilterType
+from eventry.asyncio.filter import convert_filters
 from eventry.asyncio._exceptions import HandlerFound
+from eventry.asyncio.default_types import FilterType, HandlerType, MiddlewareType
+from eventry.asyncio.callable_wrappers import Handler, HandlerMeta, CallableWrapper
+
 
 if TYPE_CHECKING:
     from eventry.asyncio.event import Event
     from eventry.asyncio.router import Router
+
     from ..middleware_manager import MiddlewareManager, WrappedWithMiddlewaresCallable
 
 HandlerT = TypeVar('HandlerT', bound=HandlerType, default=HandlerType)
 FilterT = TypeVar('FilterT', bound=FilterType, default=FilterType)
 RouterT = TypeVar('RouterT', bound='Router', default='Router')
+MiddlewareT = TypeVar('MiddlewareT', bound=MiddlewareType, default=MiddlewareType)
 
 
 class MiddlewareManagerTypes(Enum):
@@ -40,7 +42,7 @@ class MiddlewareManagerTypes(Enum):
     INNER = auto()
 
 
-class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):
+class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
     """
     Manages the registration and filtering of event handlers for a specific event type.
 
@@ -82,7 +84,9 @@ class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):
         self._event_type_filter = event_type_filter
         self._handler_manager_id = handler_manager_id
         self._config = config or HandlerManagerConfig()
-        self._middleware_managers: dict[MiddlewareManagerTypes, MiddlewareManager[Any]] = {}
+        self._middleware_managers: dict[
+            MiddlewareManagerTypes, MiddlewareManager[MiddlewareT]
+        ] = {}
 
     def _create_handler_obj(
         self,
@@ -90,6 +94,7 @@ class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):
         on_event: Type[Event] | None = None,
         handler_id: str | None = None,
         filter: Optional[FilterT] = None,
+        middlewares: list[MiddlewareT] | None = None,
         as_task: bool = False,
         meta: HandlerMeta | None = None,
     ) -> Handler[Any, Self]:
@@ -105,12 +110,15 @@ class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):
             handler_manager=self,
             on_event=on_event,
             filter=convert_filters([filter])[0] if filter is not None else None,
+            middlewares=[CallableWrapper(i) for i in middlewares]
+            if middlewares is not None
+            else [],
             as_task=as_task,
             meta=meta
-               or HandlerMeta.from_callable(
-              _callable=handler,
-              registration_frame=inspect.stack()[1]
-            )
+            or HandlerMeta.from_callable(
+                _callable=handler,
+                registration_frame=inspect.stack()[1],
+            ),
         )
         return handler_obj
 
@@ -185,7 +193,8 @@ class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):
                 middlewares=reversed(outer_middlewares_manager),
                 data=data,
                 callable_positional_only_args=(event, single_handler, data),
-                middlewares_positional_only_args=self._config.middleware_positional_only_args)
+                middlewares_positional_only_args=self._config.middleware_positional_only_args,
+            )
             state = await wrapped_get_matching_handlers()
             if not state.callable_executed:
                 return
@@ -230,11 +239,10 @@ class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):
                 continue
 
             try:
-                if isinstance(handler.filter, LogicalFilter):
-                    filter_result = await handler.filter.execute(
-                        self._config.filter_call_positional_only_args, data)
-                else:
-                    filter_result = await handler.filter(self._config.positional_only_args, data)
+                filter_result = await handler.filter.execute(
+                    self._config.filter_call_positional_only_args,
+                    data,
+                )
             except KeyboardInterrupt:
                 raise
             except Exception as e:
@@ -274,36 +282,45 @@ class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):
         return self._middleware_managers.get(_type)
 
     @overload
-    def __call__(self, func: HandlerT, /) -> HandlerT: pass
+    def __call__(self, func: HandlerT, /) -> HandlerT:
+        pass
 
     @overload
     def __call__(
         self,
-        /, *,
+        /,
+        *,
         on_event: Type[Event] | None = None,
         handler_id: str | None = None,
         filter: Optional[FilterT] = None,
+        middlewares: list[MiddlewareT] | None = None,
         as_task: bool = False,
-    ) -> Callable[[HandlerT], HandlerT]: pass
+    ) -> Callable[[HandlerT], HandlerT]:
+        pass
 
     @overload
     def __call__(
         self,
         func: HandlerT,
-        /, *,
+        /,
+        *,
         on_event: Type[Event] | None = None,
         handler_id: str | None = None,
         filter: Optional[FilterT] = None,
+        middlewares: list[MiddlewareT] | None = None,
         as_task: bool = False,
-    ) -> HandlerT: pass
+    ) -> HandlerT:
+        pass
 
     def __call__(
         self,
         func: Optional[HandlerT] = None,
-        /, *,
+        /,
+        *,
         on_event: Type[Event] | None = None,
         handler_id: str | None = None,
         filter: Optional[FilterT] = None,
+        middlewares: list[MiddlewareT] | None = None,
         as_task: bool = False,
     ) -> Union[HandlerT, Callable[[HandlerT], HandlerT]]:
         def inner(handler: HandlerT) -> HandlerT:
@@ -311,8 +328,14 @@ class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):
                 handler,
                 registration_frame=inspect.stack()[2 if func is not None else 1],
             )
-            handler_obj = self._create_handler_obj(handler=handler, handler_id=handler_id,
-                                                   filter=filter, as_task=as_task, meta=meta)
+            handler_obj = self._create_handler_obj(
+                handler=handler,
+                handler_id=handler_id,
+                as_task=as_task,
+                filter=filter,
+                middlewares=middlewares,
+                meta=meta,
+            )
             self._register_handler(handler_obj)
             return handler
 
@@ -366,6 +389,4 @@ def gen_default_handler_id(
 
     module_path = '.'.join(rel_path.parts)
 
-    return (
-        f'{manager.router.id}.{manager.id}--{module_path}.{handler.__qualname__}'
-    )
+    return f'{manager.router.id}.{manager.id}--{module_path}.{handler.__qualname__}'
