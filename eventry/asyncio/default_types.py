@@ -17,13 +17,6 @@ RouterType = TypeVar('RouterType', bound='Router')
 # HandlerType = TypeVar('HandlerType', bound=Callable[..., Any])
 
 
-class HandlerProtocol(Protocol):
-    def __call__(self, *__args: Any, **__kwargs: Any) -> Any: pass
-
-
-class AsyncHandlerProtocol(Protocol):
-    async def __call__(self, *__args: Any, **__kwargs: Any) -> Any: pass
-
-
-HandlerType: TypeAlias = HandlerProtocol | AsyncHandlerProtocol
+HandlerType: TypeAlias = Callable[..., Any]
 FilterType: TypeAlias = Union['Filter', Callable[..., bool | Awaitable[bool]]]
+MiddlewareType: TypeAlias = Callable[..., Any]

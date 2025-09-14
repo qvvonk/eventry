@@ -182,7 +182,7 @@ class HandlerManager(Generic[FilterT, HandlerT, RouterT], ABC):
                 AsyncGenerator[tuple[Handler[Any, Self], Exception | None], None]
             ] = MiddlewareManager.wrap_callable_with_middlewares(
                 self._inner_get_matching_handlers,
-                middlewares=outer_middlewares_manager,
+                middlewares=reversed(outer_middlewares_manager),
                 data=data,
                 callable_positional_only_args=(event, single_handler, data),
                 middlewares_positional_only_args=self._config.middleware_positional_only_args)
