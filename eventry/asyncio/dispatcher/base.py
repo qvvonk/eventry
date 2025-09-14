@@ -24,6 +24,7 @@ from dataclasses import dataclass
 
 if TYPE_CHECKING:
     from eventry.asyncio.callable_wrappers import Handler, CallableWrapper
+    from eventry.asyncio.handler_manager import HandlerManager
 
 
 @dataclass(frozen=True)
@@ -40,18 +41,13 @@ class Dispatcher(Router):
         workflow_data: dict[str, Any] | None = None,
         config: DispatcherConfig | None = None,
     ) -> None:
-        super().__init__(router_id='Dispatcher')
+        Router.__init__(self, router_id='Dispatcher')
 
         self._workflow_data = workflow_data or {}
         self._config = config or DispatcherConfig()
         self._error_event_factory: Callable[[ErrorContext], Event] = error_event_factory
 
-    async def propagate_event(
-        self,
-        event: Event,
-        workflow_injection: dict[str, Any] | None = None,
-        silent: bool = False
-    ) -> None:
+    async def propagate_event(self, event: Event, workflow_injection: dict[str, Any] | None = None, silent: bool = False) -> None:
         dispatcher_logger.debug(f'New event {id(event)}: {type(event)}')
 
         workflow_injection = workflow_injection or {}
@@ -64,8 +60,42 @@ class Dispatcher(Router):
             'dispatcher': self,
         }
         data['data'] = data
+        errors: list[ErrorContext]= []
 
-        async for handler, e in self._get_matching_handlers(
+        for manager in self._get_handler_managers_to_tail(event):
+            outer_middlewares = manager.middleware_manager(MiddlewareManagerTypes.OUTER)
+            if outer_middlewares:
+                wrapped: WrappedWithMiddlewaresCallable[Any] = outer_middlewares.wrap_callable_with_middlewares(
+                    self._execute_manager_handlers,
+                    middlewares=outer_middlewares,
+                    data=data,
+                    callable_positional_only_args=(event, manager, data, silent),
+                    middlewares_positional_only_args=manager._config.middleware_positional_only_args,
+                )
+                state = await wrapped()
+                if not state.callable_executed:
+                    return
+                else:
+                    result = state.callable_return
+            else:
+                result = await self._execute_manager_handlers(event, manager, data, silent)
+
+            errors.extend(result)
+
+        for err in errors:
+            event = self._error_event_factory(err)
+            await self.propagate_event(event, {}, silent=True)
+
+    async def _execute_manager_handlers(
+        self,
+        event: Event,
+        manager: HandlerManager[Any, Any, Any, Any],
+        data: dict[str, Any],
+        silent: bool
+    ) -> list[ErrorContext]:
+        errors: list[ErrorContext] = []
+
+        async for handler, e in manager.get_matching_handlers(
             event, self._config.single_handler_mode, data
         ):
             if e is not None:
@@ -75,22 +105,18 @@ class Dispatcher(Router):
                     exc_info=e,
                 )
 
-                if silent:
-                    continue
-
-                err_context = ErrorContext(e, handler, event)
-                await self.propagate_event(
-                    self._error_event_factory(err_context),
-                    workflow_injection={},
-                    silent=True
-                )
+                if not silent:
+                    errors.append(ErrorContext(e, handler, event))
                 continue
 
-            await self._execute_handler_wrapper(event, handler, data, silent)
+            result = await self._execute_handler_wrapper(event, handler, data, silent)
+            if isinstance(result, ErrorContext):
+                errors.append(result)
 
             if event.propagation_stopped:
                 dispatcher_logger.debug(f'({id(event)}) Event propagation stopped.')
                 break
+        return errors
 
     async def _execute_handler_wrapper(
         self,
@@ -104,13 +130,7 @@ class Dispatcher(Router):
             return r
         except Exception as e:
             if not silent:
-                err_context = ErrorContext(e, handler, event)
-                await self.propagate_event(
-                    self._error_event_factory(err_context),
-                    workflow_injection={},
-                    silent=True
-                )
-            return False
+                return ErrorContext(e, handler, event)
 
     async def _execute_handler(
         self,

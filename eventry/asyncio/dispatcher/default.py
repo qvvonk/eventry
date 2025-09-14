@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-__all__ = ['DefaultDispatcher']
+__all__ = ['DefaultDispatcher', 'ErrorEvent']
 
 
 from .base import Dispatcher, ErrorContext
@@ -30,4 +30,5 @@ def error_event_factory(context: ErrorContext) -> ErrorEvent:
 
 class DefaultDispatcher(Dispatcher, DefaultRouter):
     def __init__(self, workflow_data: dict[str, Any] | None = None):
-        super().__init__(error_event_factory=error_event_factory, workflow_data=workflow_data)
+        Dispatcher.__init__(self, error_event_factory=error_event_factory, workflow_data=workflow_data)
+        DefaultRouter.__init__(self, router_id='Dispatcher')

@@ -1,6 +1,6 @@
-__all__ = ['Dispatcher', 'DefaultDispatcher', 'ErrorContext']
+__all__ = ['Dispatcher', 'DefaultDispatcher', 'ErrorContext', 'ErrorEvent']
 
 
 from .base import Dispatcher, ErrorContext
-from .default import DefaultDispatcher
+from .default import DefaultDispatcher, ErrorEvent
 

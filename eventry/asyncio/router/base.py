@@ -93,6 +93,10 @@ class Router:
 
         raise RuntimeError('No handler manager with this event type.')  # todo
 
+    def _get_handler_managers_to_tail(self, event: Event) -> Generator[HandlerManager[Any, Any, Any, Self], None]:
+        for router in self.chain_to_last_router:
+            yield router._get_handler_manager(event)
+
     @property
     def id(self) -> str:
         return self._router_id

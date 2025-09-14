@@ -9,6 +9,7 @@ __all__ = [
 
 
 import inspect
+from types import MethodType
 from typing import TYPE_CHECKING, Any, Type, Union, Generic, TypeVar
 from dataclasses import dataclass
 from collections.abc import Callable, Sequence, Awaitable
@@ -41,7 +42,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
         self._is_async = inspect.iscoroutinefunction(__obj) or inspect.iscoroutinefunction(
             getattr(__obj, '__call__', None)
         )
-        self._params_names = tuple(self._specs.args)
+        self._params_names = tuple(self._specs.args[1:]) if isinstance(self._callable, MethodType) else tuple(self._specs.args)
         self._kwargs_names = tuple(self._specs.kwonlyargs)
         self._total_names = self._params_names + self._kwargs_names
 

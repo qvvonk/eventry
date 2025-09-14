@@ -23,12 +23,12 @@ from eventry.asyncio.filter import convert_filters
 from eventry.asyncio._exceptions import HandlerFound
 from eventry.asyncio.default_types import FilterType, HandlerType, MiddlewareType
 from eventry.asyncio.callable_wrappers import Handler, HandlerMeta, CallableWrapper
+from eventry.asyncio.middleware_manager import MiddlewareManager, WrappedWithMiddlewaresCallable
 
 
 if TYPE_CHECKING:
     from eventry.asyncio.event import Event
     from eventry.asyncio.router import Router
-    from eventry.asyncio.middleware_manager import MiddlewareManager, WrappedWithMiddlewaresCallable
 
 
 RouterT = TypeVar('RouterT', bound='Router', default='Router')
@@ -173,44 +173,6 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         data: dict[str, Any],
     ) -> AsyncGenerator[tuple[Handler[Any, Self], Exception | None], None]:
         """
-        Executes the chain of pre-filter middlewares and yields handlers
-        whose filters match the given event.
-
-        :param event: The event object to be checked against handler filters.
-        :param single_handler: # todo
-        :param data: A dictionary containing data related to the current workflow.
-
-        :return: An async generator of ``HandlerInfo`` objects with matching filters.
-        """
-        outer_middlewares_manager = self._middleware_managers.get(MiddlewareManagerTypes.OUTER)
-
-        if not outer_middlewares_manager:
-            result = self._inner_get_matching_handlers(event, single_handler, data)
-        else:
-            wrapped_get_matching_handlers: WrappedWithMiddlewaresCallable[
-                AsyncGenerator[tuple[Handler[Any, Self], Exception | None], None]
-            ] = MiddlewareManager.wrap_callable_with_middlewares(
-                self._inner_get_matching_handlers,
-                middlewares=reversed(outer_middlewares_manager),
-                data=data,
-                callable_positional_only_args=(event, single_handler, data),
-                middlewares_positional_only_args=self._config.middleware_positional_only_args,
-            )
-            state = await wrapped_get_matching_handlers()
-            if not state.callable_executed:
-                return
-            result = state.callable_return
-
-        async for handler, e in result:
-            yield handler, e
-
-    async def _inner_get_matching_handlers(
-        self,
-        event: Event,
-        single_handler: bool,
-        data: dict[str, Any],
-    ) -> AsyncGenerator[tuple[Handler[Any, Self], Exception | None], None]:
-        """
         Iterates through all registered handlers and yields those whose filters
         match the given event.
 
@@ -334,6 +296,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
                 handler_id=handler_id,
                 as_task=as_task,
                 filter=filter,
+                on_event=on_event,
                 middlewares=middlewares,
                 meta=meta,
             )
