@@ -145,7 +145,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
         handler_manager: HandlerManagerTypeT,
         on_event: Type[Event] | None,
         filter: Union[Filter, None],
-        middlewares: list[MiddlewareType],
+        middlewares: list[CallableWrapper[Any]],
         as_task: bool,
         meta: HandlerMeta,
     ):
@@ -186,5 +186,5 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
         return self.handler_manager.event_type_filter or self._on_event
 
     @property
-    def middlewares(self) -> list[MiddlewareType]:
+    def middlewares(self) -> list[CallableWrapper[Any]]:
         return self._middlewares

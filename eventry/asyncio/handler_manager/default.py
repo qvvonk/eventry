@@ -7,7 +7,7 @@ __all__ = ['DefaultHandlerManager']
 from typing import TYPE_CHECKING, Any, Type, TypeVar
 from collections.abc import Callable
 
-from eventry.asyncio.default_types import FilterType, HandlerType
+from eventry.asyncio.default_types import FilterType, HandlerType, MiddlewareType
 
 from .base import HandlerManager, MiddlewareManagerTypes
 from ..middleware_manager import MiddlewareManager
@@ -19,15 +19,16 @@ if TYPE_CHECKING:
     from ..router import Router
 
 
-HandlerTypeT = TypeVar('HandlerTypeT', bound=HandlerType, default=HandlerType)
-FilterTypeT = TypeVar('FilterTypeT', bound=FilterType, default=FilterType)
-RouterType = TypeVar('RouterType', bound='Router', default='Router')
+HandlerT = TypeVar('HandlerT', bound=HandlerType, default=HandlerType)
+FilterT = TypeVar('FilterT', bound=FilterType, default=FilterType)
+MiddlewareT = TypeVar('MiddlewareT', bound=MiddlewareType, default=MiddlewareType)
+RouterT = TypeVar('RouterT', bound='Router', default='Router')
 
 
-class DefaultHandlerManager(HandlerManager[FilterTypeT, HandlerTypeT, RouterType]):
+class DefaultHandlerManager(HandlerManager[FilterT, HandlerT, MiddlewareT, RouterT]):
     def __init__(
         self,
-        router: RouterType,
+        router: RouterT,
         handler_manager_id: str,
         event_type_filter: Type[Event] | None = None,
     ):
@@ -41,9 +42,9 @@ class DefaultHandlerManager(HandlerManager[FilterTypeT, HandlerTypeT, RouterType
         self._add_middleware_manager(MiddlewareManagerTypes.INNER, MiddlewareManager())
 
     @property
-    def outer_middleware(self) -> MiddlewareManager[Callable[..., Any]]:
+    def outer_middleware(self) -> MiddlewareManager[MiddlewareT]:
         return self._middleware_managers[MiddlewareManagerTypes.OUTER]
 
     @property
-    def inner_middleware(self) -> MiddlewareManager[Callable[..., Any]]:
+    def inner_middleware(self) -> MiddlewareManager[MiddlewareT]:
         return self._middleware_managers[MiddlewareManagerTypes.INNER]

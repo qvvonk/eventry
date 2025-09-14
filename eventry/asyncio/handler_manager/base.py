@@ -28,13 +28,12 @@ from eventry.asyncio.callable_wrappers import Handler, HandlerMeta, CallableWrap
 if TYPE_CHECKING:
     from eventry.asyncio.event import Event
     from eventry.asyncio.router import Router
+    from eventry.asyncio.middleware_manager import MiddlewareManager, WrappedWithMiddlewaresCallable
 
-    from ..middleware_manager import MiddlewareManager, WrappedWithMiddlewaresCallable
 
-
+RouterT = TypeVar('RouterT', bound='Router', default='Router')
 HandlerT = TypeVar('HandlerT', bound=HandlerType, default=HandlerType)
 FilterT = TypeVar('FilterT', bound=FilterType, default=FilterType)
-RouterT = TypeVar('RouterT', bound='Router', default='Router')
 MiddlewareT = TypeVar('MiddlewareT', bound=MiddlewareType, default=MiddlewareType)
 
 

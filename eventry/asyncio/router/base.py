@@ -20,16 +20,16 @@ if TYPE_CHECKING:
     from eventry.asyncio.event import Event
 
 
-HandlerManagerType = TypeVar('HandlerManagerType', bound=HandlerManager[Any, Any, Any])
+HandlerManagerType = TypeVar('HandlerManagerType', bound=HandlerManager[Any, Any, Any, Any])
 
 
-class Router(ABC):
+class Router:
     def __init__(self, router_id: str):
         self._router_id = router_id
         self._parent: Self | None = None
         self._children: dict[str, Self] = {}
-        self._managers: dict[type[Event], HandlerManager] = {}
-        self._default_handler_manager: HandlerManager | None = None
+        self._managers: dict[type[Event], HandlerManager[Any, Any, Any, Self]] = {}
+        self._default_handler_manager: HandlerManager[Any, Any, Any, Self] | None = None
 
     def get_handler_by_id(self, handler_id: str, /) -> Handler[Any, Any] | None:
         for manager in self._managers.values():
@@ -79,7 +79,7 @@ class Router(ABC):
 
     def _get_handler_manager(
         self, event: Event | Type[Event], /
-    ) -> HandlerManager[Any, Any, Self]:
+    ) -> HandlerManager[Any, Any, Any, Self]:
         event_type = event if isinstance(event, type) else event.__class__
         if event_type in self._managers:
             return self._managers[event_type]

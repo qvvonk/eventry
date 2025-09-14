@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Type, TypeVar, Protocol
 from collections.abc import Callable, Awaitable
 
-from eventry.asyncio.filter import Filter
 from eventry.asyncio.handler_manager import HandlerManager, MiddlewareManagerTypes
 from eventry.asyncio.middleware_manager import MiddlewareManager
+from eventry.asyncio.default_types import FilterType
 
 from .config import handler_manager_config
 from .custom_event import MyEvent
@@ -29,7 +29,7 @@ class MiddlewareProtocol(Protocol):
         pass
 
 
-class MyHandlerManager(HandlerManager[Filter, HandlerProtocol, 'MyRouter']):
+class MyHandlerManager(HandlerManager[FilterType, HandlerProtocol, MiddlewareProtocol, 'MyRouter']):
     def __init__(
         self,
         router: MyRouter,
@@ -53,11 +53,6 @@ class MyHandlerManager(HandlerManager[Filter, HandlerProtocol, 'MyRouter']):
             MiddlewareManager(),
         )
 
-        self._add_middleware_manager(
-            MiddlewareManagerTypes.PER_HANDLER,
-            MiddlewareManager(),
-        )
-
     @property
     def outer_middleware(self) -> MiddlewareManager[MiddlewareProtocol]:
         return self._middleware_managers[MiddlewareManagerTypes.OUTER]
@@ -65,7 +60,3 @@ class MyHandlerManager(HandlerManager[Filter, HandlerProtocol, 'MyRouter']):
     @property
     def inner_middleware(self) -> MiddlewareManager[MiddlewareProtocol]:
         return self._middleware_managers[MiddlewareManagerTypes.INNER]
-
-    @property
-    def per_handler_middleware(self) -> MiddlewareManager[MiddlewareProtocol]:
-        return self._middleware_managers[MiddlewareManagerTypes.PER_HANDLER]
