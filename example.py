@@ -21,18 +21,6 @@ def dp_middleware2():
     yield
     print("DP MIDDLEWARE2 POST")
 
-
-def router_middleware(event):
-    print("ROUTER_MIDDLEWARE PRE")
-    setattr(event, 'secret', True)
-    yield
-    print("ROUTER_MIDDLEWARE POST")
-
-def router_inner_middleware(event):
-    print("ROUtER INNER MIDDLEWARE PRE")
-    yield
-    print("ROUTER INNER MIDDLEWARE POST")
-
 def handler_middleware():
     print("HANDLER INNER NON-WRAPPING MIDDLEWARE")
     raise AbortExecution()
@@ -40,16 +28,14 @@ def handler_middleware():
 
 dp.on_event.outer_middleware(dp_middleware)
 dp.on_event.outer_middleware(dp_middleware2)
-r.on_event.outer_middleware(router_middleware)
-r.on_event.inner_middleware(router_inner_middleware)
 
 
-@r.on_event(filter=lambda event: hasattr(event, 'secret'), middlewares=[handler_middleware])
+@r.on_event(middlewares=[handler_middleware])
 def handler(event: ExtendedEvent):
     print(f'Handler for event {event}')
 
 @r.on_event
-def handler2(event: ExtendedEvent):
+def handler2():
     print(f'HANDLER 2')
 
 
