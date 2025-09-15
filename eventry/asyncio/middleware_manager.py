@@ -8,9 +8,9 @@ __all__ = [
 ]
 
 
-from typing import Any, Generic, TypeVar, Callable, overload
+from typing import Any, Generic, TypeVar, Callable, overload, Union
 from dataclasses import field, dataclass
-from collections.abc import Sequence, Generator, AsyncGenerator, Iterable
+from collections.abc import Sequence, Generator, AsyncGenerator, Iterable, Awaitable
 from collections import deque
 
 from eventry.asyncio.default_types import MiddlewareType
@@ -21,13 +21,13 @@ from .callable_wrappers import CallableWrapper
 
 
 MiddlewareTypeT = TypeVar('MiddlewareTypeT', bound=MiddlewareType, default=MiddlewareType)
-R = TypeVar('R', bound=Any)
+R = TypeVar('R')
 
 
 class WrappedWithMiddlewaresCallable(Generic[R]):
     def __init__(
         self,
-        __callable: Callable[..., R] | CallableWrapper[R],
+        __callable: Union[Callable[..., Union[Awaitable[R], R]], CallableWrapper[R]],
         /,
         middlewares: Iterable[CallableWrapper[Any] | Callable[..., Any]],
     ) -> None:
@@ -38,7 +38,7 @@ class WrappedWithMiddlewaresCallable(Generic[R]):
         self,
         callable_positional_only_args: Sequence[Any],
         middlewares_positional_only_args: Sequence[Any],
-        data,
+        data: dict[str, Any],
         state: MiddlewaresExecutionState | None = None,
         execute_after_part: bool = True,
     ) -> R:
@@ -66,9 +66,7 @@ class WrappedWithMiddlewaresCallable(Generic[R]):
 
 @dataclass
 class MiddlewaresExecutionState:
-    middlewares: list[
-        CallableWrapper[Generator[Any, Any, Any] | AsyncGenerator[Any, Any, Any]]
-    ] = field(default_factory=list)
+    middlewares: list[CallableWrapper[Any]] = field(default_factory=list)
 
     _middleware_index: int = field(init=False, repr=False, default=0)
     _execute_after: deque[Generator[Any, None, Any] | AsyncGenerator[Any, None]] = field(
@@ -77,13 +75,13 @@ class MiddlewaresExecutionState:
         default_factory=deque
     )
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.middlewares = [i if isinstance(i, CallableWrapper) else CallableWrapper(i) for i in self.middlewares]
 
-    def __iter__(self):
+    def __iter__(self) -> MiddlewaresExecutionState:
         return self
 
-    def __next__(self):
+    def __next__(self) -> CallableWrapper[Any]:
         try:
             middleware = self.middlewares[self._middleware_index]
         except IndexError:
@@ -99,11 +97,11 @@ class MiddlewaresExecutionState:
     def middleware_index(self) -> int:
         return self._middleware_index
 
-    def add_middlewares(self, *middlewares: Callable[..., Any] | CallableWrapper[Any]):
+    def add_middlewares(self, *middlewares: Callable[..., Any] | CallableWrapper[Any]) -> None:
         for i in middlewares:
             self.middlewares.append(i if isinstance(i, CallableWrapper) else CallableWrapper(i))
 
-    async def execute_after_part(self):
+    async def execute_after_part(self) -> None:
         while self.execute_after:
             gen = self.execute_after.popleft()
             with suppress(StopIteration, StopAsyncIteration):

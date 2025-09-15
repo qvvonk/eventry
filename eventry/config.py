@@ -8,12 +8,14 @@ class FromData(str): ...
 
 
 class DefaultNamesRemap(TypedDict, total=False):
+    event: str
     dispatcher: str
     router: str
     handler_manager: str
     workflow_data: str
+    data: str
     handler: str
-    next_call: str
+    executed_handlers: str
     workflow_data_injection: str
 
 
@@ -25,11 +27,11 @@ class DispatcherConfig:
 
 @dataclass(frozen=True)
 class HandlerManagerConfig:
-    positional_only_args: tuple[Any, ...] = field(default_factory=tuple)
+    handler_positional_only_args: tuple[Any, ...] = field(default_factory=tuple)
     exclude_from_handler_call: frozenset[str] = field(default_factory=frozenset)
 
     middleware_positional_only_args: tuple[Any, ...] = field(default_factory=tuple)
     exclude_from_middleware_call: frozenset[str] = field(default_factory=frozenset)
 
-    filter_call_positional_only_args: tuple[Any, ...] = field(default_factory=tuple)
+    filter_positional_only_args: tuple[Any, ...] = field(default_factory=tuple)
     exclude_from_filter_call: frozenset[str] = field(default_factory=frozenset)

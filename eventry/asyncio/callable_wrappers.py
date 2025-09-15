@@ -162,7 +162,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
         self._on_event = on_event
 
     @property
-    def handler_manager(self) -> HandlerManagerTypeT:
+    def manager(self) -> HandlerManagerTypeT:
         return self._handler_manager
 
     @property
@@ -183,7 +183,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
 
     @property
     def on_event(self) -> Type[Event] | None:
-        return self.handler_manager.event_type_filter or self._on_event
+        return self.manager.event_type_filter or self._on_event
 
     @property
     def middlewares(self) -> list[CallableWrapper[Any]]:

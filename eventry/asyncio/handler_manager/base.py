@@ -139,12 +139,12 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         if (exists_handler := root_router.get_handler_by_id(handler.id)) is not None:
             raise ValueError(
                 f'Handler with ID {handler.id} already exists.\n'
-                f"Original handler registered in router '{exists_handler.handler_manager.router.id}':\n"
+                f"Original handler registered in router '{exists_handler.manager.router.id}':\n"
                 f'    Defined in "{exists_handler.meta.definition_filename}:'
                 f'{exists_handler.meta.definition_lineno}"\n'
                 f'    Registered in {exists_handler.meta.registration_filename}:'
                 f'{exists_handler.meta.registration_lineno}\n\n'
-                f"Duplicate handler in router '{handler.handler_manager.router.id}':\n"
+                f"Duplicate handler in router '{handler.manager.router.id}':\n"
                 f'    Defined in "{handler.meta.definition_filename}:'
                 f'{handler.meta.definition_lineno}"\n'
                 f'    Registered in {handler.meta.registration_filename}:'
@@ -203,7 +203,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
 
             try:
                 filter_result = await handler.filter.execute(
-                    self._config.filter_call_positional_only_args,
+                    self._config.filter_positional_only_args,
                     data,
                 )
             except KeyboardInterrupt:
@@ -330,6 +330,10 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
     @property
     def event_type_filter(self) -> Type[Event] | None:
         return self._event_type_filter
+
+    @property
+    def config(self) -> HandlerManagerConfig:
+        return self._config
 
 
 def gen_default_handler_id(

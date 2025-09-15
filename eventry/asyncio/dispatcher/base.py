@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class ErrorContext:
     exception: Exception
-    handler: Handler[Any]
+    handler: Handler[Any] | None
     event: Event
 
 
@@ -48,40 +48,49 @@ class Dispatcher(Router):
         self._config = config or DispatcherConfig()
         self._error_event_factory: Callable[[ErrorContext], Event] = error_event_factory
 
-    async def propagate_event(self, event: Event, workflow_injection: dict[str, Any] | None = None, silent: bool = False) -> None:
+    async def propagate_event(
+        self,
+        event: Event,
+        workflow_injection: dict[str, Any] | None = None,
+        silent: bool = False
+    ) -> None:
         dispatcher_logger.debug(f'New event {id(event)}: {type(event)}')
 
         workflow_injection = workflow_injection or {}
+        executed_handlers: dict[str, tuple[Handler[Any], Any]] = {}
 
-        data = {
+        data: dict[str, Any] = {
             **self._workflow_data,
             **workflow_injection,
             **event.workflow_injection,
-            'event': event,
-            'dispatcher': self,
+            self._config.default_names_remap.get(
+                'executed_handlers', 'executed_handlers'
+            ): executed_handlers,
+            self._config.default_names_remap.get('event', 'event'): event,
+            self._config.default_names_remap.get('dispatcher', 'dispatcher'): self,
         }
-        data['data'] = data
-        errors: list[ErrorContext]= []
+        data[self._config.default_names_remap.get('data', 'data')] = data
 
+        errors: list[ErrorContext] = []
         state = MiddlewaresExecutionState()
         execution_aborted = False
 
         for manager in self._get_handler_managers_to_tail(event):
             outer_middlewares = manager.middleware_manager(MiddlewareManagerTypes.OUTER)
             if not outer_middlewares:
-                errors.extend(
-                    await self._execute_manager_handlers(event, manager, data, silent)
-                )
+                errors.extend(await self._execute_manager_handlers(event, manager, data, silent))
                 continue
+
             state.add_middlewares(*outer_middlewares)
-            wrapped = WrappedWithMiddlewaresCallable(
+            wrapped: WrappedWithMiddlewaresCallable[list[ErrorContext]] = WrappedWithMiddlewaresCallable(
                 self._execute_manager_handlers,
                 middlewares=outer_middlewares,
             )
+
             try:
                 result = await wrapped(
                     callable_positional_only_args=(event, manager, data, silent),
-                    middlewares_positional_only_args=manager._config.middleware_positional_only_args,
+                    middlewares_positional_only_args=manager.config.middleware_positional_only_args,
                     data=data,
                     state=state,
                     execute_after_part=False
@@ -92,7 +101,10 @@ class Dispatcher(Router):
                 break
 
         if not execution_aborted:
-            await state.execute_after_part()  # todo: catch exceptions
+            try:
+                await state.execute_after_part()
+            except Exception as e:
+                errors.append(ErrorContext(exception=e, handler=None, event=event))
 
         for err in errors:
             event = self._error_event_factory(err)
@@ -152,7 +164,7 @@ class Dispatcher(Router):
         handler: Handler[Any],
         data: dict[str, Any],
     ) -> Any:
-        data['handler'] = handler
+        data[self._config.default_names_remap.get('handler', 'handler')] = handler
 
         wrapped_handler = self._wrap_handler_with_middlewares(
             handler=handler,
@@ -161,25 +173,25 @@ class Dispatcher(Router):
 
         dispatcher_logger.debug(
             f'({id(event)}) Executing handler '
-            f'{handler.handler_manager.router.id} -> {handler.handler_manager.id} -> {handler.id}...',
+            f'{handler.manager.router.id} -> {handler.manager.id} -> {handler.id}...',
         )
         start = time.time()
         try:
             if not handler.as_task:
                 return await wrapped_handler(
-                    callable_positional_only_args=handler.handler_manager._config.positional_only_args,
-                    middlewares_positional_only_args=handler.handler_manager._config.middleware_positional_only_args,
+                    callable_positional_only_args=handler.manager.config.handler_positional_only_args,
+                    middlewares_positional_only_args=handler.manager.config.middleware_positional_only_args,
                     data=data,
                 )
             asyncio.create_task(wrapped_handler(
-                callable_positional_only_args=handler.handler_manager._config.positional_only_args,
-                middlewares_positional_only_args=handler.handler_manager._config.middleware_positional_only_args,
+                callable_positional_only_args=handler.manager.config.handler_positional_only_args,
+                middlewares_positional_only_args=handler.manager.config.middleware_positional_only_args,
                 data=data,
             ))
         except Exception as e:
             dispatcher_logger.debug(
                 f'({id(event)}) An error occurred while executing handler '
-                f'{handler.handler_manager.router.id} -> {handler.handler_manager.id} -> {handler.id}.',
+                f'{handler.manager.router.id} -> {handler.manager.id} -> {handler.id}.',
                 exc_info=e,
             )
             raise e
@@ -195,8 +207,8 @@ class Dispatcher(Router):
     ) -> WrappedWithMiddlewaresCallable[Any]:
         middlewares: list[Iterable[CallableWrapper[Any]]] = [handler.middlewares] if handler.middlewares else []
 
-        if handler.handler_manager.middleware_manager(MiddlewareManagerTypes.INNER):
-            for router in handler.handler_manager.router.chain_to_root_router:
+        if handler.manager.middleware_manager(MiddlewareManagerTypes.INNER):
+            for router in handler.manager.router.chain_to_root_router:
                 manager = router._get_handler_manager(event)
                 middlewares.append(manager.middleware_manager(MiddlewareManagerTypes.INNER))
 
