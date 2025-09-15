@@ -7,11 +7,13 @@ __all__ = ['Dispatcher', 'ErrorContext']
 import time
 import asyncio
 from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass
 from itertools import chain
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from eventry.config import DispatcherConfig
 from eventry.loggers import dispatcher_logger
+from eventry.exceptions import HandlerNotExecuted
 from eventry.asyncio.event import Event
 from eventry.asyncio.router import Router
 from eventry.asyncio.handler_manager import MiddlewareManagerTypes
@@ -19,13 +21,11 @@ from eventry.asyncio.middleware_manager import (
     MiddlewaresExecutionState,
     WrappedWithMiddlewaresCallable,
 )
-from eventry.exceptions import HandlerNotExecuted
-from collections.abc import Callable
-from dataclasses import dataclass
+
 
 if TYPE_CHECKING:
-    from eventry.asyncio.callable_wrappers import Handler, CallableWrapper
     from eventry.asyncio.handler_manager import HandlerManager
+    from eventry.asyncio.callable_wrappers import Handler, CallableWrapper
 
 
 @dataclass(frozen=True)
@@ -52,7 +52,7 @@ class Dispatcher(Router):
         self,
         event: Event,
         workflow_injection: dict[str, Any] | None = None,
-        silent: bool = False
+        silent: bool = False,
     ) -> None:
         dispatcher_logger.debug(f'New event {id(event)}: {type(event)}')
 
@@ -64,7 +64,8 @@ class Dispatcher(Router):
             **workflow_injection,
             **event.workflow_injection,
             self._config.default_names_remap.get(
-                'executed_handlers', 'executed_handlers'
+                'executed_handlers',
+                'executed_handlers',
             ): executed_handlers,
             self._config.default_names_remap.get('event', 'event'): event,
             self._config.default_names_remap.get('dispatcher', 'dispatcher'): self,
@@ -82,9 +83,11 @@ class Dispatcher(Router):
                 continue
 
             state.add_middlewares(*outer_middlewares)
-            wrapped: WrappedWithMiddlewaresCallable[list[ErrorContext]] = WrappedWithMiddlewaresCallable(
-                self._execute_manager_handlers,
-                middlewares=outer_middlewares,
+            wrapped: WrappedWithMiddlewaresCallable[list[ErrorContext]] = (
+                WrappedWithMiddlewaresCallable(
+                    self._execute_manager_handlers,
+                    middlewares=outer_middlewares,
+                )
             )
 
             try:
@@ -93,7 +96,7 @@ class Dispatcher(Router):
                     middlewares_positional_only_args=manager.config.middleware_positional_only_args,
                     data=data,
                     state=state,
-                    execute_after_part=False
+                    execute_after_part=False,
                 )
                 errors.extend(result)
             except HandlerNotExecuted:
@@ -115,12 +118,14 @@ class Dispatcher(Router):
         event: Event,
         manager: HandlerManager[Any, Any, Any, Any],
         data: dict[str, Any],
-        silent: bool
+        silent: bool,
     ) -> list[ErrorContext]:
         errors: list[ErrorContext] = []
 
         async for handler, e in manager.get_matching_handlers(
-            event, self._config.single_handler_mode, data
+            event,
+            self._config.single_handler_mode,
+            data,
         ):
             if e is not None:
                 dispatcher_logger.debug(
@@ -150,8 +155,7 @@ class Dispatcher(Router):
         silent: bool,
     ) -> Any:
         try:
-            r = await self._execute_handler(event, handler, data=data)
-            return r
+            return await self._execute_handler(event, handler, data=data)
         except HandlerNotExecuted:
             raise
         except Exception as e:
@@ -183,11 +187,13 @@ class Dispatcher(Router):
                     middlewares_positional_only_args=handler.manager.config.middleware_positional_only_args,
                     data=data,
                 )
-            asyncio.create_task(wrapped_handler(
-                callable_positional_only_args=handler.manager.config.handler_positional_only_args,
-                middlewares_positional_only_args=handler.manager.config.middleware_positional_only_args,
-                data=data,
-            ))
+            asyncio.create_task(
+                wrapped_handler(
+                    callable_positional_only_args=handler.manager.config.handler_positional_only_args,
+                    middlewares_positional_only_args=handler.manager.config.middleware_positional_only_args,
+                    data=data,
+                )
+            )
         except Exception as e:
             dispatcher_logger.debug(
                 f'({id(event)}) An error occurred while executing handler '
@@ -205,15 +211,16 @@ class Dispatcher(Router):
         handler: Handler[Any],
         event: Event,
     ) -> WrappedWithMiddlewaresCallable[Any]:
-        middlewares: list[Iterable[CallableWrapper[Any]]] = [handler.middlewares] if handler.middlewares else []
+        middlewares: list[Iterable[CallableWrapper[Any]]] = (
+            [handler.middlewares] if handler.middlewares else []
+        )
 
         if handler.manager.middleware_manager(MiddlewareManagerTypes.INNER):
             for router in handler.manager.router.chain_to_root_router:
                 manager = router._get_handler_manager(event)
                 middlewares.append(manager.middleware_manager(MiddlewareManagerTypes.INNER))
 
-        wrapper_in_inner_middlewares_handler = WrappedWithMiddlewaresCallable(
+        return WrappedWithMiddlewaresCallable(
             handler._callable,
             middlewares=chain(*reversed(middlewares)),
         )
-        return wrapper_in_inner_middlewares_handler

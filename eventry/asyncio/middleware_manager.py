@@ -4,18 +4,18 @@ from __future__ import annotations
 __all__ = [
     'MiddlewareManager',
     'WrappedWithMiddlewaresCallable',
-    'MiddlewaresExecutionState'
+    'MiddlewaresExecutionState',
 ]
 
 
-from typing import Any, Generic, TypeVar, Callable, overload, Union
+from typing import Any, Union, Generic, TypeVar, Callable, overload
 from dataclasses import field, dataclass
-from collections.abc import Sequence, Generator, AsyncGenerator, Iterable, Awaitable
-from collections import deque
-
-from eventry.asyncio.default_types import MiddlewareType
-from eventry.exceptions import AbortExecution, HandlerNotExecuted
 from contextlib import suppress
+from collections import deque
+from collections.abc import Iterable, Sequence, Awaitable, Generator, AsyncGenerator
+
+from eventry.exceptions import AbortExecution, HandlerNotExecuted
+from eventry.asyncio.default_types import MiddlewareType
 
 from .callable_wrappers import CallableWrapper
 
@@ -31,7 +31,9 @@ class WrappedWithMiddlewaresCallable(Generic[R]):
         /,
         middlewares: Iterable[CallableWrapper[Any] | Callable[..., Any]],
     ) -> None:
-        self._callable = __callable if isinstance(__callable, CallableWrapper) else CallableWrapper(__callable)
+        self._callable = (
+            __callable if isinstance(__callable, CallableWrapper) else CallableWrapper(__callable)
+        )
         self._middlewares = middlewares
 
     async def __call__(
@@ -72,11 +74,13 @@ class MiddlewaresExecutionState:
     _execute_after: deque[Generator[Any, None, Any] | AsyncGenerator[Any, None]] = field(
         init=False,
         repr=False,
-        default_factory=deque
+        default_factory=deque,
     )
 
     def __post_init__(self) -> None:
-        self.middlewares = [i if isinstance(i, CallableWrapper) else CallableWrapper(i) for i in self.middlewares]
+        self.middlewares = [
+            i if isinstance(i, CallableWrapper) else CallableWrapper(i) for i in self.middlewares
+        ]
 
     def __iter__(self) -> MiddlewaresExecutionState:
         return self
@@ -126,7 +130,8 @@ class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[CallableWrapper[Any]]
     def __call__(self) -> Callable[[MiddlewareTypeT], MiddlewareTypeT]: ...
 
     def __call__(
-        self, middleware: MiddlewareTypeT | None = None
+        self,
+        middleware: MiddlewareTypeT | None = None,
     ) -> MiddlewareTypeT | Callable[[MiddlewareTypeT], MiddlewareTypeT]:
         if middleware is None:
             return self.register_middleware

@@ -5,7 +5,6 @@ __all__ = ['Router']
 
 
 from typing import TYPE_CHECKING, Any, Type, TypeVar
-from abc import ABC
 from collections.abc import Generator, AsyncGenerator
 
 from typing_extensions import Self
@@ -52,13 +51,17 @@ class Router:
 
         try:
             async for handler, e in manager.get_matching_handlers(
-                event, single_handler, workflow_data
+                event,
+                single_handler,
+                workflow_data,
             ):
                 yield handler, e
 
             for router in self._children.values():
                 async for handler, e in router._get_matching_handlers(
-                    event, single_handler, workflow_data
+                    event,
+                    single_handler,
+                    workflow_data,
                 ):
                     yield handler, e
         except HandlerFound:
@@ -68,7 +71,7 @@ class Router:
         if not handler_manager.event_type_filter:
             raise ValueError(
                 'Cannot add handler manager without event type filter. '
-                'Assign it as default handler manager.'
+                'Assign it as default handler manager.',
             )  # todo: improve
 
         if handler_manager.event_type_filter in self._managers:
@@ -78,7 +81,9 @@ class Router:
         return handler_manager
 
     def _get_handler_manager(
-        self, event: Event | Type[Event], /
+        self,
+        event: Event | Type[Event],
+        /,
     ) -> HandlerManager[Any, Any, Any, Self]:
         event_type = event if isinstance(event, type) else event.__class__
         if event_type in self._managers:
@@ -93,7 +98,9 @@ class Router:
 
         raise RuntimeError('No handler manager with this event type.')  # todo
 
-    def _get_handler_managers_to_tail(self, event: Event) -> Generator[HandlerManager[Any, Any, Any, Self], None]:
+    def _get_handler_managers_to_tail(
+        self, event: Event
+    ) -> Generator[HandlerManager[Any, Any, Any, Self], None]:
         for router in self.chain_to_last_router:
             yield router._get_handler_manager(event)
 

@@ -9,10 +9,11 @@ __all__ = [
 
 
 import inspect
-from types import MethodType
 from typing import TYPE_CHECKING, Any, Type, Union, Generic, TypeVar
 from dataclasses import dataclass
+from types import MethodType
 from collections.abc import Callable, Sequence, Awaitable
+
 from eventry.config import FromData
 
 
@@ -20,7 +21,6 @@ if TYPE_CHECKING:
     from .event import Event
     from .filter import Filter
     from .handler_manager import HandlerManager
-
 
 
 HandlerManagerTypeT = TypeVar(
@@ -34,14 +34,20 @@ ReturnTypeT = TypeVar('ReturnTypeT')
 
 class CallableWrapper(Generic[ReturnTypeT]):
     def __init__(
-        self, __obj: Callable[..., Union[Awaitable[ReturnTypeT], ReturnTypeT]], /
+        self,
+        __obj: Callable[..., Union[Awaitable[ReturnTypeT], ReturnTypeT]],
+        /,
     ) -> None:
         self._callable = __obj
         self._specs = inspect.getfullargspec(__obj)
         self._is_async = inspect.iscoroutinefunction(__obj) or inspect.iscoroutinefunction(
-            getattr(__obj, '__call__', None)
+            getattr(__obj, '__call__', None),
         )
-        self._params_names = tuple(self._specs.args[1:]) if isinstance(self._callable, MethodType) else tuple(self._specs.args)
+        self._params_names = (
+            tuple(self._specs.args[1:])
+            if isinstance(self._callable, MethodType)
+            else tuple(self._specs.args)
+        )
         self._kwargs_names = tuple(self._specs.kwonlyargs)
         self._total_names = self._params_names + self._kwargs_names
 
