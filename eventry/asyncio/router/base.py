@@ -126,11 +126,11 @@ class Router:
 
     @parent_router.setter
     def parent_router(self, router: Self) -> None:
-        if type(router) is not type(self):
-            raise TypeError(
-                f'Parent router must be of the same class as this router '
-                f'(expected {self.__class__.__name__}, got {router.__class__.__name__}).',
-            )
+        # if type(router) is not type(self):
+        #     raise TypeError(
+        #         f'Parent router must be of the same class as this router '
+        #         f'(expected {self.__class__.__name__}, got {router.__class__.__name__}).',
+        #     )
         if self.parent_router:
             raise RuntimeError(
                 f"Router '{self.id}' is already connected to router '{self.parent_router.id}'.",
