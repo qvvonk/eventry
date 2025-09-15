@@ -13,7 +13,8 @@ class Event:
     Base event class.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
         self._propagation_stopped = False
 
     def stop_propagation(self) -> None:
@@ -32,12 +33,12 @@ class Event:
 
 
 class ExtendedEvent(Event):
-    def __init__(self) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """
         Extended event class with flags and data features.
         """
 
-        super().__init__()
+        super().__init__(*args, **kwargs)
         self._data: dict[Any, Any] = {}
         self._flags: set[Any] = set()
 
