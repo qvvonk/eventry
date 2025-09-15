@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING, Any, Type, Union, Generic, TypeVar
 from dataclasses import dataclass
 from collections.abc import Callable, Sequence, Awaitable
 from eventry.config import FromData
-from eventry.asyncio.default_types import MiddlewareType
 
 
 if TYPE_CHECKING:
