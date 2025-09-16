@@ -47,7 +47,7 @@ class Router:
         single_handler: bool,
         workflow_data: dict[str, Any],
     ) -> AsyncGenerator[tuple[Handler[Any, Any], Exception | None], None]:
-        manager = self._get_handler_manager(event)
+        manager = self.get_handler_manager(event)
 
         try:
             async for handler, e in manager.get_matching_handlers(
@@ -74,13 +74,10 @@ class Router:
                 'Assign it as default handler manager.',
             )  # todo: improve
 
-        if handler_manager.event_type_filter in self._managers:
-            raise RuntimeError('Router already has a manager with this event type.')  # todo
-
         self._managers[handler_manager.event_type_filter] = handler_manager
         return handler_manager
 
-    def _get_handler_manager(
+    def get_handler_manager(
         self,
         event: Event | Type[Event],
         /,
@@ -102,7 +99,7 @@ class Router:
         self, event: Event
     ) -> Generator[HandlerManager[Any, Any, Any, Self], None]:
         for router in self.chain_to_last_router:
-            yield router._get_handler_manager(event)
+            yield router.get_handler_manager(event)
 
     @property
     def id(self) -> str:

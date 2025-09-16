@@ -217,7 +217,7 @@ class Dispatcher(Router):
 
         if handler.manager.middleware_manager(MiddlewareManagerTypes.INNER):
             for router in handler.manager.router.chain_to_root_router:
-                manager = router._get_handler_manager(event)
+                manager = router.get_handler_manager(event)
                 middlewares.append(manager.middleware_manager(MiddlewareManagerTypes.INNER))
 
         return WrappedWithMiddlewaresCallable(
