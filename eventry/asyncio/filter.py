@@ -5,6 +5,7 @@ __all__ = [
     'Filter',
     'CallableFilter',
     'LogicalFilter',
+    'FilterFromFunction',
     'any_of',
     'all_of',
     'not_',
