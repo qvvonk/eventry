@@ -35,7 +35,9 @@ class Filter:
         - ``~`` (NOT) creates a ``NotFilter``
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
         self._call_id = id(self.__call__)
         self._call_wrapper: CallableWrapper[bool] = CallableWrapper(self.__call__)
 
