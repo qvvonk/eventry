@@ -18,8 +18,8 @@ from eventry.asyncio.event import Event
 from eventry.asyncio.router import Router
 from eventry.asyncio.handler_manager import MiddlewareManagerTypes
 from eventry.asyncio.middleware_manager import (
-    MiddlewaresExecutionState,
-    WrappedWithMiddlewaresCallable,
+    MiddlewaresExecutor,
+    MiddlewareWrappedCallable,
 )
 
 
@@ -73,7 +73,7 @@ class Dispatcher(Router):
         data[self._config.default_names_remap.get('data', 'data')] = data
 
         errors: list[ErrorContext] = []
-        state = MiddlewaresExecutionState()
+        executor = MiddlewaresExecutor()
         execution_aborted = False
 
         for manager in self._get_handler_managers_to_tail(event):
@@ -82,9 +82,9 @@ class Dispatcher(Router):
                 errors.extend(await self._execute_manager_handlers(event, manager, data, silent))
                 continue
 
-            state.add_middlewares(*outer_middlewares)
-            wrapped: WrappedWithMiddlewaresCallable[list[ErrorContext]] = (
-                WrappedWithMiddlewaresCallable(
+            executor.add_middlewares(*outer_middlewares)
+            wrapped: MiddlewareWrappedCallable[list[ErrorContext]] = (
+                MiddlewareWrappedCallable(
                     self._execute_manager_handlers,
                     middlewares=outer_middlewares,
                 )
@@ -92,11 +92,11 @@ class Dispatcher(Router):
 
             try:
                 result = await wrapped(
-                    callable_positional_only_args=(event, manager, data, silent),
-                    middlewares_positional_only_args=manager.config.middleware_positional_only_args,
+                    callable_args=(event, manager, data, silent),
+                    middlewares_args=manager.config.middleware_positional_only_args,
                     data=data,
-                    state=state,
-                    execute_after_part=False,
+                    executor=executor,
+                    execute_post_middlewares=False,
                 )
                 errors.extend(result)
             except HandlerNotExecuted:
@@ -105,7 +105,7 @@ class Dispatcher(Router):
 
         if not execution_aborted:
             try:
-                await state.execute_after_part()
+                await executor.execute_post_middlewares()
             except Exception as e:
                 errors.append(ErrorContext(exception=e, handler=None, event=event))
 
@@ -183,14 +183,14 @@ class Dispatcher(Router):
         try:
             if not handler.as_task:
                 return await wrapped_handler(
-                    callable_positional_only_args=handler.manager.config.handler_positional_only_args,
-                    middlewares_positional_only_args=handler.manager.config.middleware_positional_only_args,
+                    callable_args=handler.manager.config.handler_positional_only_args,
+                    middlewares_args=handler.manager.config.middleware_positional_only_args,
                     data=data,
                 )
             asyncio.create_task(
                 wrapped_handler(
-                    callable_positional_only_args=handler.manager.config.handler_positional_only_args,
-                    middlewares_positional_only_args=handler.manager.config.middleware_positional_only_args,
+                    callable_args=handler.manager.config.handler_positional_only_args,
+                    middlewares_args=handler.manager.config.middleware_positional_only_args,
                     data=data,
                 )
             )
@@ -210,7 +210,7 @@ class Dispatcher(Router):
         self,
         handler: Handler[Any],
         event: Event,
-    ) -> WrappedWithMiddlewaresCallable[Any]:
+    ) -> MiddlewareWrappedCallable[Any]:
         middlewares: list[Iterable[CallableWrapper[Any]]] = (
             [handler.middlewares] if handler.middlewares else []
         )
@@ -220,7 +220,7 @@ class Dispatcher(Router):
                 manager = router.get_handler_manager(event)
                 middlewares.append(manager.middleware_manager(MiddlewareManagerTypes.INNER))
 
-        return WrappedWithMiddlewaresCallable(
+        return MiddlewareWrappedCallable(
             handler._callable,
             middlewares=chain(*reversed(middlewares)),
         )

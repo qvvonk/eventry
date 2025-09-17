@@ -3,8 +3,8 @@ from __future__ import annotations
 
 __all__ = [
     'MiddlewareManager',
-    'WrappedWithMiddlewaresCallable',
-    'MiddlewaresExecutionState',
+    'MiddlewareWrappedCallable',
+    'MiddlewaresExecutor',
 ]
 
 
@@ -24,7 +24,7 @@ MiddlewareTypeT = TypeVar('MiddlewareTypeT', bound=MiddlewareType, default=Middl
 R = TypeVar('R', default=Any)
 
 
-class WrappedWithMiddlewaresCallable(Generic[R]):
+class MiddlewareWrappedCallable(Generic[R]):
     def __init__(
         self,
         __callable: Union[Callable[..., Union[Awaitable[R], R]], CallableWrapper[R]],
@@ -38,36 +38,38 @@ class WrappedWithMiddlewaresCallable(Generic[R]):
 
     async def __call__(
         self,
-        callable_positional_only_args: Sequence[Any],
-        middlewares_positional_only_args: Sequence[Any],
+        callable_args: Sequence[Any],
+        middlewares_args: Sequence[Any],
         data: dict[str, Any],
-        state: MiddlewaresExecutionState | None = None,
-        execute_after_part: bool = True,
+        executor: MiddlewaresExecutor | None = None,
+        execute_post_middlewares: bool = True,
+        close_on_error: bool = True,
     ) -> R:
-        state = state or MiddlewaresExecutionState(middlewares=list(self._middlewares))
+        executor = executor or MiddlewaresExecutor()
+        executor.add_middlewares(*self._middlewares)
 
-        for curr_middleware in state:
-            try:
-                gen = await curr_middleware(middlewares_positional_only_args, data)
-                if isinstance(gen, Generator):
-                    next(gen)
-                    state.execute_after.appendleft(gen)
-                elif isinstance(gen, AsyncGenerator):
-                    await gen.__anext__()
-                    state.execute_after.appendleft(gen)
-                # if it is regular function, do not execute after callable
-            except AbortExecution:
+        try:
+            await executor.execute_pre_middlewares(middlewares_args, data)
+        except Exception as e:
+            if close_on_error:
+                await executor.close()
+            if isinstance(e, AbortExecution):
                 raise HandlerNotExecuted
+            raise
 
-        result = await self._callable(callable_positional_only_args, data)
+        try:
+            result = await self._callable(callable_args, data)
+            if execute_post_middlewares:
+                await executor.execute_post_middlewares()
+        finally:
+            if close_on_error:
+                await executor.close()
 
-        if execute_after_part:
-            await state.execute_after_part()
         return result
 
 
 @dataclass
-class MiddlewaresExecutionState:
+class MiddlewaresExecutor:
     middlewares: list[CallableWrapper] = field(default_factory=list)
 
     _middleware_index: int = field(init=False, repr=False, default=0)
@@ -82,7 +84,7 @@ class MiddlewaresExecutionState:
             i if isinstance(i, CallableWrapper) else CallableWrapper(i) for i in self.middlewares
         ]
 
-    def __iter__(self) -> MiddlewaresExecutionState:
+    def __iter__(self) -> MiddlewaresExecutor:
         return self
 
     def __next__(self) -> CallableWrapper[Any]:
@@ -105,14 +107,33 @@ class MiddlewaresExecutionState:
         for i in middlewares:
             self.middlewares.append(i if isinstance(i, CallableWrapper) else CallableWrapper(i))
 
-    async def execute_after_part(self) -> None:
+    async def execute_pre_middlewares(
+        self,
+        middlewares_args: Sequence[Any],
+        data: dict[str, Any]
+    ) -> None:
+        for curr_middleware in self:
+            gen = await curr_middleware(middlewares_args, data)
+            next(gen) if isinstance(gen, Generator) else await anext(gen)
+            self.execute_after.appendleft(gen)
+
+    async def execute_post_middlewares(self) -> None:
         while self.execute_after:
-            gen = self.execute_after.popleft()
-            with suppress(StopIteration, StopAsyncIteration):
-                try:
-                    next(gen) if isinstance(gen, Generator) else (await gen.__anext__())
-                except AbortExecution:
-                    return
+            gen = self.execute_after[0]
+            try:
+                with suppress(StopIteration, StopAsyncIteration):
+                    next(gen) if isinstance(gen, Generator) else (await anext(gen))
+                self.execute_after.popleft()
+            except Exception as e:
+                await self.close()
+                if not isinstance(e, AbortExecution):
+                    raise
+
+    async def close(self) -> None:
+        while self.execute_after:
+            with suppress(Exception):
+                gen = self.execute_after.popleft()
+                gen.close() if isinstance(gen, Generator) else await gen.aclose()
 
 
 class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[CallableWrapper[Any]]):
