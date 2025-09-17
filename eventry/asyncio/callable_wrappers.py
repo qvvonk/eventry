@@ -9,7 +9,7 @@ __all__ = [
 
 
 import inspect
-from typing import TYPE_CHECKING, Any, Type, Union, Generic, TypeVar
+from typing_extensions import TYPE_CHECKING, Any, Type, Union, Generic, TypeVar
 from dataclasses import dataclass
 from types import MethodType
 from collections.abc import Callable, Sequence, Awaitable
@@ -29,7 +29,7 @@ HandlerManagerTypeT = TypeVar(
     bound='HandlerManager[Any, Any, Any, Any]',
 )
 
-ReturnTypeT = TypeVar('ReturnTypeT')
+ReturnTypeT = TypeVar('ReturnTypeT', default=Any)
 
 
 class CallableWrapper(Generic[ReturnTypeT]):

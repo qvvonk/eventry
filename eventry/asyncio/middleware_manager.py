@@ -21,7 +21,7 @@ from .callable_wrappers import CallableWrapper
 
 
 MiddlewareTypeT = TypeVar('MiddlewareTypeT', bound=MiddlewareType, default=MiddlewareType)
-R = TypeVar('R')
+R = TypeVar('R', default=Any)
 
 
 class WrappedWithMiddlewaresCallable(Generic[R]):
@@ -29,7 +29,7 @@ class WrappedWithMiddlewaresCallable(Generic[R]):
         self,
         __callable: Union[Callable[..., Union[Awaitable[R], R]], CallableWrapper[R]],
         /,
-        middlewares: Iterable[CallableWrapper[Any] | Callable[..., Any]],
+        middlewares: Iterable[CallableWrapper],
     ) -> None:
         self._callable = (
             __callable if isinstance(__callable, CallableWrapper) else CallableWrapper(__callable)
@@ -68,7 +68,7 @@ class WrappedWithMiddlewaresCallable(Generic[R]):
 
 @dataclass
 class MiddlewaresExecutionState:
-    middlewares: list[CallableWrapper[Any]] = field(default_factory=list)
+    middlewares: list[CallableWrapper] = field(default_factory=list)
 
     _middleware_index: int = field(init=False, repr=False, default=0)
     _execute_after: deque[Generator[Any, None, Any] | AsyncGenerator[Any, None]] = field(
