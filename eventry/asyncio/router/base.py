@@ -101,6 +101,13 @@ class Router:
         for router in self.chain_to_last_router:
             yield router.get_handler_manager(event)
 
+    def connect_router(self, router: Router) -> None:
+        router.parent_router = self
+
+    def connect_routers(self, *routers: Router) -> None:
+        for i in routers:
+            i.parent_router = self
+
     @property
     def id(self) -> str:
         return self._router_id
