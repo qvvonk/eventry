@@ -44,7 +44,7 @@ class Dispatcher(Router):
     ) -> None:
         Router.__init__(self, router_id='Dispatcher')
 
-        self._workflow_data = workflow_data or {}
+        self._workflow_data = workflow_data if workflow_data is not None else {}
         self._config = config or DispatcherConfig()
         self._error_event_factory: Callable[[ErrorContext], Event] = error_event_factory
 
