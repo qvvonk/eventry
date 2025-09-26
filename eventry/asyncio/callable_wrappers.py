@@ -53,7 +53,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
 
     async def __call__(
         self,
-        args: Sequence[Any] = tuple(),
+        args: Sequence[Any] = (),
         data: dict[str, Any] | None = None,
     ) -> ReturnTypeT:
         data = data if data is not None else {}

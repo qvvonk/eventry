@@ -70,6 +70,10 @@ class MiddlewareWrappedCallable(Generic[R]):
 
 @dataclass
 class MiddlewaresExecutor:
+    """
+    Middlewares executor.
+    """
+
     middlewares: list[CallableWrapper] = field(default_factory=list)
 
     _middleware_index: int = field(init=False, repr=False, default=0)
@@ -88,10 +92,9 @@ class MiddlewaresExecutor:
         return self
 
     def __next__(self) -> CallableWrapper[Any]:
-        try:
-            middleware = self.middlewares[self._middleware_index]
-        except IndexError:
+        if len(self.middlewares) >= self._middleware_index:
             raise StopIteration
+        middleware = self.middlewares[self._middleware_index]
         self._middleware_index += 1
         return middleware
 

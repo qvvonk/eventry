@@ -195,9 +195,6 @@ def all_of(*__filters: CallableFilter | Filter) -> AndFilter:
     - or an asynchronous function returning ``bool``.
 
     If no filters are provided, the resulting filter always returns ``True``.
-
-    Args:
-        /:
     """
     return AndFilter(*convert_filters(__filters))
 
