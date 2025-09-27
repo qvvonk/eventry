@@ -29,6 +29,7 @@ HandlerManagerTypeT = TypeVar(
     bound='HandlerManager[Any, Any, Any, Any]',
 )
 
+# Params = ParamSpec('Params', default=...)
 ReturnTypeT = TypeVar('ReturnTypeT', default=Any)
 
 
@@ -38,18 +39,46 @@ class CallableWrapper(Generic[ReturnTypeT]):
         __obj: Callable[..., Union[Awaitable[ReturnTypeT], ReturnTypeT]],
         /,
     ) -> None:
+        """
+        Wrapper around any callable to allow dynamic invocation with positional
+        arguments and a data dictionary for named parameters.
+
+        Supports sync and async functions / objects with sync and async `__call__` method with
+        any signature.
+
+        Usage:
+            >>> def my_function(arg1, arg2, arg3='some', **kwargs):
+            >>>     print(arg1, arg2, arg3, kwargs)
+            >>> wrapper = CallableWrapper(my_function)
+            >>> positional_args = (1, )
+            >>> data = {'arg2': 2, 'arg3': 'overwrite', 'another': 'value', 'one': 'more'}
+            >>> await wrapper(positional_args, data)
+            1, 2, 'overwrite', {'another': 'value', 'one': 'more'}
+
+        Behavior of extra data:
+          - If the callable has varkw, extra keys from ``data`` go there.
+          - Else, if the callable has varargs but no varkw, extra values from
+            ``data`` are appended to it.
+          - Otherwise, extra keys are ignored.
+
+        :param __obj: Callable to wrap. Can be a normal function, coroutine
+                      function, or object with sync/async __call__.
+        """
         self._callable = __obj
-        self._specs = inspect.getfullargspec(__obj)
-        self._is_async = inspect.iscoroutinefunction(__obj) or inspect.iscoroutinefunction(
-            getattr(__obj, '__call__', None),
+        self._sig = inspect.signature(__obj)
+        self._var_args_name = None
+        self._var_kwargs_name = None
+
+        for n, p in self._sig.parameters.items():
+            if p.kind == inspect.Parameter.VAR_POSITIONAL:
+                self._var_args_name = n
+            elif p.kind == inspect.Parameter.VAR_KEYWORD:
+                self._var_kwargs_name = n
+
+        self._is_async = (
+            inspect.iscoroutinefunction(__obj) or
+            inspect.iscoroutinefunction(getattr(__obj, '__call__', None))
         )
-        self._params_names = (
-            tuple(self._specs.args[1:])
-            if isinstance(self._callable, MethodType)
-            else tuple(self._specs.args)
-        )
-        self._kwargs_names = tuple(self._specs.kwonlyargs)
-        self._total_names = self._params_names + self._kwargs_names
 
     async def __call__(
         self,
@@ -57,22 +86,32 @@ class CallableWrapper(Generic[ReturnTypeT]):
         data: dict[str, Any] | None = None,
     ) -> ReturnTypeT:
         data = data if data is not None else {}
-        exclude: set[str] = set()
-        if args:
-            exclude.update(self._params_names[: len(args)])
-            args = [i if not isinstance(i, FromData) else data[i] for i in args]
+        args = [i if not isinstance(i, FromData) else data[i] for i in args]
 
-        if not self.has_varkw or exclude:
-            kwargs = {}
-            for k, v in data.items():
-                if k in exclude:
-                    continue
-                if not self.has_varkw and k not in self.params_names:
-                    continue
-                kwargs[k] = v
-            data = kwargs
+        bound = self._sig.bind_partial(*args)
+        extra_kwargs: dict[str, Any] = {}
+        extra_values: list[Any] = []
 
-        result = self._callable(*args, **data)
+        for k, v in data.items():
+            if k in bound.arguments:
+                continue
+
+            if k in self._sig.parameters:
+                bound.arguments[k] = v
+            else:
+                if self.has_varkw:
+                    extra_kwargs[k] = v
+                elif self.has_varargs:
+                    extra_values.append(v)
+
+        bound.apply_defaults()
+
+        if self.varargs_name and extra_values:
+            current_args = list(bound.arguments.get(self.varargs_name, ()))
+            current_args.extend(extra_values)
+            bound.arguments[self.varargs_name] = tuple(current_args)
+
+        result = self._callable(*bound.args, **bound.kwargs, **extra_kwargs)
         if inspect.isawaitable(result):
             return await result
         return result
@@ -87,37 +126,30 @@ class CallableWrapper(Generic[ReturnTypeT]):
     @property
     def has_varkw(self) -> bool:
         """
-        Indicates whether the callable accepts arbitrary keyword arguments via ``**kwargs``.
+        Returns True if the wrapped callable has a **kwargs parameter.
         """
-        return self._specs.varkw is not None
+        return self._var_kwargs_name is not None
 
     @property
     def has_varargs(self) -> bool:
         """
-        Indicates whether the callable accepts arbitrary arguments via ``*args``.
+        Returns True if the wrapped callable has a *args parameter.
         """
-        return self._specs.varargs is not None
+        return self._var_args_name is not None
 
     @property
-    def params_names(self) -> tuple[str, ...]:
+    def varkw_name(self) -> str | None:
         """
-        Tuple of positional arguments that can be accepted by the original callable.
+        Returns the name of the **kwargs parameter if present, else None.
         """
-        return self._params_names
+        return self._var_kwargs_name
 
     @property
-    def kwargs_names(self) -> tuple[str, ...]:
+    def varargs_name(self) -> str | None:
         """
-        Tuple of keyword only arguments that can be accepted by the original callable.
+        Returns the name of the *args parameter if present, else None.
         """
-        return self._kwargs_names
-
-    @property
-    def total_names(self) -> tuple[str, ...]:
-        """
-        Tuple of params and keyword params that can be accepted by the original callable.
-        """
-        return self._total_names
+        return self._var_args_name
 
 
 @dataclass(frozen=True)
