@@ -92,7 +92,7 @@ class MiddlewaresExecutor:
         return self
 
     def __next__(self) -> CallableWrapper[Any]:
-        if len(self.middlewares) >= self._middleware_index:
+        if self._middleware_index >= len(self.middlewares):
             raise StopIteration
         middleware = self.middlewares[self._middleware_index]
         self._middleware_index += 1
@@ -175,3 +175,6 @@ class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[CallableWrapper[Any]]
 
     def __len__(self) -> int:
         return len(self._middlewares)
+
+    def __bool__(self) -> bool:
+        return bool(len(self._middlewares))

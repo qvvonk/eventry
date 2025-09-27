@@ -82,7 +82,6 @@ class Dispatcher(Router):
                 errors.extend(await self._execute_manager_handlers(event, manager, data, silent))
                 continue
 
-            executor.add_middlewares(*outer_middlewares)
             wrapped: MiddlewareWrappedCallable[list[ErrorContext]] = (
                 MiddlewareWrappedCallable(
                     self._execute_manager_handlers,
