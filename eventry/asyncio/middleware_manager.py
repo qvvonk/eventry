@@ -117,6 +117,8 @@ class MiddlewaresExecutor:
     ) -> None:
         for curr_middleware in self:
             gen = await curr_middleware(middlewares_args, data)
+            if not isinstance(gen, Generator | AsyncGenerator):
+                continue
             next(gen) if isinstance(gen, Generator) else await anext(gen)
             self.execute_after.appendleft(gen)
 
