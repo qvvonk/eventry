@@ -41,7 +41,7 @@ class Filter:
         self._call_id = id(self.__call__)
         self._call_wrapper: CallableWrapper[bool] = CallableWrapper(self.__call__)
 
-    async def __call__(self, *args: Any, **kwargs: Any) -> bool:
+    async def __call__(self, *args: Any, **kwargs: Any) -> bool | dict[str, Any]:
         return True
 
     def __and__(self, other: CallableFilter | Filter) -> AndFilter:
@@ -76,7 +76,7 @@ class Filter:
 
         return NotFilter(self)
 
-    async def execute(self, args: Sequence[Any], data: dict[str, Any]) -> bool:
+    async def execute(self, args: Sequence[Any], data: dict[str, Any]) -> bool | dict[str, Any]:
         if id(self.__call__) != self._call_id:
             self._call_id = id(self.__call__)
             self._call_wrapper = CallableWrapper(self.__call__)
@@ -102,8 +102,10 @@ class AndFilter(LogicalFilter):
 
     async def execute(self, args: Sequence[Any], data: dict[str, Any]) -> bool:
         for i in self._filters:
-            if not (await i.execute(args, data)):
+            if not (result := await i.execute(args, data)):
                 return False
+            if isinstance(result, dict):
+                data.update(result)
         return True
 
 
@@ -122,7 +124,9 @@ class OrFilter(LogicalFilter):
 
     async def execute(self, args: Sequence[Any], data: dict[str, Any]) -> bool:
         for i in self._filters:
-            if await i.execute(args, data):
+            if result := await i.execute(args, data):
+                if isinstance(result, dict):
+                    data.update(result)
                 return True
         return False
 
