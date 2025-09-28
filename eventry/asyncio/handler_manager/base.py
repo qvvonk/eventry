@@ -184,19 +184,9 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
 
         for handler in self._handlers.values():
             if handler.on_event is not None and type(event) != handler.on_event:
-                router_logger.debug(
-                    f'Handler manager {self.router.id}.{self.id} '
-                    f'skipped handler {handler.id}: '
-                    f'event type {type(event)} is not {handler.on_event} '
-                    f'(from handler event type filter).',
-                )
                 continue
 
             if handler.filter is None:
-                router_logger.debug(
-                    f'Handler manager {self.router.id}.{self.id} yielded handler '
-                    f'{handler.id}: handler has no filter.',
-                )
                 yield handler, None
                 if single_handler:
                     raise HandlerFound()
@@ -207,31 +197,18 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
                     self._config.filter_positional_only_args,
                     data,
                 )
-            except KeyboardInterrupt:
-                raise
             except Exception as e:
-                router_logger.debug(
-                    f'An error occurred in handler manager {self.router.id}.{self.id} while '
-                    f'executing filters of handler {handler.id}. An exception yielded.',
-                )
                 yield handler, e
                 if single_handler:
                     raise HandlerFound()
                 continue
 
             if filter_result:
-                router_logger.debug(
-                    f'Handler manager {self.router.id}.{self.id} '
-                    f'yielded handler {handler.id}: handler filter result is {filter_result}.',
-                )
+                if isinstance(filter_result, dict):
+                    data.update(filter_result)
                 yield handler, None
                 if single_handler:
                     raise HandlerFound()
-            else:
-                router_logger.debug(
-                    f'Handler manager {self.router.id}.{self.id} '
-                    f'skipped handler {handler.id}: handler filter result is {filter_result}.',
-                )
 
     def _add_middleware_manager(
         self,
