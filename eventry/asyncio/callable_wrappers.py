@@ -103,8 +103,12 @@ class CallableWrapper(Generic[ReturnTypeT]):
         extra_kwargs: dict[str, Any] = {}
         extra_values: list[Any] = []
 
+
         for k, v in data.items():
             if k in bound.arguments:
+                continue
+
+            if k == self.varargs_name or k == self.varkw_name:
                 continue
 
             if k in self._sig.parameters:
