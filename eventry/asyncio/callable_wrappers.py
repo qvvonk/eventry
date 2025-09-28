@@ -9,10 +9,12 @@ __all__ = [
 
 
 import inspect
+from collections import OrderedDict
+
 from typing_extensions import TYPE_CHECKING, Any, Type, Union, Generic, TypeVar
 from dataclasses import dataclass
-from types import MethodType
 from collections.abc import Callable, Sequence, Awaitable
+from copy import copy
 
 from eventry.config import FromData
 
@@ -29,7 +31,6 @@ HandlerManagerTypeT = TypeVar(
     bound='HandlerManager[Any, Any, Any, Any]',
 )
 
-# Params = ParamSpec('Params', default=...)
 ReturnTypeT = TypeVar('ReturnTypeT', default=Any)
 
 
@@ -80,15 +81,25 @@ class CallableWrapper(Generic[ReturnTypeT]):
             inspect.iscoroutinefunction(getattr(__obj, '__call__', None))
         )
 
+        self._last_args: Sequence[Any] = ()
+        self._last_bound_args: OrderedDict[str, Any] = OrderedDict()
+
     async def __call__(
         self,
         args: Sequence[Any] = (),
         data: dict[str, Any] | None = None,
     ) -> ReturnTypeT:
         data = data if data is not None else {}
-        args = [i if not isinstance(i, FromData) else data[i] for i in args]
+        args = tuple(i if not isinstance(i, FromData) else data[i] for i in args)
 
-        bound = self._sig.bind_partial(*args)
+        if args == self._last_args:
+            bound_args = copy(self._last_bound_args)
+            bound = inspect.BoundArguments(self._sig, bound_args)
+        else:
+            self._last_args = args
+            bound = self._sig.bind_partial(*args)
+            self._last_bound_args = copy(bound.arguments)
+
         extra_kwargs: dict[str, Any] = {}
         extra_values: list[Any] = []
 
@@ -104,17 +115,14 @@ class CallableWrapper(Generic[ReturnTypeT]):
                 elif self.has_varargs:
                     extra_values.append(v)
 
-        bound.apply_defaults()
-
         if self.varargs_name and extra_values:
             current_args = list(bound.arguments.get(self.varargs_name, ()))
             current_args.extend(extra_values)
-            bound.arguments[self.varargs_name] = tuple(current_args)
+            bound.arguments[self.varargs_name] = current_args
 
-        result = self._callable(*bound.args, **bound.kwargs, **extra_kwargs)
-        if inspect.isawaitable(result):
-            return await result
-        return result
+        if self.is_async:
+            return await self._callable(*bound.args, **bound.kwargs, **extra_kwargs)  # type: ignore
+        return self._callable(*bound.args, **bound.kwargs, **extra_kwargs)  # type: ignore
 
     @property
     def is_async(self) -> bool:
@@ -154,10 +162,21 @@ class CallableWrapper(Generic[ReturnTypeT]):
 
 @dataclass(frozen=True)
 class HandlerMeta:
+    """
+    Represents metadata about a handler.
+    """
+
     definition_filename: str | None
+    """Name of the file where the handler is defined."""
+
     definition_lineno: int
+    """Line number in the file where the handler is defined."""
+
     registration_filename: str
+    """Name of the file where the handler was added to the handler manager."""
+
     registration_lineno: int
+    """Line number in the file where the handler was added to the handler manager."""
 
     @classmethod
     def from_callable(
