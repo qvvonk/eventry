@@ -5,9 +5,11 @@ __all__ = [
     'MiddlewareManager',
     'MiddlewareWrappedCallable',
     'MiddlewaresExecutor',
+    'MiddlewareManagerTypes',
 ]
 
 
+from enum import Enum, auto
 from typing import Any, Union, Generic, TypeVar, Callable, overload
 from dataclasses import field, dataclass
 from contextlib import suppress
@@ -22,6 +24,12 @@ from .callable_wrappers import CallableWrapper
 
 MiddlewareTypeT = TypeVar('MiddlewareTypeT', bound=MiddlewareType, default=MiddlewareType)
 R = TypeVar('R', default=Any)
+
+
+class MiddlewareManagerTypes(Enum):
+    OUTER = auto()
+    INNER_INHERITABLE = auto()
+    INNER = auto()
 
 
 class MiddlewareWrappedCallable(Generic[R]):

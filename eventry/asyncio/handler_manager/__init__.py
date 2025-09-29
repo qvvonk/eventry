@@ -3,10 +3,10 @@ from __future__ import annotations
 
 __all__ = [
     'HandlerManager',
-    'MiddlewareManagerTypes',
     'DefaultHandlerManager',
 ]
 
 
-from .base import HandlerManager, MiddlewareManagerTypes
+from .base import HandlerManager
+from ..middleware_manager import MiddlewareManagerTypes
 from .default import DefaultHandlerManager

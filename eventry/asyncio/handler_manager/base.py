@@ -3,7 +3,6 @@ from __future__ import annotations
 
 __all__ = [
     'HandlerManager',
-    'MiddlewareManagerTypes',
 ]
 
 
@@ -11,7 +10,6 @@ import sys
 import inspect
 import pathlib
 from typing import TYPE_CHECKING, Any, Type, Union, Generic, Optional, overload
-from enum import Enum, auto
 from types import MappingProxyType
 from collections.abc import Callable, AsyncGenerator
 
@@ -23,23 +21,17 @@ from eventry.asyncio.filter import convert_filters
 from eventry.asyncio._exceptions import HandlerFound
 from eventry.asyncio.default_types import FilterType, HandlerType, MiddlewareType
 from eventry.asyncio.callable_wrappers import Handler, HandlerMeta, CallableWrapper
-from eventry.asyncio.middleware_manager import MiddlewareManager
-
+from eventry.asyncio.middleware_manager import MiddlewareManager, MiddlewareManagerTypes
 
 if TYPE_CHECKING:
     from eventry.asyncio.event import Event
-    from eventry.asyncio.router import Router
+    from eventry.asyncio.router.base import Router
 
 
 RouterT = TypeVar('RouterT', bound='Router', default='Router')
 HandlerT = TypeVar('HandlerT', bound=HandlerType, default=HandlerType)
 FilterT = TypeVar('FilterT', bound=FilterType, default=FilterType)
 MiddlewareT = TypeVar('MiddlewareT', bound=MiddlewareType, default=MiddlewareType)
-
-
-class MiddlewareManagerTypes(Enum):
-    OUTER = auto()
-    INNER = auto()
 
 
 class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):

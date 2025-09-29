@@ -16,10 +16,9 @@ from eventry.loggers import dispatcher_logger
 from eventry.exceptions import HandlerNotExecuted
 from eventry.asyncio.event import Event
 from eventry.asyncio.router import Router
-from eventry.asyncio.handler_manager import MiddlewareManagerTypes
 from eventry.asyncio.middleware_manager import (
     MiddlewaresExecutor,
-    MiddlewareWrappedCallable,
+    MiddlewareWrappedCallable, MiddlewareManagerTypes,
 )
 
 
@@ -214,10 +213,10 @@ class Dispatcher(Router):
             [handler.middlewares] if handler.middlewares else []
         )
 
-        if handler.manager.middleware_manager(MiddlewareManagerTypes.INNER):
+        if handler.manager.middleware_manager(MiddlewareManagerTypes.INNER_INHERITABLE):
             for router in handler.manager.router.chain_to_root_router:
                 manager = router.get_handler_manager(event)
-                middlewares.append(manager.middleware_manager(MiddlewareManagerTypes.INNER))
+                middlewares.append(manager.middleware_manager(MiddlewareManagerTypes.INNER_INHERITABLE))
 
         return MiddlewareWrappedCallable(
             handler._callable,

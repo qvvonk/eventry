@@ -9,15 +9,17 @@ __all__ = [
 
 
 import inspect
-from collections import OrderedDict
+from collections import OrderedDict, deque
 
 from typing_extensions import TYPE_CHECKING, Any, Type, Union, Generic, TypeVar
 from dataclasses import dataclass
-from collections.abc import Callable, Sequence, Awaitable
+from collections.abc import Callable, Sequence, Awaitable, Iterable
 from copy import copy
 
 from eventry.config import FromData
-
+from .middleware_manager import MiddlewareManagerTypes, MiddlewareWrappedCallable
+from itertools import chain
+from eventry.asyncio.default_types import MiddlewareType
 
 if TYPE_CHECKING:
     from .event import Event
@@ -28,7 +30,7 @@ if TYPE_CHECKING:
 HandlerManagerTypeT = TypeVar(
     'HandlerManagerTypeT',
     default='HandlerManager',
-    bound='HandlerManager[Any, Any, Any, Any]',
+    bound='HandlerManager',
 )
 
 ReturnTypeT = TypeVar('ReturnTypeT', default=Any)
@@ -248,3 +250,35 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
     @property
     def middlewares(self) -> list[CallableWrapper[Any]]:
         return self._middlewares
+
+    def wrap_with_middlewares(self) -> MiddlewareWrappedCallable[ReturnTypeT]:
+        """
+        Build a middleware-wrapped callable for this handler.
+
+        The returned object executes the original handler wrapped into all
+        relevant middleware layers.
+        """
+
+        middlewares: deque[CallableWrapper[Any]] = deque()
+        middlewares.extendleft(reversed(self.middlewares))
+
+        inner = bool(self.manager.middleware_manager(MiddlewareManagerTypes.INNER))
+        inner_inh = bool(self.manager.middleware_manager(MiddlewareManagerTypes.INNER_INHERITABLE))
+
+        if inner:
+            middlewares.extendleft(
+                reversed(self.manager.middleware_manager(MiddlewareManagerTypes.INNER))
+            )
+
+        if inner_inh:
+            for router in self.manager.router.chain_to_root_router:
+                manager = router[self.manager.id]
+
+                middlewares.extendleft(
+                    reversed(manager.middleware_manager(MiddlewareManagerTypes.INNER_INHERITABLE))
+                )
+
+        return MiddlewareWrappedCallable(
+            self._callable,
+            middlewares=middlewares,
+        )

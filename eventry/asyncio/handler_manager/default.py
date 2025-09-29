@@ -8,9 +8,8 @@ from typing import TYPE_CHECKING, Type, TypeVar
 
 from eventry.asyncio.default_types import FilterType, HandlerType, MiddlewareType
 
-from .base import HandlerManager, MiddlewareManagerTypes
-from ..middleware_manager import MiddlewareManager
-
+from .base import HandlerManager
+from ..middleware_manager import MiddlewareManager, MiddlewareManagerTypes
 
 if TYPE_CHECKING:
     from eventry.asyncio.event import Event
@@ -38,7 +37,7 @@ class DefaultHandlerManager(HandlerManager[FilterT, HandlerT, MiddlewareT, Route
         )
 
         self._add_middleware_manager(MiddlewareManagerTypes.OUTER, MiddlewareManager())
-        self._add_middleware_manager(MiddlewareManagerTypes.INNER, MiddlewareManager())
+        self._add_middleware_manager(MiddlewareManagerTypes.INNER_INHERITABLE, MiddlewareManager())
 
     @property
     def outer_middleware(self) -> MiddlewareManager[MiddlewareT]:
@@ -46,4 +45,4 @@ class DefaultHandlerManager(HandlerManager[FilterT, HandlerT, MiddlewareT, Route
 
     @property
     def inner_middleware(self) -> MiddlewareManager[MiddlewareT]:
-        return self._middleware_managers[MiddlewareManagerTypes.INNER]
+        return self._middleware_managers[MiddlewareManagerTypes.INNER_INHERITABLE]

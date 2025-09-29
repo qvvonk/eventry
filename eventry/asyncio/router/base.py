@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from eventry.asyncio.event import Event
 
 
-HandlerManagerType = TypeVar('HandlerManagerType', bound=HandlerManager[Any, Any, Any, Any])
+HandlerManagerT = TypeVar('HandlerManagerT', bound=HandlerManager[Any, Any, Any, Any])
 
 
 class Router:
@@ -28,6 +28,7 @@ class Router:
         self._parent: Self | None = None
         self._children: dict[str, Self] = {}
         self._managers: dict[type[Event], HandlerManager[Any, Any, Any, Self]] = {}
+        self._managers_by_id: dict[str, HandlerManager[Any, Any, Any, Self]] = {}
         self._default_handler_manager: HandlerManager[Any, Any, Any, Self] | None = None
 
     def get_handler_by_id(self, handler_id: str, /) -> Handler[Any, Any] | None:
@@ -67,14 +68,21 @@ class Router:
         except HandlerFound:
             return
 
-    def _add_handler_manager(self, handler_manager: HandlerManagerType, /) -> HandlerManagerType:
+    def _add_handler_manager(self, handler_manager: HandlerManagerT, /) -> HandlerManagerT:
         if not handler_manager.event_type_filter:
             raise ValueError(
                 'Cannot add handler manager without event type filter. '
                 'Assign it as default handler manager.',
             )  # todo: improve
 
+        if handler_manager.id in self._managers_by_id:
+            raise ValueError(
+                f'Manager with id {handler_manager.id!r} already added to router '
+                f'{self._router_id!r}. '
+            )
+
         self._managers[handler_manager.event_type_filter] = handler_manager
+        self._managers_by_id[handler_manager.id] = handler_manager
         return handler_manager
 
     def get_handler_manager(
@@ -82,7 +90,7 @@ class Router:
         event: Event | Type[Event],
         /,
     ) -> HandlerManager[Any, Any, Any, Self]:
-        event_type = event if isinstance(event, type) else event.__class__
+        event_type = event if isinstance(event, type) else type(event)
         if event_type in self._managers:
             return self._managers[event_type]
 
@@ -107,6 +115,11 @@ class Router:
     def connect_routers(self, *routers: Router) -> None:
         for i in routers:
             i.parent_router = self
+
+    def __getitem__(self, item: str | Event | type[Event]) -> HandlerManager[Any, Any, Any, Self]:
+        if isinstance(item, str):
+            return self._managers_by_id[item]
+        return self.get_handler_manager(item)
 
     @property
     def id(self) -> str:
