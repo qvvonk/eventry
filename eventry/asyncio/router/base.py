@@ -75,7 +75,7 @@ class Router:
                 'Assign it as default handler manager.',
             )  # todo: improve
 
-        if handler_manager.id in self._managers_by_id:
+        if handler_manager.id in self._managers_by_id or (self._default_handler_manager and self._default_handler_manager.id == handler_manager.id) :
             raise ValueError(
                 f'Manager with id {handler_manager.id!r} already added to router '
                 f'{self._router_id!r}. '
@@ -118,6 +118,8 @@ class Router:
 
     def __getitem__(self, item: str | Event | type[Event]) -> HandlerManager[Any, Any, Any, Self]:
         if isinstance(item, str):
+            if self._default_handler_manager and self._default_handler_manager.id == item:
+                return self._default_handler_manager
             return self._managers_by_id[item]
         return self.get_handler_manager(item)
 

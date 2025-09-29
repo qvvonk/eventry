@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 
-__all__ = ['AbortExecution', 'HandlerNotExecuted']
+__all__ = ['Return', 'HandlerNotExecuted']
 
 
-class AbortExecution(Exception):
+class Return(Exception):
     pass
 
 

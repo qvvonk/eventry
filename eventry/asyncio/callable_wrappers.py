@@ -13,18 +13,17 @@ from collections import OrderedDict, deque
 
 from typing_extensions import TYPE_CHECKING, Any, Type, Union, Generic, TypeVar
 from dataclasses import dataclass
-from collections.abc import Callable, Sequence, Awaitable, Iterable
+from collections.abc import Callable, Sequence, Awaitable
 from copy import copy
 
 from eventry.config import FromData
-from .middleware_manager import MiddlewareManagerTypes, MiddlewareWrappedCallable
-from itertools import chain
-from eventry.asyncio.default_types import MiddlewareType
+
 
 if TYPE_CHECKING:
     from .event import Event
     from .filter import Filter
     from .handler_manager import HandlerManager
+    from .middleware_manager import MiddlewareWrappedCallable
 
 
 HandlerManagerTypeT = TypeVar(
@@ -258,6 +257,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
         The returned object executes the original handler wrapped into all
         relevant middleware layers.
         """
+        from .middleware_manager import MiddlewareManagerTypes, MiddlewareWrappedCallable
 
         middlewares: deque[CallableWrapper[Any]] = deque()
         middlewares.extendleft(reversed(self.middlewares))

@@ -72,9 +72,11 @@ class Dispatcher(Router):
         event_context[self._config.default_names_remap.get('data', 'data')] = event_context
 
         executor = MiddlewaresExecutor()
-        execution_aborted = False
 
         for router in self.chain_to_last_router:
+            if event.propagation_stopped:
+                return
+
             manager = router[event]
             outer_middlewares = manager.middleware_manager(MiddlewareManagerTypes.OUTER)
             if not outer_middlewares:
@@ -88,25 +90,20 @@ class Dispatcher(Router):
                 )
             )
 
-            try:
-                await wrapped(
-                    callable_args=(event, manager, event_context, silent),
-                    middlewares_args=manager.config.middleware_positional_only_args,
-                    data=event_context,
-                    executor=executor,
-                    execute_post_middlewares=False,
-                )
-            except HandlerNotExecuted:
-                execution_aborted = True
-                break
+            await wrapped(
+                callable_args=(event, manager, event_context, silent),
+                middlewares_args=manager.config.middleware_positional_only_args,
+                data=event_context,
+                executor=executor,
+                execute_post_middlewares=False,
+            )
 
-        if not execution_aborted:
-            try:
-                await executor.execute_post_middlewares()
-            except Exception as e:
-                if not silent:
-                    err_event = self._error_event_factory(ErrorContext(e, None, event))
-                    await self.propagate_event(err_event, {}, silent=True)
+        try:
+            await executor.execute_post_middlewares()
+        except Exception as e:
+            if not silent:
+                err_event = self._error_event_factory(ErrorContext(e, None, event))
+                await self.propagate_event(err_event, {}, silent=True)
 
     async def _execute_manager_handlers(
         self,
@@ -173,7 +170,12 @@ class Dispatcher(Router):
         )
 
         start = time.time()
-        wrapped_handler = handler.wrap_with_middlewares()
+        try:
+            wrapped_handler = handler.wrap_with_middlewares()
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            raise
         try:
             if not handler.as_task:
                 return await wrapped_handler(

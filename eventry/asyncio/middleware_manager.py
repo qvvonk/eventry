@@ -12,11 +12,10 @@ __all__ = [
 from enum import Enum, auto
 from typing import Any, Union, Generic, TypeVar, Callable, overload
 from dataclasses import field, dataclass
-from contextlib import suppress
 from collections import deque
 from collections.abc import Iterable, Sequence, Awaitable, Generator, AsyncGenerator
 
-from eventry.exceptions import AbortExecution, HandlerNotExecuted
+from eventry.exceptions import Return, HandlerNotExecuted
 from eventry.asyncio.default_types import MiddlewareType
 
 from .callable_wrappers import CallableWrapper
@@ -51,28 +50,32 @@ class MiddlewareWrappedCallable(Generic[R]):
         data: dict[str, Any],
         executor: MiddlewaresExecutor | None = None,
         execute_post_middlewares: bool = True,
-        close_on_error: bool = True,
-    ) -> R:
+    ) -> R | None:
         executor = executor or MiddlewaresExecutor()
         executor.add_middlewares(*self._middlewares)
 
         try:
             await executor.execute_pre_middlewares(middlewares_args, data)
         except Exception as e:
-            if close_on_error:
-                await executor.close()
-            if isinstance(e, AbortExecution):
-                raise HandlerNotExecuted
-            raise
+            if execute_post_middlewares:
+                exc = e if not isinstance(e, Return) else None
+                await executor.execute_post_middlewares(exception=exc)
+                return None
+            else:
+                raise
 
         try:
             result = await self._callable(callable_args, data)
-            if execute_post_middlewares:
-                await executor.execute_post_middlewares()
-        finally:
-            if close_on_error:
-                await executor.close()
+            if not execute_post_middlewares:
+                return result
+        except Exception as e:
+            if not execute_post_middlewares:
+                raise
+            await executor.execute_post_middlewares(exception=e)
+            return None
 
+        if execute_post_middlewares:
+            await executor.execute_post_middlewares()
         return result
 
 
@@ -107,10 +110,6 @@ class MiddlewaresExecutor:
         return middleware
 
     @property
-    def execute_after(self) -> deque[Generator[Any, None, Any] | AsyncGenerator[Any, None]]:
-        return self._execute_after
-
-    @property
     def middleware_index(self) -> int:
         return self._middleware_index
 
@@ -128,25 +127,24 @@ class MiddlewaresExecutor:
             if not isinstance(gen, Generator | AsyncGenerator):
                 continue
             next(gen) if isinstance(gen, Generator) else await anext(gen)
-            self.execute_after.appendleft(gen)
+            self._execute_after.appendleft(gen)
 
-    async def execute_post_middlewares(self) -> None:
-        while self.execute_after:
-            gen = self.execute_after[0]
+    async def execute_post_middlewares(
+        self,
+        exception: Exception | None = None
+    ) -> None:
+        while self._execute_after:
+            gen = self._execute_after.popleft()
             try:
-                with suppress(StopIteration, StopAsyncIteration):
-                    next(gen) if isinstance(gen, Generator) else (await anext(gen))
-                self.execute_after.popleft()
+                if isinstance(gen, Generator):
+                    gen.throw(exception) if exception is not None else next(gen)
+                elif isinstance(gen, AsyncGenerator):
+                    await gen.athrow(exception) if exception is not None else await anext(gen)
+                exception = None
+            except (StopIteration, StopAsyncIteration):
+                exception = None
             except Exception as e:
-                await self.close()
-                if not isinstance(e, AbortExecution):
-                    raise
-
-    async def close(self) -> None:
-        while self.execute_after:
-            with suppress(Exception):
-                gen = self.execute_after.popleft()
-                gen.close() if isinstance(gen, Generator) else await gen.aclose()
+                exception = e
 
 
 class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[CallableWrapper[Any]]):
