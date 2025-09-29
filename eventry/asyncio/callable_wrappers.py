@@ -165,6 +165,21 @@ class CallableWrapper(Generic[ReturnTypeT]):
         return self._var_args_name
 
 
+class MiddlewareCallable(CallableWrapper[ReturnTypeT]):
+    def __init__(
+        self,
+        __obj: Callable[..., Union[Awaitable[ReturnTypeT], ReturnTypeT]],
+        /,
+        inheritable: bool = False
+    ) -> None:
+        super().__init__(__obj)
+        self._inheritable = inheritable
+
+    @property
+    def inheritable(self) -> bool:
+        return self._inheritable
+
+
 @dataclass(frozen=True)
 class HandlerMeta:
     """
