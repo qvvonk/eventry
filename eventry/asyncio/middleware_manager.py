@@ -26,9 +26,9 @@ R = TypeVar('R', default=Any)
 
 
 class MiddlewareManagerTypes(Enum):
-    OUTER = auto()
-    INNER_INHERITABLE = auto()
-    INNER = auto()
+    GLOBAL = auto()
+    OUTER_PER_HANDLER = auto()
+    INNER_PER_HANDLER = auto()
 
 
 class MiddlewareWrappedCallable(Generic[R]):

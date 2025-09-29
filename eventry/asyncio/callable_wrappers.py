@@ -262,12 +262,12 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
         middlewares: deque[CallableWrapper[Any]] = deque()
         middlewares.extendleft(reversed(self.middlewares))
 
-        inner = bool(self.manager.middleware_manager(MiddlewareManagerTypes.INNER))
-        inner_inh = bool(self.manager.middleware_manager(MiddlewareManagerTypes.INNER_INHERITABLE))
+        inner = bool(self.manager.middleware_manager(MiddlewareManagerTypes.INNER_PER_HANDLER))
+        inner_inh = bool(self.manager.middleware_manager(MiddlewareManagerTypes.OUTER_PER_HANDLER))
 
         if inner:
             middlewares.extendleft(
-                reversed(self.manager.middleware_manager(MiddlewareManagerTypes.INNER))
+                reversed(self.manager.middleware_manager(MiddlewareManagerTypes.INNER_PER_HANDLER))
             )
 
         if inner_inh:
@@ -275,7 +275,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
                 manager = router[self.manager.id]
 
                 middlewares.extendleft(
-                    reversed(manager.middleware_manager(MiddlewareManagerTypes.INNER_INHERITABLE))
+                    reversed(manager.middleware_manager(MiddlewareManagerTypes.OUTER_PER_HANDLER))
                 )
 
         return MiddlewareWrappedCallable(

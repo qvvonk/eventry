@@ -78,7 +78,7 @@ class Dispatcher(Router):
                 return
 
             manager = router[event]
-            outer_middlewares = manager.middleware_manager(MiddlewareManagerTypes.OUTER)
+            outer_middlewares = manager.middleware_manager(MiddlewareManagerTypes.GLOBAL)
             if not outer_middlewares:
                 await self._execute_manager_handlers(event, manager, event_context, silent)
                 continue

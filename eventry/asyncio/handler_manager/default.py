@@ -36,13 +36,13 @@ class DefaultHandlerManager(HandlerManager[FilterT, HandlerT, MiddlewareT, Route
             event_type_filter=event_type_filter,
         )
 
-        self._add_middleware_manager(MiddlewareManagerTypes.OUTER, MiddlewareManager())
-        self._add_middleware_manager(MiddlewareManagerTypes.INNER_INHERITABLE, MiddlewareManager())
+        self._add_middleware_manager(MiddlewareManagerTypes.GLOBAL, MiddlewareManager())
+        self._add_middleware_manager(MiddlewareManagerTypes.OUTER_PER_HANDLER, MiddlewareManager())
 
     @property
     def outer_middleware(self) -> MiddlewareManager[MiddlewareT]:
-        return self._middleware_managers[MiddlewareManagerTypes.OUTER]
+        return self._middleware_managers[MiddlewareManagerTypes.GLOBAL]
 
     @property
     def inner_middleware(self) -> MiddlewareManager[MiddlewareT]:
-        return self._middleware_managers[MiddlewareManagerTypes.INNER_INHERITABLE]
+        return self._middleware_managers[MiddlewareManagerTypes.OUTER_PER_HANDLER]
