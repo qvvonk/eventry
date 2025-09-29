@@ -18,17 +18,33 @@ class Event:
         self._propagation_stopped = False
 
     def stop_propagation(self) -> None:
+        """
+        Stop further propagation of this event.
+
+        Once called, the dispatcher will no longer deliver the event
+        to subsequent handlers.
+        """
         self._propagation_stopped = True
 
     @property
-    def workflow_injection(self) -> dict[str, Any]:
+    def event_context_injection(self) -> dict[str, Any]:
         """
-        Workflow injection.  # todo: docstring
+        Data to inject into the event context.
+
+        Subclasses may override this property to provide additional
+        key-value pairs that will be merged into the event context.
+
+        :return: A dictionary with event-specific context data.
         """
         return {}
 
     @property
     def propagation_stopped(self) -> bool:
+        """
+        Check whether the event propagation has been stopped.
+
+        :return: ``True`` if propagation has been stopped, otherwise ``False``.
+        """
         return self._propagation_stopped
 
 
@@ -48,6 +64,9 @@ class ExtendedEvent(Event):
     def __getitem__(self, key: Any) -> Any:
         return self._data[key]
 
+    def __contains__(self, key: Any) -> bool:
+        return key in self._data
+
     def set_flag(self, flag: Any) -> None:
         self._flags.add(flag)
 
@@ -65,7 +84,7 @@ class ExtendedEvent(Event):
         return flag in self._flags
 
     @property
-    def flags(self) -> frozenset[Any]:  # todo: optimization for big sets?
+    def flags(self) -> frozenset[Any]:
         return frozenset(self._flags)
 
     @property

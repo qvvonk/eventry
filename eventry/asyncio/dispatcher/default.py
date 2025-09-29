@@ -22,7 +22,7 @@ class ErrorEvent(ExtendedEvent):
         return self._context
 
     @property
-    def workflow_injection(self) -> dict[str, Any]:
+    def event_context_injection(self) -> dict[str, Any]:
         return {'context': self.context}
 
 

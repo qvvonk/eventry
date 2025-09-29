@@ -62,7 +62,7 @@ class Dispatcher(Router):
         data: dict[str, Any] = {
             **self._workflow_data,
             **workflow_injection,
-            **event.workflow_injection,
+            **event.event_context_injection,
             self._config.default_names_remap.get(
                 'executed_handlers',
                 'executed_handlers',
