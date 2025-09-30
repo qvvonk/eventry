@@ -128,7 +128,7 @@ class Dispatcher(Router):
         event_context: dict[str, Any],
         silent: bool,
     ) -> None:
-        async for h in manager.get_matching_handlers(event, self._config.single_handler_mode):
+        async for h in manager.get_matching_handlers(event):
             event_context = {
                 **event_context,
                 self._config.default_names_remap.get('handler', 'handler'): h

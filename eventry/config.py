@@ -22,7 +22,6 @@ class DefaultNamesRemap(TypedDict, total=False):
 @dataclass(frozen=True)
 class DispatcherConfig:
     default_names_remap: DefaultNamesRemap = field(default_factory=dict)  # type: ignore
-    single_handler_mode: bool = False
 
 
 @dataclass(frozen=True)

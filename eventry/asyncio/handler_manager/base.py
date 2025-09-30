@@ -161,7 +161,6 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
     async def get_matching_handlers(
         self,
         event: Event,
-        single_handler: bool,
     ) -> AsyncGenerator[Handler[Any, Self], None]:
         """
         Iterates through all registered handlers and yields those whose filters
@@ -176,8 +175,6 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
             if handler.on_event is not None and type(event) != handler.on_event:
                 continue
             yield handler
-            if single_handler:
-                return
 
     def _add_middleware_manager(
         self,
