@@ -85,6 +85,8 @@ class MiddlewareWrappedCallable(Generic[R]):
                                 and all finalizers ran without errors.
             :raises FinalizingError: Raised if an exception occurs during middleware
                                      finalization after successful callable execution.
+            :raises Exception: todo: if an unhandled exception occurs in finalizer and handler
+            not executed.
             """
         executor = executor or MiddlewaresExecutor()
         executor.add_middlewares(*self._middlewares)

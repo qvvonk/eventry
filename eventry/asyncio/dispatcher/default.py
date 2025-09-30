@@ -35,4 +35,4 @@ class DefaultDispatcher(Dispatcher, DefaultRouter):
         Dispatcher.__init__(
             self, error_event_factory=error_event_factory, workflow_data=workflow_data
         )
-        DefaultRouter.__init__(self, router_id='Dispatcher')
+        DefaultRouter.__init__(self, name='Dispatcher')

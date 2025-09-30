@@ -36,7 +36,7 @@ dictConfig(
 
 
 dp = DefaultDispatcher()
-r = DefaultRouter(router_id='router')
+r = DefaultRouter(name='router')
 
 dp.connect_router(r)
 
@@ -72,6 +72,7 @@ async def another():
 @dp.on_event.global_middleware
 async def global_middleware():
     print(f'GLOBAL MIDDLEWARE')
+    raise Exception('EXCEPTION FROM GLOBAL MIDDLEWARE')
     yield
     print(f'GLOBAL FINALIZER')
 

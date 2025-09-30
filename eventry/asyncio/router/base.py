@@ -23,8 +23,8 @@ HandlerManagerT = TypeVar('HandlerManagerT', bound=HandlerManager[Any, Any, Any,
 
 
 class Router:
-    def __init__(self, router_id: str):
-        self._router_id = router_id
+    def __init__(self, name: str):
+        self._name = name
         self._parent: Self | None = None
         self._children: dict[str, Self] = {}
         self._managers: dict[type[Event], HandlerManager[Any, Any, Any, Self]] = {}
@@ -42,32 +42,6 @@ class Router:
                 return result
         return None
 
-    async def _get_matching_handlers(
-        self,
-        event: Event,
-        single_handler: bool,
-        workflow_data: dict[str, Any],
-    ) -> AsyncGenerator[tuple[Handler[Any, Any], Exception | None], None]:
-        manager = self.get_handler_manager(event)
-
-        try:
-            async for handler, e in manager.get_matching_handlers(
-                event,
-                single_handler,
-                workflow_data,
-            ):
-                yield handler, e
-
-            for router in self._children.values():
-                async for handler, e in router._get_matching_handlers(
-                    event,
-                    single_handler,
-                    workflow_data,
-                ):
-                    yield handler, e
-        except HandlerFound:
-            return
-
     def _add_handler_manager(self, handler_manager: HandlerManagerT, /) -> HandlerManagerT:
         if not handler_manager.event_type_filter:
             raise ValueError(
@@ -78,7 +52,7 @@ class Router:
         if handler_manager.id in self._managers_by_id or (self._default_handler_manager and self._default_handler_manager.id == handler_manager.id) :
             raise ValueError(
                 f'Manager with id {handler_manager.id!r} already added to router '
-                f'{self._router_id!r}. '
+                f'{self._name!r}. '
             )
 
         self._managers[handler_manager.event_type_filter] = handler_manager
@@ -124,8 +98,8 @@ class Router:
         return self.get_handler_manager(item)
 
     @property
-    def id(self) -> str:
-        return self._router_id
+    def name(self) -> str:
+        return self._name
 
     @property
     def root_router(self) -> Self:
@@ -159,7 +133,7 @@ class Router:
         #     )
         if self.parent_router:
             raise RuntimeError(
-                f"Router '{self.id}' is already connected to router '{self.parent_router.id}'.",
+                f"Router '{self.name}' is already connected to router '{self.parent_router.name}'.",
             )
 
         if not isinstance(router, Router):
@@ -179,8 +153,8 @@ class Router:
         # todo: add name check
 
         self._parent = router
-        router._children[self.id] = self
+        router._children[self.name] = self
 
         router_logger.info(
-            f"Router '{self.id}' connected to router '{router.id}'.",
+            f"Router '{self.name}' connected to router '{router.name}'.",
         )

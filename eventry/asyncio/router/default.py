@@ -6,8 +6,8 @@ from .base import Router
 
 
 class DefaultRouter(Router):
-    def __init__(self, router_id: str):
-        super().__init__(router_id=router_id)
+    def __init__(self, name: str):
+        super().__init__(name=name)
 
         self._default_handler_manager: DefaultHandlerManager = DefaultHandlerManager(
             self,

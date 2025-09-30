@@ -131,12 +131,12 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         if (exists_handler := root_router.get_handler_by_id(handler.id)) is not None:
             raise ValueError(
                 f'Handler with ID {handler.id} already exists.\n'
-                f"Original handler registered in router '{exists_handler.manager.router.id}':\n"
+                f"Original handler registered in router '{exists_handler.manager.router.name}':\n"
                 f'    Defined in "{exists_handler.meta.definition_filename}:'
                 f'{exists_handler.meta.definition_lineno}"\n'
                 f'    Registered in {exists_handler.meta.registration_filename}:'
                 f'{exists_handler.meta.registration_lineno}\n\n'
-                f"Duplicate handler in router '{handler.manager.router.id}':\n"
+                f"Duplicate handler in router '{handler.manager.router.name}':\n"
                 f'    Defined in "{handler.meta.definition_filename}:'
                 f'{handler.meta.definition_lineno}"\n'
                 f'    Registered in {handler.meta.registration_filename}:'
@@ -144,7 +144,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
             )
         self._handlers[handler.id] = handler
         router_logger.info(
-            f"[{self.router.id} -> {self.id}] Registered handler '{handler.id}'.",
+            f"[{self.router.name} -> {self.id}] Registered handler '{handler.id}'.",
         )
 
     def get_handler(self, handler_id: str) -> Handler[Any, Self] | None:
@@ -304,4 +304,4 @@ def gen_default_handler_id(
 
     module_path = '.'.join(rel_path.parts)
 
-    return f'{manager.router.id}.{manager.id}--{module_path}.{handler.__qualname__}'
+    return f'{manager.router.name}.{manager.id}--{module_path}.{handler.__qualname__}'

@@ -41,7 +41,7 @@ class Dispatcher(Router):
         workflow_data: dict[str, Any] | None = None,
         config: DispatcherConfig | None = None,
     ) -> None:
-        Router.__init__(self, router_id='Dispatcher')
+        Router.__init__(self, name='Dispatcher')
 
         self._workflow_data = workflow_data if workflow_data is not None else {}
         self._config = config or DispatcherConfig()
@@ -96,19 +96,13 @@ class Dispatcher(Router):
                     finalize=False,
                 )
             except Finalized:
-                # an error occurred in global middlewares, but it has been caught
-                # by one of the global middlewares finalizer
                 return
-            except FinalizingError as e:
-                # an error occurred in global middlewares finalizer and it hasn't been
-                # caught by any finalizer
+            except Exception as e:
+                if isinstance(e, FinalizingError):
+                    e = e.__cause__
                 if not silent:
-                    err_event = self._error_event_factory(ErrorContext(e.__cause__, None, event))
+                    err_event = self._error_event_factory(ErrorContext(e, None, event))
                     await self.propagate_event(err_event, {}, silent=True)
-                return
-            except:
-                # that actually should never happen.
-                print('OMG IMPOSSIBLE AN ERROR')
                 return
 
             outer = manager.middleware_manager(MiddlewareManagerTypes.OUTER_PER_HANDLER)
@@ -162,7 +156,7 @@ class Dispatcher(Router):
     ) -> Any:
         dispatcher_logger.debug(
             f'({id(event)}) Executing handler '
-            f'{handler.manager.router.id} -> {handler.manager.id} -> {handler.id}...',
+            f'{handler.manager.router.name} -> {handler.manager.id} -> {handler.id}...',
         )
 
         start = time.time()
@@ -173,17 +167,20 @@ class Dispatcher(Router):
                     inherited_outer_middlewares=event.__inherited_outer_middlewares__,
                     inherited_inner_middlewares=event.__inherited_inner_middlewares__,
                 )
-            asyncio.create_task(
-                handler.execute_wrapped(
-                    data=event_context,
-                    inherited_outer_middlewares=event.__inherited_outer_middlewares__,
-                    inherited_inner_middlewares=event.__inherited_inner_middlewares__,
+            else:
+                asyncio.create_task(
+                    handler.execute_wrapped(
+                        data=event_context,
+                        inherited_outer_middlewares=event.__inherited_outer_middlewares__,
+                        inherited_inner_middlewares=event.__inherited_inner_middlewares__,
+                    )
                 )
-            )
         except Exception as e:
+            if isinstance(e, FinalizingError):
+                e = e.__cause__
             dispatcher_logger.debug(
                 f'({id(event)}) An error occurred while executing handler '
-                f'{handler.manager.router.id} -> {handler.manager.id} -> {handler.id}.',
+                f'{handler.manager.router.name} -> {handler.manager.id} -> {handler.id}.',
                 exc_info=e,
             )
             raise e
