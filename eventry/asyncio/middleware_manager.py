@@ -112,6 +112,19 @@ class MiddlewaresExecutor:
     def middleware_index(self) -> int:
         return self._middleware_index
 
+    @property
+    def done(self) -> bool:
+        if self._execute_after:
+            return False
+
+        if len(self.middlewares) == 0:
+            return True
+
+        if self.middleware_index == len(self.middlewares)-1:
+            return True
+
+        return False
+
     def add_middlewares(self, *middlewares: Callable[..., Any] | CallableWrapper[Any]) -> None:
         for i in middlewares:
             self.middlewares.append(i if isinstance(i, CallableWrapper) else CallableWrapper(i))
