@@ -145,7 +145,7 @@ class Dispatcher(Router):
                 if isinstance(e, FinalizingError):
                     e = e.__cause__
                 if not silent:
-                    err_event = self._error_event_factory(ErrorContext(e, handler, event))
+                    err_event = self._error_event_factory(ErrorContext(e, h, event))
                     await self.propagate_event(err_event, {}, silent=True)
 
             if event.propagation_stopped:

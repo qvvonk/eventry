@@ -18,27 +18,21 @@ from collections.abc import Callable, Sequence, Awaitable
 from copy import copy
 
 from eventry.config import FromData
-from collections.abc import Iterable
 
 from ..exceptions import Finalized
 
 if TYPE_CHECKING:
     from .event import Event
-    from .filter import Filter, FilterFromFunction
+    from .filter import Filter
     from .handler_manager import HandlerManager
     from .middleware_manager import MiddlewareWrappedCallable, MiddlewareManagerTypes
 
-    HandlerManagerTypeT = TypeVar(
-        'HandlerManagerTypeT',
-        default=HandlerManager,
-        bound=HandlerManager,
-    )
-else:
-    HandlerManagerTypeT = TypeVar(
-        'HandlerManagerTypeT',
-        default='HandlerManager',
-        bound='HandlerManager',
-    )
+
+HandlerManagerTypeT = TypeVar(
+    'HandlerManagerTypeT',
+    default='HandlerManager',
+    bound='HandlerManager',
+)
 
 ReturnTypeT = TypeVar('ReturnTypeT', default=Any)
 
@@ -233,13 +227,14 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
         as_task: bool,
         meta: HandlerMeta,
     ):
+        from eventry.asyncio.filter import FilterFromFunction
         super().__init__(__obj)
         self._handler_manager = handler_manager
         self._handler_id = handler_id
         self._meta = meta
         self._middlewares = middlewares
         self._as_task = as_task
-        self._filter = filter if filter is not None else FilterFromFunction(lambda *args, **kwargs: True)
+        self._filter = filter if filter is not None else FilterFromFunction(lambda *args: True)
 
         if self._handler_manager.event_type_filter and on_event:
             raise ValueError('')  # todo: err message
@@ -289,17 +284,20 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
         curr_outer = self.manager.middleware_manager(MiddlewareManagerTypes.OUTER_PER_HANDLER) or []
         curr_inner = self.manager.middleware_manager(MiddlewareManagerTypes.INNER_PER_HANDLER) or []
 
-        outer_middlewares = outer_middlewares + deque(*curr_outer)
-        inner_middlewares = inner_middlewares + deque(*curr_inner)
+        outer_middlewares = outer_middlewares + deque(curr_outer)
+        inner_middlewares = inner_middlewares + deque(curr_inner)
 
         executor = MiddlewaresExecutor()
-        wrapped_filter = MiddlewareWrappedCallable(self._filter, outer_middlewares)
+        wrapped_filter = MiddlewareWrappedCallable(self._filter.execute, outer_middlewares)
 
         try:
             r = await wrapped_filter(
-                self.manager._config.filter_positional_only_args,
-                self.manager._config.middleware_positional_only_args,
-                data,
+                callable_args=(
+                    self.manager._config.filter_positional_only_args,
+                    data
+                ),
+                middlewares_args=self.manager._config.middleware_positional_only_args,
+                data=data,
                 finalize=False,
                 executor=executor
             )
@@ -307,6 +305,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
             return
 
         if not r:
+            await executor.finalize_middlewares()
             return
 
         if isinstance(r, dict):

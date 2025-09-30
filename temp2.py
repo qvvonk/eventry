@@ -37,7 +37,13 @@ dictConfig(
 dp = DefaultDispatcher()
 
 
+def filt():
+    print('FILTER')
+    return False
+
+
 @dp.on_event(
+    filter=filt,
     on_event=Event
 )
 async def original_callable():
@@ -48,26 +54,25 @@ async def original_callable():
     raise ValueError('00000000000000000')
 
 
-@dp.on_event.inner_middleware(inheritable=True)
+@dp.on_event.outer_middleware(inheritable=False)
 async def first_middleware():
     print('FIRST MIDDLE PRE')
     try:
         yield
     except:
         import traceback
-        print(traceback.format_exc())
-        print(f'FIRST MIDDLE ERROR HANDLE')
+        traceback.print_exc()
     print('FIRST MIDDLE POST')
 
 
-@dp.on_event.inner_middleware
+@dp.on_event.outer_middleware(inheritable=False)
 async def second_middleware():
     print('SECOND MIDDLE PRE')
     yield
     print('SECOND MIDDLE POST')
 
 
-@dp.on_event.inner_middleware
+@dp.on_event.outer_middleware(inheritable=False)
 async def third_middleware():
     print('THIRD MIDDLE')
 
