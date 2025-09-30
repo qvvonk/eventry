@@ -138,9 +138,15 @@ class MiddlewaresExecutor:
             for curr_middleware in self:
                 gen = await curr_middleware(middlewares_args, data)
                 if not isinstance(gen, Generator | AsyncGenerator):
+                    if isinstance(gen, dict):
+                        data.update(gen)
                     continue
-                next(gen) if isinstance(gen, Generator) else await anext(gen)
+
+                r = next(gen) if isinstance(gen, Generator) else await anext(gen)
+                if isinstance(r, dict):
+                    data.update(r)
                 self._execute_after.appendleft(gen)
+
         except Return:
             await self.finalize_middlewares()
             raise
