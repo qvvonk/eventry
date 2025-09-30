@@ -48,7 +48,7 @@ async def original_callable():
     raise ValueError('00000000000000000')
 
 
-@dp.on_event.inner_middleware
+@dp.on_event.inner_middleware(inheritable=True)
 async def first_middleware():
     print('FIRST MIDDLE PRE')
     try:

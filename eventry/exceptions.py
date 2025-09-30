@@ -1,20 +1,35 @@
 from __future__ import annotations
 
 
-__all__ = ['Return', 'HandlerNotExecuted']
+__all__ = [
+    'Return',
+    'Finalized',
+    'FinalizingError',
+    'HandlerNotExecuted'
+]
+
+
+from typing import Any
 
 
 class Return(Exception):
     pass
 
 
+class Finalized(Exception):
+    pass
+
+
+class FinalizingError(Exception):
+    def __init__(self, callable_return: Any, *args: Any) -> None:
+        super().__init__(*args)
+        self._callable_return = callable_return
+
+    @property
+    def callable_return(self) -> Any:
+        return self._callable_return
+
+
 class HandlerNotExecuted(Exception):
     pass
 
-
-class SkipHandler(Exception):
-    pass
-
-
-class DelayHandler(Exception):
-    pass

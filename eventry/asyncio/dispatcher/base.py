@@ -95,11 +95,11 @@ class Dispatcher(Router):
                 middlewares_args=manager.config.middleware_positional_only_args,
                 data=event_context,
                 executor=executor,
-                execute_post_middlewares=False,
+                finalize=False,
             )
 
         try:
-            await executor.execute_post_middlewares()
+            await executor.finalize_middlewares()
         except Exception as e:
             if not silent:
                 err_event = self._error_event_factory(ErrorContext(e, None, event))

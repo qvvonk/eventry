@@ -15,10 +15,10 @@ from dataclasses import field, dataclass
 from collections import deque
 from collections.abc import Iterable, Sequence, Awaitable, Generator, AsyncGenerator
 
-from eventry.exceptions import Return, HandlerNotExecuted
+from eventry.exceptions import Return, Finalized, FinalizingError
 from eventry.asyncio.default_types import MiddlewareType
 
-from .callable_wrappers import CallableWrapper
+from .callable_wrappers import CallableWrapper, MiddlewareCallable
 
 
 MiddlewareTypeT = TypeVar('MiddlewareTypeT', bound=MiddlewareType, default=MiddlewareType)
@@ -49,34 +49,51 @@ class MiddlewareWrappedCallable(Generic[R]):
         middlewares_args: Sequence[Any],
         data: dict[str, Any],
         executor: MiddlewaresExecutor | None = None,
-        execute_post_middlewares: bool = True,
+        finalize: bool = True,
     ) -> R | None:
+        """
+        # todo: translate
+        Выполняет callable обернутый в миддлвари.
+        Если во время выполнения миддлварей произошла ошибка - финализирует их и возвращает None.
+        Если во время финализации миддлварей (до выполнения оригинальной функции) произошла ошибка -
+        пробрасывает ее наружу.
+
+        Если во время выполнения хэндлера так же произошла ошибка - финализирует миддлвари.
+        Если во время финализации миддлварей (после ошибки оригинальной функции) произошла ошибка -
+        пробрасывает ее наружу.
+
+        Если finalize == True - финализирует миддлвари после выполнения оригинальной функции.
+        Если во время финализации произошла ошибка - вбрасываем FinalizingError, у которого
+        callable_return - это результат выполнения callable, а __cause__ - оригинальная ошибка в
+        финализаторе.
+        """
         executor = executor or MiddlewaresExecutor()
         executor.add_middlewares(*self._middlewares)
 
         try:
-            await executor.execute_pre_middlewares(middlewares_args, data)
-        except Exception as e:
-            if execute_post_middlewares:
-                exc = e if not isinstance(e, Return) else None
-                await executor.execute_post_middlewares(exception=exc)
-                return None
-            else:
-                raise
+            await executor.execute_middlewares(middlewares_args, data)
+        except Return:
+            return None
+        except Finalized:
+            return None
+        # Just for explicitly
+        # Exception goes out (to dispatcher)
+        except:
+            raise
 
         try:
             result = await self._callable(callable_args, data)
-            if not execute_post_middlewares:
+            if not finalize:
                 return result
         except Exception as e:
-            if not execute_post_middlewares:
-                raise
-            await executor.execute_post_middlewares(exception=e)
+            await executor.finalize_middlewares(exception=e)
             return None
 
-        if execute_post_middlewares:
-            await executor.execute_post_middlewares()
-        return result
+        try:
+            await executor.finalize_middlewares()
+            return result
+        except Exception as e:
+            raise FinalizingError(callable_return=result) from e
 
 
 @dataclass
@@ -117,19 +134,28 @@ class MiddlewaresExecutor:
         for i in middlewares:
             self.middlewares.append(i if isinstance(i, CallableWrapper) else CallableWrapper(i))
 
-    async def execute_pre_middlewares(
+    async def execute_middlewares(
         self,
         middlewares_args: Sequence[Any],
-        data: dict[str, Any]
+        data: dict[str, Any],
     ) -> None:
-        for curr_middleware in self:
-            gen = await curr_middleware(middlewares_args, data)
-            if not isinstance(gen, Generator | AsyncGenerator):
-                continue
-            next(gen) if isinstance(gen, Generator) else await anext(gen)
-            self._execute_after.appendleft(gen)
+        try:
+            for curr_middleware in self:
+                gen = await curr_middleware(middlewares_args, data)
+                if not isinstance(gen, Generator | AsyncGenerator):
+                    continue
+                next(gen) if isinstance(gen, Generator) else await anext(gen)
+                self._execute_after.appendleft(gen)
+        except Return:
+            await self.finalize_middlewares()
+            raise
+        except Exception as e:
+            await self.finalize_middlewares(exception=e)
+            raise Finalized from e
+        finally:
+            self.strip()
 
-    async def execute_post_middlewares(
+    async def finalize_middlewares(
         self,
         exception: Exception | None = None
     ) -> None:
@@ -146,39 +172,73 @@ class MiddlewaresExecutor:
             except Exception as e:
                 exception = e
 
+        if exception is not None:
+            raise exception
 
-class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[CallableWrapper[Any]]):
+    def strip(self) -> None:
+        self.middlewares = self.middlewares[:self.middleware_index]
+
+
+class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[MiddlewareCallable[Any]]):
     def __init__(self) -> None:
-        self._middlewares: list[CallableWrapper[Any]] = []
+        self._middlewares: list[MiddlewareCallable[Any]] = []
+        self._inheritable: list[MiddlewareCallable[Any]] = []
 
-    def register_middleware(self, middleware: MiddlewareTypeT) -> MiddlewareTypeT:
-        self._middlewares.append(CallableWrapper(middleware))
+    def register_middleware(self, middleware: MiddlewareTypeT, inheritable: bool=False) -> MiddlewareTypeT:
+        m = MiddlewareCallable(middleware, inheritable=inheritable)
+        self._middlewares.append(m)
+        if m.inheritable:
+            self._inheritable.append(m)
         return middleware
 
     @overload
-    def __call__(self, middleware: MiddlewareTypeT, /) -> MiddlewareTypeT: ...
+    def __call__(self, func: MiddlewareTypeT, /) -> MiddlewareTypeT:
+        pass
 
     @overload
-    def __call__(self) -> Callable[[MiddlewareTypeT], MiddlewareTypeT]: ...
+    def __call__(
+        self,
+        /,
+        *,
+        inheritable: bool = False
+    ) -> Callable[[MiddlewareTypeT], MiddlewareTypeT]:
+        pass
+
+    @overload
+    def __call__(
+        self,
+        func: MiddlewareTypeT,
+        /,
+        *,
+        inheritable: bool = False
+    ) -> MiddlewareTypeT:
+        pass
 
     def __call__(
         self,
-        middleware: MiddlewareTypeT | None = None,
-    ) -> MiddlewareTypeT | Callable[[MiddlewareTypeT], MiddlewareTypeT]:
-        if middleware is None:
-            return self.register_middleware
-        return self.register_middleware(middleware)
+        func: MiddlewareTypeT | None = None,
+        /,
+        *,
+        inheritable: bool = False
+    ) -> Union[MiddlewareTypeT, Callable[[MiddlewareTypeT], MiddlewareTypeT]]:
+        def inner(middleware: MiddlewareTypeT) -> MiddlewareTypeT:
+            self.register_middleware(middleware, inheritable=inheritable)
+            return middleware
+
+        if func is None:
+            return inner
+        return inner(func)
 
     @overload
-    def __getitem__(self, index: int) -> CallableWrapper[Any]: ...
+    def __getitem__(self, index: int) -> MiddlewareCallable[Any]: ...
 
     @overload
-    def __getitem__(self, index: slice) -> list[CallableWrapper[Any]]: ...
+    def __getitem__(self, index: slice) -> list[MiddlewareCallable[Any]]: ...
 
     def __getitem__(
         self,
         index: int | slice,
-    ) -> CallableWrapper[Any] | list[CallableWrapper[Any]]:
+    ) -> MiddlewareCallable[Any] | list[MiddlewareCallable[Any]]:
         return self._middlewares[index]
 
     def __len__(self) -> int:
@@ -186,3 +246,7 @@ class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[CallableWrapper[Any]]
 
     def __bool__(self) -> bool:
         return bool(len(self._middlewares))
+
+    @property
+    def inheritable_middlewares(self) -> tuple[MiddlewareCallable[Any], ...]:
+        return tuple(self._inheritable)

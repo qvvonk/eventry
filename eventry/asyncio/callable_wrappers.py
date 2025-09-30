@@ -23,14 +23,19 @@ if TYPE_CHECKING:
     from .event import Event
     from .filter import Filter
     from .handler_manager import HandlerManager
-    from .middleware_manager import MiddlewareWrappedCallable
+    from .middleware_manager import MiddlewareWrappedCallable, MiddlewareManagerTypes
 
-
-HandlerManagerTypeT = TypeVar(
-    'HandlerManagerTypeT',
-    default='HandlerManager',
-    bound='HandlerManager',
-)
+    HandlerManagerTypeT = TypeVar(
+        'HandlerManagerTypeT',
+        default=HandlerManager,
+        bound=HandlerManager,
+    )
+else:
+    HandlerManagerTypeT = TypeVar(
+        'HandlerManagerTypeT',
+        default='HandlerManager',
+        bound='HandlerManager',
+    )
 
 ReturnTypeT = TypeVar('ReturnTypeT', default=Any)
 
@@ -265,35 +270,39 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
     def middlewares(self) -> list[CallableWrapper[Any]]:
         return self._middlewares
 
-    def wrap_with_middlewares(self) -> MiddlewareWrappedCallable[ReturnTypeT]:
-        """
-        Build a middleware-wrapped callable for this handler.
+    def collect_middlewares(self, type_: MiddlewareManagerTypes) -> deque[MiddlewareCallable[ReturnTypeT]]:
+        result: deque[MiddlewareCallable[Any]] = deque()
+        middlewares = self.manager.middleware_manager(type_)
 
-        The returned object executes the original handler wrapped into all
-        relevant middleware layers.
-        """
-        from .middleware_manager import MiddlewareManagerTypes, MiddlewareWrappedCallable
+        if middlewares is None:
+            return result
 
-        middlewares: deque[CallableWrapper[Any]] = deque()
-        middlewares.extendleft(reversed(self.middlewares))
+        for router in self.manager.router.chain_to_last_router:
+            if router is self.manager.router:
+                result.extendleft(reversed(middlewares))
+                continue
 
-        inner = bool(self.manager.middleware_manager(MiddlewareManagerTypes.INNER_PER_HANDLER))
-        inner_inh = bool(self.manager.middleware_manager(MiddlewareManagerTypes.OUTER_PER_HANDLER))
+            manager = router[self.manager.id]
+            middlewares = manager.middleware_manager(type_)
+            result.extendleft(reversed(middlewares.inheritable_middlewares))
+        return result
 
-        if inner:
-            middlewares.extendleft(
-                reversed(self.manager.middleware_manager(MiddlewareManagerTypes.INNER_PER_HANDLER))
-            )
+    async def execute(
+        self,
+        handler_args: tuple[Any, ...] = (),
+        middleware_args: tuple[Any, ...] = (),
+        data: dict[str, Any] | None = None
+    ):
+        from eventry.asyncio.middleware_manager import MiddlewaresExecutor
 
-        if inner_inh:
-            for router in self.manager.router.chain_to_root_router:
-                manager = router[self.manager.id]
+        data = data or {}
 
-                middlewares.extendleft(
-                    reversed(manager.middleware_manager(MiddlewareManagerTypes.OUTER_PER_HANDLER))
-                )
-
-        return MiddlewareWrappedCallable(
-            self._callable,
-            middlewares=middlewares,
+        executor = MiddlewaresExecutor()
+        executor.add_middlewares(
+            *self.collect_middlewares(MiddlewareManagerTypes.OUTER_PER_HANDLER)
         )
+
+        try:
+            await executor.execute_middlewares(middleware_args, data)
+        except Exception as e:
+            await executor.finalize_middlewares(exception=e)
