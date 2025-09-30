@@ -111,11 +111,13 @@ class Dispatcher(Router):
                 print('OMG IMPOSSIBLE AN ERROR')
                 return
 
+            outer = manager.middleware_manager(MiddlewareManagerTypes.OUTER_PER_HANDLER)
+            inner = manager.middleware_manager(MiddlewareManagerTypes.INNER_PER_HANDLER)
             event.__inherited_outer_middlewares__.extend(
-                manager.middleware_manager(MiddlewareManagerTypes.OUTER_PER_HANDLER) or []
+                outer.inheritable_middlewares if outer is not None else []
             )
             event.__inherited_inner_middlewares__.extend(
-                manager.middleware_manager(MiddlewareManagerTypes.INNER_PER_HANDLER) or []
+                 inner.inheritable_middlewares if inner is not None else []
             )
 
         try:

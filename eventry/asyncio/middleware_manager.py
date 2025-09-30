@@ -51,6 +51,41 @@ class MiddlewareWrappedCallable(Generic[R]):
         executor: MiddlewaresExecutor | None = None,
         finalize: bool = True,
     ) -> R | None:
+        """
+            Execute the wrapped callable with the provided middlewares.
+
+            This method runs in three stages:
+
+            1. **Middleware pre-processing**: Executes the first part of all middlewares.
+               If an exception occurs during this stage, all already started middlewares
+               are finalized. If all finalizers complete without errors, `Finalized` is
+               raised with the original exception in `__cause__`. If a finalizer raises
+               an unhandled exception, that exception is propagated instead.
+
+            2. **Callable execution**: Calls the original callable wrapped by this object.
+               If an exception occurs during execution, all middlewares are finalized,
+               and `Finalized` is raised with the original exception.
+
+            3. **Middleware finalization**: If `finalize` is True, finalizes all middlewares
+               after callable execution. If an exception occurs during finalization, it is
+               wrapped in `FinalizingError` with `callable_return` containing the result
+               of the callable, and the original exception set as `__cause__`.
+
+            :param callable_args: Positional arguments for the wrapped callable.
+            :param middlewares_args: Positional arguments for all middlewares.
+            :param data: Shared dictionary passed to middlewares and the callable.
+            :param executor: Optional `MiddlewaresExecutor` instance to manage middleware
+                             execution. If None, a new executor is created.
+            :param finalize: Whether to finalize middlewares after callable execution.
+
+            :return: The result of the wrapped callable, or None if execution was stopped
+                     by a middleware raising `Return`.
+
+            :raises Finalized: Raised if a middleware throws an exception during pre-processing,
+                                and all finalizers ran without errors.
+            :raises FinalizingError: Raised if an exception occurs during middleware
+                                     finalization after successful callable execution.
+            """
         executor = executor or MiddlewaresExecutor()
         executor.add_middlewares(*self._middlewares)
 
@@ -134,6 +169,27 @@ class MiddlewaresExecutor:
         middlewares_args: Sequence[Any],
         data: dict[str, Any],
     ) -> None:
+        """
+        Execute the first part of all middlewares (up to the first `yield` or return).
+
+        If an error occurs while executing, finalizes all started middlewares by running
+        their second part (after `yield`) and throws the original exception into them.
+
+        If none of the finalizers handle the exception, the original exception is raised.
+        If all finalizers complete without errors, raises `Finalized` with the original
+        exception in `__cause__`.
+
+        If a `Return` exception is raised during execution of a middleware, all started
+        middlewares are finalized and the `Return` exception is propagated.
+
+        :param middlewares_args: Positional arguments to pass to each middleware.
+        :param data: Dictionary containing data to pass to middlewares. Updated with
+                     middleware results if they return a dict.
+
+        :raises Return: If a middleware explicitly raises `Return`.
+        :raises Finalized: If an exception occurs during middleware execution and
+                           all finalizers succeed.
+        """
         try:
             for curr_middleware in self:
                 gen = await curr_middleware(middlewares_args, data)
@@ -160,6 +216,21 @@ class MiddlewaresExecutor:
         self,
         exception: Exception | None = None
     ) -> None:
+        """
+        Finalize all started middlewares by executing the second part of generators
+        (code after `yield`) in reverse order of their start.
+
+        If an exception is provided, it is thrown into each generator. If a generator
+        raises an exception during finalization, it replaces the previous exception
+        to be propagated.
+
+        After all generators are finalized, if any exception remains, it is raised.
+
+        :param exception: Optional exception to throw into middleware generators
+                          during finalization.
+        :raises Exception: Any exception raised by a middleware finalizer that was not
+                           handled by earlier finalizers.
+        """
         while self._execute_after:
             gen = self._execute_after.popleft()
             try:
