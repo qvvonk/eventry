@@ -13,7 +13,7 @@ from collections.abc import Callable, Iterable
 
 from eventry.config import DispatcherConfig
 from eventry.loggers import dispatcher_logger
-from eventry.exceptions import HandlerNotExecuted
+from eventry.exceptions import FinalizingError, Finalized
 from eventry.asyncio.event import Event
 from eventry.asyncio.router import Router
 from eventry.asyncio.middleware_manager import (
@@ -78,24 +78,44 @@ class Dispatcher(Router):
                 return
 
             manager = router[event]
-            outer_middlewares = manager.middleware_manager(MiddlewareManagerTypes.GLOBAL)
-            if not outer_middlewares:
-                await self._execute_manager_handlers(event, manager, event_context, silent)
-                continue
+            global_middlewares = manager.middleware_manager(MiddlewareManagerTypes.GLOBAL) or []
 
             wrapped: MiddlewareWrappedCallable[None] = (
                 MiddlewareWrappedCallable(
                     self._execute_manager_handlers,
-                    middlewares=outer_middlewares,
+                    middlewares=global_middlewares,
                 )
             )
 
-            await wrapped(
-                callable_args=(event, manager, event_context, silent),
-                middlewares_args=manager.config.middleware_positional_only_args,
-                data=event_context,
-                executor=executor,
-                finalize=False,
+            try:
+                await wrapped(
+                    callable_args=(event, manager, event_context, silent),
+                    middlewares_args=manager.config.middleware_positional_only_args,
+                    data=event_context,
+                    executor=executor,
+                    finalize=False,
+                )
+            except Finalized:
+                # an error occurred in global middlewares, but it has been caught
+                # by one of the global middlewares finalizer
+                return
+            except FinalizingError as e:
+                # an error occurred in global middlewares finalizer and it hasn't been
+                # caught by any finalizer
+                if not silent:
+                    err_event = self._error_event_factory(ErrorContext(e.__cause__, None, event))
+                    await self.propagate_event(err_event, {}, silent=True)
+                return
+            except:
+                # that actually should never happen.
+                print('OMG IMPOSSIBLE AN ERROR')
+                return
+
+            event.__inherited_outer_middlewares__.extend(
+                manager.middleware_manager(MiddlewareManagerTypes.OUTER_PER_HANDLER) or []
+            )
+            event.__inherited_inner_middlewares__.extend(
+                manager.middleware_manager(MiddlewareManagerTypes.INNER_PER_HANDLER) or []
             )
 
         try:
@@ -109,54 +129,28 @@ class Dispatcher(Router):
         self,
         event: Event,
         manager: HandlerManager[Any, Any, Any, Any],
-        data: dict[str, Any],
+        event_context: dict[str, Any],
         silent: bool,
     ) -> None:
-        async for handler, e in manager.get_matching_handlers(
-            event,
-            self._config.single_handler_mode,
-            data,
-        ):
-            if e is not None:
-                dispatcher_logger.debug(
-                    f'({id(event)}) An error occurred while executing '
-                    f"handler '{handler.id}' filter.",
-                    exc_info=e,
-                )
+        async for h in manager.get_matching_handlers(event, self._config.single_handler_mode):
+            event_context = {
+                **event_context,
+                self._config.default_names_remap.get('handler', 'handler'): h
+            }
+            event_context[self._config.default_names_remap.get('data', 'data')] = event_context
 
+            try:
+                await self._execute_handler(event, h, event_context=event_context)
+            except Exception as e:
+                if isinstance(e, FinalizingError):
+                    e = e.__cause__
                 if not silent:
                     err_event = self._error_event_factory(ErrorContext(e, handler, event))
                     await self.propagate_event(err_event, {}, silent=True)
-                continue
-
-            await self._execute_handler_wrapper(event, handler, data, silent)
 
             if event.propagation_stopped:
                 dispatcher_logger.debug(f'({id(event)}) Event propagation stopped.')
                 break
-
-    async def _execute_handler_wrapper(
-        self,
-        event: Event,
-        handler: Handler[Any],
-        event_context: dict[str, Any],
-        silent: bool,
-    ) -> Any:
-        # Creating own copy of context for each handler and its inner middlewares.
-        event_context = {
-            **event_context,
-            self._config.default_names_remap.get('handler', 'handler'): handler
-        }
-        event_context[self._config.default_names_remap.get('data', 'data')] = event_context
-
-        try:
-            return await self._execute_handler(event, handler, event_context=event_context)
-        except HandlerNotExecuted:
-            raise
-        except Exception as e:
-            if not silent:
-                err_event = self._error_event_factory(ErrorContext(e, handler, event))
-                await self.propagate_event(err_event, {}, silent=True)
 
     async def _execute_handler(
         self,
@@ -171,23 +165,17 @@ class Dispatcher(Router):
 
         start = time.time()
         try:
-            wrapped_handler = handler.wrap_with_middlewares()
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            raise
-        try:
             if not handler.as_task:
-                return await wrapped_handler(
-                    callable_args=handler.manager.config.handler_positional_only_args,
-                    middlewares_args=handler.manager.config.middleware_positional_only_args,
+                return await handler.execute_wrapped(
                     data=event_context,
+                    inherited_outer_middlewares=event.__inherited_outer_middlewares__,
+                    inherited_inner_middlewares=event.__inherited_inner_middlewares__,
                 )
             asyncio.create_task(
-                wrapped_handler(
-                    callable_args=handler.manager.config.handler_positional_only_args,
-                    middlewares_args=handler.manager.config.middleware_positional_only_args,
+                handler.execute_wrapped(
                     data=event_context,
+                    inherited_outer_middlewares=event.__inherited_outer_middlewares__,
+                    inherited_inner_middlewares=event.__inherited_inner_middlewares__,
                 )
             )
         except Exception as e:

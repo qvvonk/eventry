@@ -18,7 +18,6 @@ from typing_extensions import Self, TypeVar
 from eventry.config import HandlerManagerConfig
 from eventry.loggers import router_logger
 from eventry.asyncio.filter import convert_filters
-from eventry.asyncio._exceptions import HandlerFound
 from eventry.asyncio.default_types import FilterType, HandlerType, MiddlewareType
 from eventry.asyncio.callable_wrappers import Handler, HandlerMeta, CallableWrapper
 from eventry.asyncio.middleware_manager import MiddlewareManager, MiddlewareManagerTypes
@@ -163,8 +162,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         self,
         event: Event,
         single_handler: bool,
-        data: dict[str, Any],
-    ) -> AsyncGenerator[tuple[Handler[Any, Self], Exception | None], None]:
+    ) -> AsyncGenerator[Handler[Any, Self], None]:
         """
         Iterates through all registered handlers and yields those whose filters
         match the given event.
@@ -177,30 +175,9 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         for handler in self._handlers.values():
             if handler.on_event is not None and type(event) != handler.on_event:
                 continue
-
-            if handler.filter is None:
-                yield handler, None
-                if single_handler:
-                    raise HandlerFound()
-                continue
-
-            try:
-                filter_result = await handler.filter.execute(
-                    self._config.filter_positional_only_args,
-                    data,
-                )
-            except Exception as e:
-                yield handler, e
-                if single_handler:
-                    raise HandlerFound()
-                continue
-
-            if filter_result:
-                if isinstance(filter_result, dict):
-                    data.update(filter_result)
-                yield handler, None
-                if single_handler:
-                    raise HandlerFound()
+            yield handler
+            if single_handler:
+                return
 
     def _add_middleware_manager(
         self,

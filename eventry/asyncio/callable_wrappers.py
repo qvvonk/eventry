@@ -20,6 +20,7 @@ from copy import copy
 from eventry.config import FromData
 from collections.abc import Iterable
 
+from ..exceptions import Finalized
 
 if TYPE_CHECKING:
     from .event import Event
@@ -272,22 +273,56 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
     def middlewares(self) -> list[CallableWrapper[Any]]:
         return self._middlewares
 
-    def wrap_execution(
+    async def execute_wrapped(
         self,
-        handler_args: tuple[Any, ...] = (),
-        filter_args: tuple[Any, ...] = (),
-        middleware_args: tuple[Any, ...] = (),
         data: dict[str, Any] | None = None,
         inherited_outer_middlewares: deque[MiddlewareCallable[Any]] | None = None,
         inherited_inner_middlewares: deque[MiddlewareCallable[Any]] | None = None,
-    ):
+    ) -> None:
         from eventry.asyncio.middleware_manager import MiddlewaresExecutor, MiddlewareWrappedCallable, MiddlewareManagerTypes
+
         data = data if data is not None else {}
 
-        outer_middlewares = self.manager.middleware_manager(MiddlewareManagerTypes.OUTER_PER_HANDLER) or []
-        inner_middlewares = self.manager.middleware_manager(MiddlewareManagerTypes.INNER_PER_HANDLER) or []
+        outer_middlewares = inherited_outer_middlewares or deque()
+        inner_middlewares = inherited_inner_middlewares or deque()
 
-        inherited_outer_middlewares = inherited_outer_middlewares or deque()
-        inherited_inner_middlewares = inherited_inner_middlewares or deque()
+        curr_outer = self.manager.middleware_manager(MiddlewareManagerTypes.OUTER_PER_HANDLER) or []
+        curr_inner = self.manager.middleware_manager(MiddlewareManagerTypes.INNER_PER_HANDLER) or []
+
+        outer_middlewares = outer_middlewares + deque(*curr_outer)
+        inner_middlewares = inner_middlewares + deque(*curr_inner)
 
         executor = MiddlewaresExecutor()
+        wrapped_filter = MiddlewareWrappedCallable(self._filter, outer_middlewares)
+
+        try:
+            r = await wrapped_filter(
+                self.manager._config.filter_positional_only_args,
+                self.manager._config.middleware_positional_only_args,
+                data,
+                finalize=False,
+                executor=executor
+            )
+        except Finalized:
+            return
+
+        if not r:
+            return
+
+        if isinstance(r, dict):
+            data.update(r)
+
+        wrapped_handler = MiddlewareWrappedCallable(self._callable, inner_middlewares)
+
+        try:
+            await wrapped_handler(
+                self.manager._config.handler_positional_only_args,
+                self.manager._config.middleware_positional_only_args,
+                data,
+                finalize=True,
+                executor=executor
+            )
+        except Finalized:
+            return
+
+        # todo: hook to handler return
