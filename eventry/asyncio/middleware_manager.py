@@ -51,31 +51,13 @@ class MiddlewareWrappedCallable(Generic[R]):
         executor: MiddlewaresExecutor | None = None,
         finalize: bool = True,
     ) -> R | None:
-        """
-        # todo: translate
-        Выполняет callable обернутый в миддлвари.
-        Если во время выполнения миддлварей произошла ошибка - финализирует их и возвращает None.
-        Если во время финализации миддлварей (до выполнения оригинальной функции) произошла ошибка -
-        пробрасывает ее наружу.
-
-        Если во время выполнения хэндлера так же произошла ошибка - финализирует миддлвари.
-        Если во время финализации миддлварей (после ошибки оригинальной функции) произошла ошибка -
-        пробрасывает ее наружу.
-
-        Если finalize == True - финализирует миддлвари после выполнения оригинальной функции.
-        Если во время финализации произошла ошибка - вбрасываем FinalizingError, у которого
-        callable_return - это результат выполнения callable, а __cause__ - оригинальная ошибка в
-        финализаторе.
-        """
         executor = executor or MiddlewaresExecutor()
         executor.add_middlewares(*self._middlewares)
 
         try:
             await executor.execute_middlewares(middlewares_args, data)
-        except Return:
-            return None
-        except Finalized:
-            return None
+        except (Return, Finalized) as e:
+            raise Finalized from e
         # Just for explicitly
         # Exception goes out (to dispatcher)
         except:
@@ -87,7 +69,7 @@ class MiddlewareWrappedCallable(Generic[R]):
                 return result
         except Exception as e:
             await executor.finalize_middlewares(exception=e)
-            return None
+            raise Finalized from e
 
         try:
             await executor.finalize_middlewares()
