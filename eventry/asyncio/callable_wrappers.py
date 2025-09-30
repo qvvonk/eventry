@@ -285,7 +285,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
         curr_inner = self.manager.middleware_manager(MiddlewareManagerTypes.INNER_PER_HANDLER) or []
 
         outer_middlewares = outer_middlewares + deque(curr_outer)
-        inner_middlewares = inner_middlewares + deque(curr_inner)
+        inner_middlewares = inner_middlewares + deque(curr_inner) + deque(self.middlewares)
 
         executor = MiddlewaresExecutor()
         wrapped_filter = MiddlewareWrappedCallable(self._filter.execute, outer_middlewares)
