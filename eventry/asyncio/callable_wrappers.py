@@ -18,11 +18,12 @@ from collections.abc import Callable, Sequence, Awaitable
 from copy import copy
 
 from eventry.config import FromData
+from collections.abc import Iterable
 
 
 if TYPE_CHECKING:
     from .event import Event
-    from .filter import Filter
+    from .filter import Filter, FilterFromFunction
     from .handler_manager import HandlerManager
     from .middleware_manager import MiddlewareWrappedCallable, MiddlewareManagerTypes
 
@@ -234,10 +235,10 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
         super().__init__(__obj)
         self._handler_manager = handler_manager
         self._handler_id = handler_id
-        self._filter = filter
         self._meta = meta
         self._middlewares = middlewares
         self._as_task = as_task
+        self._filter = filter if filter is not None else FilterFromFunction(lambda *args, **kwargs: True)
 
         if self._handler_manager.event_type_filter and on_event:
             raise ValueError('')  # todo: err message
@@ -271,39 +272,22 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
     def middlewares(self) -> list[CallableWrapper[Any]]:
         return self._middlewares
 
-    def collect_middlewares(self, type_: MiddlewareManagerTypes) -> deque[MiddlewareCallable[ReturnTypeT]]:
-        result: deque[MiddlewareCallable[Any]] = deque()
-        middlewares = self.manager.middleware_manager(type_)
-
-        if middlewares is None:
-            return result
-
-        for router in self.manager.router.chain_to_last_router:
-            if router is self.manager.router:
-                result.extendleft(reversed(middlewares))
-                continue
-
-            manager = router[self.manager.id]
-            middlewares = manager.middleware_manager(type_)
-            result.extendleft(reversed(middlewares.inheritable_middlewares))
-        return result
-
-    async def execute(
+    def wrap_execution(
         self,
         handler_args: tuple[Any, ...] = (),
+        filter_args: tuple[Any, ...] = (),
         middleware_args: tuple[Any, ...] = (),
-        data: dict[str, Any] | None = None
+        data: dict[str, Any] | None = None,
+        inherited_outer_middlewares: deque[MiddlewareCallable[Any]] | None = None,
+        inherited_inner_middlewares: deque[MiddlewareCallable[Any]] | None = None,
     ):
-        from eventry.asyncio.middleware_manager import MiddlewaresExecutor
+        from eventry.asyncio.middleware_manager import MiddlewaresExecutor, MiddlewareWrappedCallable, MiddlewareManagerTypes
+        data = data if data is not None else {}
 
-        data = data or {}
+        outer_middlewares = self.manager.middleware_manager(MiddlewareManagerTypes.OUTER_PER_HANDLER) or []
+        inner_middlewares = self.manager.middleware_manager(MiddlewareManagerTypes.INNER_PER_HANDLER) or []
+
+        inherited_outer_middlewares = inherited_outer_middlewares or deque()
+        inherited_inner_middlewares = inherited_inner_middlewares or deque()
 
         executor = MiddlewaresExecutor()
-        executor.add_middlewares(
-            *self.collect_middlewares(MiddlewareManagerTypes.OUTER_PER_HANDLER)
-        )
-
-        try:
-            await executor.execute_middlewares(middleware_args, data)
-        except Exception as e:
-            await executor.finalize_middlewares(exception=e)

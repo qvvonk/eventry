@@ -17,7 +17,9 @@ class Event:
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.__inherited__middlewares__: deque[MiddlewareCallable] = deque()
+        self.__inherited_outer_middlewares__: deque[MiddlewareCallable] = deque()
+        self.__inherited_inner_middlewares__: deque[MiddlewareCallable] = deque()
+
         self._propagation_stopped = False
 
     def stop_propagation(self) -> None:
