@@ -9,7 +9,7 @@ __all__ = [
 import sys
 import inspect
 import pathlib
-from typing import TYPE_CHECKING, Any, Type, Union, Generic, Optional, overload
+from typing_extensions import TYPE_CHECKING, Any, Type, Union, Generic, Optional, overload
 from types import MappingProxyType
 from collections.abc import Callable, AsyncGenerator
 

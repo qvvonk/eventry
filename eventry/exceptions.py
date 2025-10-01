@@ -9,7 +9,7 @@ __all__ = [
 ]
 
 
-from typing import Any
+from typing_extensions import Any
 
 
 class Return(Exception):

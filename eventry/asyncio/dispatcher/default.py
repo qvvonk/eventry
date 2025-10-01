@@ -4,7 +4,7 @@ from __future__ import annotations
 __all__ = ['DefaultDispatcher', 'ErrorEvent']
 
 
-from typing import Any
+from typing_extensions import Any
 
 from eventry.asyncio.event import ExtendedEvent
 from eventry.asyncio.router import DefaultRouter

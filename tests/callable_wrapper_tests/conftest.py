@@ -3,7 +3,7 @@ from mypy.operators import int_op_to_method
 
 from eventry.asyncio.callable_wrappers import CallableWrapper
 from collections.abc import Callable, Awaitable
-from typing import Literal, Any
+from typing_extensions import Literal, Any
 
 
 

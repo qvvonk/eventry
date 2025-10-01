@@ -4,7 +4,7 @@ from __future__ import annotations
 __all__ = ['Router']
 
 
-from typing import TYPE_CHECKING, Any, Type, TypeVar
+from typing_extensions import TYPE_CHECKING, Any, Type, TypeVar
 from collections.abc import Generator, AsyncGenerator
 
 from typing_extensions import Self

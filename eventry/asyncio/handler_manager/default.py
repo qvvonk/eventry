@@ -4,7 +4,7 @@ from __future__ import annotations
 __all__ = ['DefaultHandlerManager']
 
 
-from typing import TYPE_CHECKING, Type, TypeVar
+from typing_extensions import TYPE_CHECKING, Type, TypeVar
 
 from eventry.asyncio.default_types import FilterType, HandlerType, MiddlewareType
 

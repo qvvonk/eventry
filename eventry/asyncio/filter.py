@@ -13,7 +13,7 @@ __all__ = [
 ]
 
 
-from typing import Any, Callable, Iterable, Awaitable, TypeAlias
+from typing_extensions import Any, Callable, Iterable, Awaitable, TypeAlias
 from abc import ABC
 from collections.abc import Sequence
 

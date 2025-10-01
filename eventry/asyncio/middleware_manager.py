@@ -10,7 +10,7 @@ __all__ = [
 
 
 from enum import Enum, auto
-from typing import Any, Union, Generic, TypeVar, Callable, overload
+from typing_extensions import Any, Union, Generic, TypeVar, Callable, overload
 from dataclasses import field, dataclass
 from collections import deque
 from collections.abc import Iterable, Sequence, Awaitable, Generator, AsyncGenerator

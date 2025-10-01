@@ -4,7 +4,7 @@ from __future__ import annotations
 __all__ = ['Event', 'ExtendedEvent']
 
 
-from typing import Any
+from typing_extensions import Any
 from types import MappingProxyType
 from eventry.asyncio.callable_wrappers import MiddlewareCallable
 from collections import deque

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Union, TypeAlias
+from typing_extensions import TYPE_CHECKING, Any, Union, TypeAlias
 from collections.abc import Callable, Awaitable
 
 

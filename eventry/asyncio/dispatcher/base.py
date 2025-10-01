@@ -6,7 +6,7 @@ __all__ = ['Dispatcher', 'ErrorContext']
 
 import time
 import asyncio
-from typing import TYPE_CHECKING, Any
+from typing_extensions import TYPE_CHECKING, Any
 from dataclasses import dataclass
 from itertools import chain
 from collections.abc import Callable, Iterable

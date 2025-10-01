@@ -1,7 +1,6 @@
-from typing import Literal
+from typing_extensions import Literal, Any
 import pytest
 from eventry.asyncio.callable_wrappers import CallableWrapper
-from typing import Any
 
 
 class TestCallableWrapper:
