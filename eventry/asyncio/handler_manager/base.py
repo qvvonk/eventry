@@ -9,11 +9,20 @@ __all__ = [
 import sys
 import inspect
 import pathlib
-from typing_extensions import TYPE_CHECKING, Any, Type, Union, Generic, Optional, overload
 from types import MappingProxyType
 from collections.abc import Callable, AsyncGenerator
 
-from typing_extensions import Self, TypeVar
+from typing_extensions import (
+    TYPE_CHECKING,
+    Any,
+    Self,
+    Type,
+    Union,
+    Generic,
+    TypeVar,
+    Optional,
+    overload,
+)
 
 from eventry.config import HandlerManagerConfig
 from eventry.loggers import router_logger
@@ -21,6 +30,7 @@ from eventry.asyncio.filter import convert_filters
 from eventry.asyncio.default_types import FilterType, HandlerType, MiddlewareType
 from eventry.asyncio.callable_wrappers import Handler, HandlerMeta, CallableWrapper
 from eventry.asyncio.middleware_manager import MiddlewareManager, MiddlewareManagerTypes
+
 
 if TYPE_CHECKING:
     from eventry.asyncio.event import Event

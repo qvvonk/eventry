@@ -5,7 +5,7 @@ __all__ = [
     'Return',
     'Finalized',
     'FinalizingError',
-    'HandlerNotExecuted'
+    'HandlerNotExecuted',
 ]
 
 
@@ -32,4 +32,3 @@ class FinalizingError(Exception):
 
 class HandlerNotExecuted(Exception):
     pass
-

@@ -6,25 +6,26 @@ __all__ = ['Dispatcher', 'ErrorContext']
 
 import time
 import asyncio
-from typing_extensions import TYPE_CHECKING, Any
 from dataclasses import dataclass
-from itertools import chain
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
+
+from typing_extensions import TYPE_CHECKING, Any
 
 from eventry.config import DispatcherConfig
 from eventry.loggers import dispatcher_logger
-from eventry.exceptions import FinalizingError, Finalized
+from eventry.exceptions import Finalized, FinalizingError
 from eventry.asyncio.event import Event
 from eventry.asyncio.router import Router
 from eventry.asyncio.middleware_manager import (
     MiddlewaresExecutor,
-    MiddlewareWrappedCallable, MiddlewareManagerTypes,
+    MiddlewareManagerTypes,
+    MiddlewareWrappedCallable,
 )
 
 
 if TYPE_CHECKING:
     from eventry.asyncio.handler_manager import HandlerManager
-    from eventry.asyncio.callable_wrappers import Handler, CallableWrapper
+    from eventry.asyncio.callable_wrappers import Handler
 
 
 @dataclass(frozen=True)
@@ -80,11 +81,9 @@ class Dispatcher(Router):
             manager = router[event]
             global_middlewares = manager.middleware_manager(MiddlewareManagerTypes.GLOBAL) or []
 
-            wrapped: MiddlewareWrappedCallable[None] = (
-                MiddlewareWrappedCallable(
-                    self._execute_manager_handlers,
-                    middlewares=global_middlewares,
-                )
+            wrapped: MiddlewareWrappedCallable[None] = MiddlewareWrappedCallable(
+                self._execute_manager_handlers,
+                middlewares=global_middlewares,
             )
 
             try:
@@ -108,10 +107,10 @@ class Dispatcher(Router):
             outer = manager.middleware_manager(MiddlewareManagerTypes.OUTER_PER_HANDLER)
             inner = manager.middleware_manager(MiddlewareManagerTypes.INNER_PER_HANDLER)
             event.__inherited_outer_middlewares__.extend(
-                outer.inheritable_middlewares if outer is not None else []
+                outer.inheritable_middlewares if outer is not None else [],
             )
             event.__inherited_inner_middlewares__.extend(
-                 inner.inheritable_middlewares if inner is not None else []
+                inner.inheritable_middlewares if inner is not None else [],
             )
 
         try:
@@ -131,7 +130,7 @@ class Dispatcher(Router):
         async for h in manager.get_matching_handlers(event):
             event_context = {
                 **event_context,
-                self._config.default_names_remap.get('handler', 'handler'): h
+                self._config.default_names_remap.get('handler', 'handler'): h,
             }
             event_context[self._config.default_names_remap.get('data', 'data')] = event_context
 
@@ -167,14 +166,13 @@ class Dispatcher(Router):
                     inherited_outer_middlewares=event.__inherited_outer_middlewares__,
                     inherited_inner_middlewares=event.__inherited_inner_middlewares__,
                 )
-            else:
-                asyncio.create_task(
-                    handler.execute_wrapped(
-                        data=event_context,
-                        inherited_outer_middlewares=event.__inherited_outer_middlewares__,
-                        inherited_inner_middlewares=event.__inherited_inner_middlewares__,
-                    )
-                )
+            asyncio.create_task(
+                handler.execute_wrapped(
+                    data=event_context,
+                    inherited_outer_middlewares=event.__inherited_outer_middlewares__,
+                    inherited_inner_middlewares=event.__inherited_inner_middlewares__,
+                ),
+            )
         except Exception as e:
             if isinstance(e, FinalizingError):
                 e = e.__cause__

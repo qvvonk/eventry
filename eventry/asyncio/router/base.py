@@ -4,13 +4,11 @@ from __future__ import annotations
 __all__ = ['Router']
 
 
-from typing_extensions import TYPE_CHECKING, Any, Type, TypeVar
-from collections.abc import Generator, AsyncGenerator
+from collections.abc import Generator
 
-from typing_extensions import Self
+from typing_extensions import TYPE_CHECKING, Any, Self, Type, TypeVar
 
 from eventry.loggers import router_logger
-from eventry.asyncio._exceptions import HandlerFound
 from eventry.asyncio.handler_manager import HandlerManager
 from eventry.asyncio.callable_wrappers import Handler
 
@@ -49,10 +47,12 @@ class Router:
                 'Assign it as default handler manager.',
             )  # todo: improve
 
-        if handler_manager.id in self._managers_by_id or (self._default_handler_manager and self._default_handler_manager.id == handler_manager.id) :
+        if handler_manager.id in self._managers_by_id or (
+            self._default_handler_manager
+            and self._default_handler_manager.id == handler_manager.id
+        ):
             raise ValueError(
-                f'Manager with id {handler_manager.id!r} already added to router '
-                f'{self._name!r}. '
+                f'Manager with id {handler_manager.id!r} already added to router {self._name!r}. ',
             )
 
         self._managers[handler_manager.event_type_filter] = handler_manager
@@ -78,7 +78,8 @@ class Router:
         raise RuntimeError('No handler manager with this event type.')  # todo
 
     def _get_handler_managers_to_tail(
-        self, event: Event
+        self,
+        event: Event,
     ) -> Generator[HandlerManager[Any, Any, Any, Self], None]:
         for router in self.chain_to_last_router:
             yield router.get_handler_manager(event)

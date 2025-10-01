@@ -9,11 +9,12 @@ __all__ = [
 ]
 
 
-from enum import Enum, auto
-from typing_extensions import Any, Union, Generic, TypeVar, Callable, overload
 from dataclasses import field, dataclass
+from enum import Enum, auto
 from collections import deque
 from collections.abc import Iterable, Sequence, Awaitable, Generator, AsyncGenerator
+
+from typing_extensions import Any, Union, Generic, TypeVar, Callable, overload
 
 from eventry.exceptions import Return, Finalized, FinalizingError
 from eventry.asyncio.default_types import MiddlewareType
@@ -52,42 +53,42 @@ class MiddlewareWrappedCallable(Generic[R]):
         finalize: bool = True,
     ) -> R | None:
         """
-            Execute the wrapped callable with the provided middlewares.
+        Execute the wrapped callable with the provided middlewares.
 
-            This method runs in three stages:
+        This method runs in three stages:
 
-            1. **Middleware pre-processing**: Executes the first part of all middlewares.
-               If an exception occurs during this stage, all already started middlewares
-               are finalized. If all finalizers complete without errors, `Finalized` is
-               raised with the original exception in `__cause__`. If a finalizer raises
-               an unhandled exception, that exception is propagated instead.
+        1. **Middleware pre-processing**: Executes the first part of all middlewares.
+           If an exception occurs during this stage, all already started middlewares
+           are finalized. If all finalizers complete without errors, `Finalized` is
+           raised with the original exception in `__cause__`. If a finalizer raises
+           an unhandled exception, that exception is propagated instead.
 
-            2. **Callable execution**: Calls the original callable wrapped by this object.
-               If an exception occurs during execution, all middlewares are finalized,
-               and `Finalized` is raised with the original exception.
+        2. **Callable execution**: Calls the original callable wrapped by this object.
+           If an exception occurs during execution, all middlewares are finalized,
+           and `Finalized` is raised with the original exception.
 
-            3. **Middleware finalization**: If `finalize` is True, finalizes all middlewares
-               after callable execution. If an exception occurs during finalization, it is
-               wrapped in `FinalizingError` with `callable_return` containing the result
-               of the callable, and the original exception set as `__cause__`.
+        3. **Middleware finalization**: If `finalize` is True, finalizes all middlewares
+           after callable execution. If an exception occurs during finalization, it is
+           wrapped in `FinalizingError` with `callable_return` containing the result
+           of the callable, and the original exception set as `__cause__`.
 
-            :param callable_args: Positional arguments for the wrapped callable.
-            :param middlewares_args: Positional arguments for all middlewares.
-            :param data: Shared dictionary passed to middlewares and the callable.
-            :param executor: Optional `MiddlewaresExecutor` instance to manage middleware
-                             execution. If None, a new executor is created.
-            :param finalize: Whether to finalize middlewares after callable execution.
+        :param callable_args: Positional arguments for the wrapped callable.
+        :param middlewares_args: Positional arguments for all middlewares.
+        :param data: Shared dictionary passed to middlewares and the callable.
+        :param executor: Optional `MiddlewaresExecutor` instance to manage middleware
+                         execution. If None, a new executor is created.
+        :param finalize: Whether to finalize middlewares after callable execution.
 
-            :return: The result of the wrapped callable, or None if execution was stopped
-                     by a middleware raising `Return`.
+        :return: The result of the wrapped callable, or None if execution was stopped
+                 by a middleware raising `Return`.
 
-            :raises Finalized: Raised if a middleware throws an exception during pre-processing,
-                                and all finalizers ran without errors.
-            :raises FinalizingError: Raised if an exception occurs during middleware
-                                     finalization after successful callable execution.
-            :raises Exception: todo: if an unhandled exception occurs in finalizer and handler
-            not executed.
-            """
+        :raises Finalized: Raised if a middleware throws an exception during pre-processing,
+                            and all finalizers ran without errors.
+        :raises FinalizingError: Raised if an exception occurs during middleware
+                                 finalization after successful callable execution.
+        :raises Exception: todo: if an unhandled exception occurs in finalizer and handler
+        not executed.
+        """
         executor = executor or MiddlewaresExecutor()
         executor.add_middlewares(*self._middlewares)
 
@@ -157,7 +158,7 @@ class MiddlewaresExecutor:
         if len(self.middlewares) == 0:
             return True
 
-        if self.middleware_index == len(self.middlewares)-1:
+        if self.middleware_index == len(self.middlewares) - 1:
             return True
 
         return False
@@ -216,7 +217,7 @@ class MiddlewaresExecutor:
 
     async def finalize_middlewares(
         self,
-        exception: Exception | None = None
+        exception: Exception | None = None,
     ) -> None:
         """
         Finalize all started middlewares by executing the second part of generators
@@ -250,7 +251,7 @@ class MiddlewaresExecutor:
             raise exception
 
     def strip(self) -> None:
-        self.middlewares = self.middlewares[:self.middleware_index]
+        self.middlewares = self.middlewares[: self.middleware_index]
 
 
 class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[MiddlewareCallable[Any]]):
@@ -258,7 +259,9 @@ class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[MiddlewareCallable[An
         self._middlewares: list[MiddlewareCallable[Any]] = []
         self._inheritable: list[MiddlewareCallable[Any]] = []
 
-    def register_middleware(self, middleware: MiddlewareTypeT, inheritable: bool=False) -> MiddlewareTypeT:
+    def register_middleware(
+        self, middleware: MiddlewareTypeT, inheritable: bool = False
+    ) -> MiddlewareTypeT:
         m = MiddlewareCallable(middleware, inheritable=inheritable)
         self._middlewares.append(m)
         if m.inheritable:
@@ -274,7 +277,7 @@ class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[MiddlewareCallable[An
         self,
         /,
         *,
-        inheritable: bool = False
+        inheritable: bool = False,
     ) -> Callable[[MiddlewareTypeT], MiddlewareTypeT]:
         pass
 
@@ -284,7 +287,7 @@ class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[MiddlewareCallable[An
         func: MiddlewareTypeT,
         /,
         *,
-        inheritable: bool = False
+        inheritable: bool = False,
     ) -> MiddlewareTypeT:
         pass
 
@@ -293,7 +296,7 @@ class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[MiddlewareCallable[An
         func: MiddlewareTypeT | None = None,
         /,
         *,
-        inheritable: bool = False
+        inheritable: bool = False,
     ) -> Union[MiddlewareTypeT, Callable[[MiddlewareTypeT], MiddlewareTypeT]]:
         def inner(middleware: MiddlewareTypeT) -> MiddlewareTypeT:
             self.register_middleware(middleware, inheritable=inheritable)

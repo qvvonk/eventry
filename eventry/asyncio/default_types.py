@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing_extensions import TYPE_CHECKING, Any, Union, TypeAlias
 from collections.abc import Callable, Awaitable
+
+from typing_extensions import TYPE_CHECKING, Any, Union, TypeAlias
 
 
 if TYPE_CHECKING:

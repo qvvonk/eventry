@@ -10,22 +10,22 @@ __all__ = [
 
 
 import inspect
+from dataclasses import dataclass
+from copy import copy
 from collections import OrderedDict, deque
+from collections.abc import Callable, Sequence, Awaitable
 
 from typing_extensions import TYPE_CHECKING, Any, Type, Union, Generic, TypeVar
-from dataclasses import dataclass
-from collections.abc import Callable, Sequence, Awaitable
-from copy import copy
 
 from eventry.config import FromData
 
 from ..exceptions import Finalized
 
+
 if TYPE_CHECKING:
     from .event import Event
     from .filter import Filter
     from .handler_manager import HandlerManager
-    from .middleware_manager import MiddlewareWrappedCallable, MiddlewareManagerTypes
 
 
 HandlerManagerTypeT = TypeVar(
@@ -79,9 +79,8 @@ class CallableWrapper(Generic[ReturnTypeT]):
             elif p.kind == inspect.Parameter.VAR_KEYWORD:
                 self._var_kwargs_name = n
 
-        self._is_async = (
-            inspect.iscoroutinefunction(__obj) or
-            inspect.iscoroutinefunction(getattr(__obj, '__call__', None))
+        self._is_async = inspect.iscoroutinefunction(__obj) or inspect.iscoroutinefunction(
+            getattr(__obj, '__call__', None)
         )
 
         self._last_args: Sequence[Any] = ()
@@ -105,7 +104,6 @@ class CallableWrapper(Generic[ReturnTypeT]):
 
         extra_kwargs: dict[str, Any] = {}
         extra_values: list[Any] = []
-
 
         for k, v in data.items():
             if k in bound.arguments:
@@ -172,7 +170,7 @@ class MiddlewareCallable(CallableWrapper[ReturnTypeT]):
         self,
         __obj: Callable[..., Union[Awaitable[ReturnTypeT], ReturnTypeT]],
         /,
-        inheritable: bool = False
+        inheritable: bool = False,
     ) -> None:
         super().__init__(__obj)
         self._inheritable = inheritable
@@ -228,6 +226,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
         meta: HandlerMeta,
     ):
         from eventry.asyncio.filter import FilterFromFunction
+
         super().__init__(__obj)
         self._handler_manager = handler_manager
         self._handler_id = handler_id
@@ -274,15 +273,23 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
         inherited_outer_middlewares: deque[MiddlewareCallable[Any]] | None = None,
         inherited_inner_middlewares: deque[MiddlewareCallable[Any]] | None = None,
     ) -> None:
-        from eventry.asyncio.middleware_manager import MiddlewaresExecutor, MiddlewareWrappedCallable, MiddlewareManagerTypes
+        from eventry.asyncio.middleware_manager import (
+            MiddlewaresExecutor,
+            MiddlewareManagerTypes,
+            MiddlewareWrappedCallable,
+        )
 
         data = data if data is not None else {}
 
         outer_middlewares = inherited_outer_middlewares or deque()
         inner_middlewares = inherited_inner_middlewares or deque()
 
-        curr_outer = self.manager.middleware_manager(MiddlewareManagerTypes.OUTER_PER_HANDLER) or []
-        curr_inner = self.manager.middleware_manager(MiddlewareManagerTypes.INNER_PER_HANDLER) or []
+        curr_outer = (
+            self.manager.middleware_manager(MiddlewareManagerTypes.OUTER_PER_HANDLER) or []
+        )
+        curr_inner = (
+            self.manager.middleware_manager(MiddlewareManagerTypes.INNER_PER_HANDLER) or []
+        )
 
         outer_middlewares = outer_middlewares + deque(curr_outer)
         inner_middlewares = inner_middlewares + deque(curr_inner) + deque(self.middlewares)
@@ -294,12 +301,12 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
             r = await wrapped_filter(
                 callable_args=(
                     self.manager._config.filter_positional_only_args,
-                    data
+                    data,
                 ),
                 middlewares_args=self.manager._config.middleware_positional_only_args,
                 data=data,
                 finalize=False,
-                executor=executor
+                executor=executor,
             )
         except Finalized:
             return
@@ -319,7 +326,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
                 self.manager._config.middleware_positional_only_args,
                 data,
                 finalize=True,
-                executor=executor
+                executor=executor,
             )
         except Finalized:
             return

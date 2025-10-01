@@ -8,5 +8,5 @@ __all__ = [
 
 
 from .base import HandlerManager
-from ..middleware_manager import MiddlewareManagerTypes
 from .default import DefaultHandlerManager
+from ..middleware_manager import MiddlewareManagerTypes

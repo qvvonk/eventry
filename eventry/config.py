@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing_extensions import Any, TypedDict
 from dataclasses import field, dataclass
+
+from typing_extensions import Any, TypedDict
 
 
 class FromData(str): ...

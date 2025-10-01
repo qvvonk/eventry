@@ -11,6 +11,7 @@ from eventry.asyncio.default_types import FilterType, HandlerType, MiddlewareTyp
 from .base import HandlerManager
 from ..middleware_manager import MiddlewareManager, MiddlewareManagerTypes
 
+
 if TYPE_CHECKING:
     from eventry.asyncio.event import Event
 

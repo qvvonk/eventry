@@ -33,6 +33,8 @@ def error_event_factory(context: ErrorContext) -> ErrorEvent:
 class DefaultDispatcher(Dispatcher, DefaultRouter):
     def __init__(self, workflow_data: dict[str, Any] | None = None):
         Dispatcher.__init__(
-            self, error_event_factory=error_event_factory, workflow_data=workflow_data
+            self,
+            error_event_factory=error_event_factory,
+            workflow_data=workflow_data,
         )
         DefaultRouter.__init__(self, name='Dispatcher')
