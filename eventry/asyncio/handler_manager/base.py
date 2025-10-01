@@ -17,11 +17,9 @@ from typing_extensions import (
     Any,
     Self,
     Type,
-    Union,
     Generic,
     TypeVar,
     Optional,
-    overload,
 )
 
 from eventry.config import HandlerManagerConfig
@@ -198,52 +196,20 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
     def middleware_manager(self, _type: MiddlewareManagerTypes) -> MiddlewareManager[Any] | None:
         return self._middleware_managers.get(_type)
 
-    @overload
-    def __call__(self, func: HandlerT, /) -> HandlerT:
-        pass
-
-    @overload
     def __call__(
         self,
+        filter: Optional[FilterT] = None,
         /,
         *,
         on_event: Type[Event] | None = None,
         handler_id: str | None = None,
-        filter: Optional[FilterT] = None,
         middlewares: list[MiddlewareT] | None = None,
         as_task: bool = False,
     ) -> Callable[[HandlerT], HandlerT]:
-        pass
-
-    @overload
-    def __call__(
-        self,
-        func: HandlerT,
-        /,
-        *,
-        on_event: Type[Event] | None = None,
-        handler_id: str | None = None,
-        filter: Optional[FilterT] = None,
-        middlewares: list[MiddlewareT] | None = None,
-        as_task: bool = False,
-    ) -> HandlerT:
-        pass
-
-    def __call__(
-        self,
-        func: Optional[HandlerT] = None,
-        /,
-        *,
-        on_event: Type[Event] | None = None,
-        handler_id: str | None = None,
-        filter: Optional[FilterT] = None,
-        middlewares: list[MiddlewareT] | None = None,
-        as_task: bool = False,
-    ) -> Union[HandlerT, Callable[[HandlerT], HandlerT]]:
         def inner(handler: HandlerT) -> HandlerT:
             meta = HandlerMeta.from_callable(
                 handler,
-                registration_frame=inspect.stack()[2 if func is not None else 1],
+                registration_frame=inspect.stack()[1],
             )
             handler_obj = self._create_handler_obj(
                 handler=handler,
@@ -257,9 +223,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
             self._register_handler(handler_obj)
             return handler
 
-        if func is None:
-            return inner
-        return inner(func)
+        return inner
 
     @property
     def handlers(self) -> MappingProxyType[str, Handler[Any, Self]]:

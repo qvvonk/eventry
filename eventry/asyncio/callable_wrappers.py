@@ -315,9 +315,6 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
             await executor.finalize_middlewares()
             return
 
-        if isinstance(r, dict):
-            data.update(r)
-
         wrapped_handler = MiddlewareWrappedCallable(self._callable, inner_middlewares)
 
         try:
