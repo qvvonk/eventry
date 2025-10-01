@@ -80,7 +80,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
                 self._var_kwargs_name = n
 
         self._is_async = inspect.iscoroutinefunction(__obj) or inspect.iscoroutinefunction(
-            getattr(__obj, '__call__', None)
+            getattr(__obj, '__call__', None),
         )
 
         self._last_args: Sequence[Any] = ()

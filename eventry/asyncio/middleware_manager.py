@@ -260,7 +260,9 @@ class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[MiddlewareCallable[An
         self._inheritable: list[MiddlewareCallable[Any]] = []
 
     def register_middleware(
-        self, middleware: MiddlewareTypeT, inheritable: bool = False
+        self,
+        middleware: MiddlewareTypeT,
+        inheritable: bool = False,
     ) -> MiddlewareTypeT:
         m = MiddlewareCallable(middleware, inheritable=inheritable)
         self._middlewares.append(m)
