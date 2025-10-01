@@ -83,7 +83,10 @@ class Filter:
             self._call_id = id(self.__call__)
             self._call_wrapper = CallableWrapper(self.__call__)
 
-        return await self._call_wrapper(args, data)
+        result = await self._call_wrapper(args, data)
+        if isinstance(result, dict):
+            data.update(result)
+        return result
 
 
 class LogicalFilter(Filter, ABC): ...
@@ -145,7 +148,7 @@ class NotFilter(LogicalFilter):
         self._filter: Filter = filter if isinstance(filter, Filter) else FilterFromFunction(filter)
 
     async def execute(self, args: Sequence[Any], data: dict[str, Any]) -> bool:
-        return not (await self._filter(args, data))
+        return not (await self._filter.execute(args, data))
 
 
 class FilterFromFunction(LogicalFilter):
