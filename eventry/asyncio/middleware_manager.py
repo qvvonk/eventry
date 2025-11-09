@@ -65,7 +65,7 @@ class MiddlewareWrappedCallable(Generic[R]):
 
         2. **Callable execution**: Calls the original callable wrapped by this object.
            If an exception occurs during execution, all middlewares are finalized,
-           and `Finalized` is raised with the original exception.
+           and `Finalized` is raised with the original exception in `__cause__`.
 
         3. **Middleware finalization**: If `finalize` is True, finalizes all middlewares
            after callable execution. If an exception occurs during finalization, it is
@@ -96,18 +96,18 @@ class MiddlewareWrappedCallable(Generic[R]):
             await executor.execute_middlewares(middlewares_args, data)
         except (Return, Finalized) as e:
             raise Finalized from e
-        # Just for explicitly
-        # Exception goes out (to dispatcher)
+        # Just for explicitly: Exception goes out
         except:
             raise
 
         try:
             result = await self._callable(callable_args, data)
-            if not finalize:
-                return result
         except Exception as e:
             await executor.finalize_middlewares(exception=e)
             raise Finalized from e
+
+        if not finalize:
+            return result
 
         try:
             await executor.finalize_middlewares()
@@ -123,7 +123,6 @@ class MiddlewaresExecutor:
     """
 
     middlewares: list[CallableWrapper] = field(default_factory=list)
-
     _middleware_index: int = field(init=False, repr=False, default=0)
     _execute_after: deque[Generator[Any, None, Any] | AsyncGenerator[Any, None]] = field(
         init=False,

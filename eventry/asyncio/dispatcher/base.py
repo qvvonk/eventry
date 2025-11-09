@@ -176,7 +176,7 @@ class Dispatcher(Router):
         except Exception as e:
             if isinstance(e, FinalizingError):
                 e = e.__cause__
-            dispatcher_logger.debug(
+            dispatcher_logger.error(
                 f'({id(event)}) An error occurred while executing handler '
                 f'{handler.manager.router.name} -> {handler.manager.id} -> {handler.id}.',
                 exc_info=e,
