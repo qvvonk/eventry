@@ -19,7 +19,7 @@ from typing_extensions import TYPE_CHECKING, Any, Type, Union, Generic, TypeVar
 
 from eventry.config import FromData
 
-from ..exceptions import Finalized
+from ..exceptions import EarlyFinalized
 
 
 if TYPE_CHECKING:
@@ -329,7 +329,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
                 finalize=False,
                 executor=executor,
             )
-        except Finalized:
+        except EarlyFinalized:
             return
 
         if not r:
@@ -346,7 +346,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
                 finalize=True,
                 executor=executor,
             )
-        except Finalized:
+        except EarlyFinalized:
             return
 
         # todo: hook to handler return

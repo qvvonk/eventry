@@ -3,7 +3,7 @@ from __future__ import annotations
 
 __all__ = [
     'Return',
-    'Finalized',
+    'EarlyFinalized',
     'FinalizingError',
     'HandlerNotExecuted',
 ]
@@ -16,7 +16,7 @@ class Return(Exception):
     pass
 
 
-class Finalized(Exception):
+class EarlyFinalized(Exception):
     pass
 
 

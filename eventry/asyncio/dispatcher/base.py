@@ -13,7 +13,7 @@ from typing_extensions import TYPE_CHECKING, Any
 
 from eventry.config import DispatcherConfig
 from eventry.loggers import dispatcher_logger
-from eventry.exceptions import Finalized, FinalizingError
+from eventry.exceptions import EarlyFinalized, FinalizingError
 from eventry.asyncio.event import Event
 from eventry.asyncio.router import Router
 from eventry.asyncio.middleware_manager import (
@@ -94,7 +94,7 @@ class Dispatcher(Router):
                     executor=executor,
                     finalize=False,
                 )
-            except Finalized:
+            except EarlyFinalized:
                 return
             except Exception as e:
                 if isinstance(e, FinalizingError):
