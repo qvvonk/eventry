@@ -39,13 +39,14 @@ ReturnTypeT = TypeVar('ReturnTypeT', default=Any)
 
 class CallableWrapper(Generic[ReturnTypeT]):
     __slots__ = (
+        '_is_method',
         '_callable',
-        '_sig',
-        '_var_args_name',
-        '_var_kwargs_name',
+        '_argcount',
+        '_kwonlyargcount',
+        '_has_varargs',
+        '_has_varkw',
+        '_arg_names',
         '_is_async',
-        '_last_args',
-        '_last_bound_args'
     )
     def __init__(
         self,
@@ -77,23 +78,24 @@ class CallableWrapper(Generic[ReturnTypeT]):
         :param __obj: Callable to wrap. Can be a normal function, coroutine
                       function, or object with sync/async __call__.
         """
-        self._callable = __obj
-        self._sig = inspect.signature(__obj)
-        self._var_args_name = None
-        self._var_kwargs_name = None
+        self._is_method = not isinstance(__obj, FunctionType)
+        self._callable: FunctionType | MethodType = (
+            getattr(__obj, '__call__') if self._is_method else __obj
+        )
 
-        for n, p in self._sig.parameters.items():
-            if p.kind == inspect.Parameter.VAR_POSITIONAL:
-                self._var_args_name = n
-            elif p.kind == inspect.Parameter.VAR_KEYWORD:
-                self._var_kwargs_name = n
+        self._argcount = self._callable.__code__.co_argcount
+        self._kwonlyargcount = self._callable.__code__.co_kwonlyargcount
+
+        self._has_varargs = bool(self._callable.__code__.co_flags & inspect.CO_VARARGS)
+        self._has_varkw = bool(self._callable.__code__.co_flags & inspect.CO_VARKEYWORDS)
+
+        self._arg_names = self._callable.__code__.co_varnames[
+            self._is_method:self._argcount + self._kwonlyargcount + 1
+        ]
 
         self._is_async = inspect.iscoroutinefunction(__obj) or inspect.iscoroutinefunction(
             getattr(__obj, '__call__', None),
         )
-
-        self._last_args: Sequence[Any] = ()
-        self._last_bound_args: OrderedDict[str, Any] = OrderedDict()
 
     async def __call__(
         self,
@@ -101,42 +103,18 @@ class CallableWrapper(Generic[ReturnTypeT]):
         data: dict[str, Any] | None = None,
     ) -> ReturnTypeT:
         data = data if data is not None else {}
-        args = tuple(i if not isinstance(i, FromData) else data[i] for i in args)
+        args = tuple(i if type(i) is not FromData else data[i] for i in args)
+        bound_names = self._arg_names[: len(args)]
+        names_to_bind = self._arg_names[len(args) :]
 
-        if args == self._last_args:
-            bound_args = copy(self._last_bound_args)
-            bound = inspect.BoundArguments(self._sig, bound_args)
+        if self._has_varkw:
+            kwargs = {k: v for k, v in data.items() if k not in bound_names}
         else:
-            self._last_args = args
-            bound = self._sig.bind_partial(*args)
-            self._last_bound_args = copy(bound.arguments)
-
-        extra_kwargs: dict[str, Any] = {}
-        extra_values: list[Any] = []
-
-        for k, v in data.items():
-            if k in bound.arguments:
-                continue
-
-            if k == self.varargs_name or k == self.varkw_name:
-                continue
-
-            if k in self._sig.parameters:
-                bound.arguments[k] = v
-            else:
-                if self.has_varkw:
-                    extra_kwargs[k] = v
-                elif self.has_varargs:
-                    extra_values.append(v)
-
-        if self.varargs_name and extra_values:
-            current_args = list(bound.arguments.get(self.varargs_name, ()))
-            current_args.extend(extra_values)
-            bound.arguments[self.varargs_name] = current_args
+            kwargs = {k: data[k] for k in names_to_bind if k in data}
 
         if self.is_async:
-            return await self._callable(*bound.args, **bound.kwargs, **extra_kwargs)  # type: ignore
-        return self._callable(*bound.args, **bound.kwargs, **extra_kwargs)  # type: ignore
+            return await self._callable(*args, **kwargs)  # type: ignore
+        return self._callable(*args, **kwargs)  # type: ignore
 
     @property
     def is_async(self) -> bool:
@@ -150,28 +128,14 @@ class CallableWrapper(Generic[ReturnTypeT]):
         """
         Returns True if the wrapped callable has a **kwargs parameter.
         """
-        return self._var_kwargs_name is not None
+        return self._has_varkw
 
     @property
     def has_varargs(self) -> bool:
         """
         Returns True if the wrapped callable has a *args parameter.
         """
-        return self._var_args_name is not None
-
-    @property
-    def varkw_name(self) -> str | None:
-        """
-        Returns the name of the **kwargs parameter if present, else None.
-        """
-        return self._var_kwargs_name
-
-    @property
-    def varargs_name(self) -> str | None:
-        """
-        Returns the name of the *args parameter if present, else None.
-        """
-        return self._var_args_name
+        return self._has_varargs
 
 
 class MiddlewareCallable(CallableWrapper[ReturnTypeT]):
