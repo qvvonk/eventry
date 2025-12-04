@@ -38,6 +38,15 @@ ReturnTypeT = TypeVar('ReturnTypeT', default=Any)
 
 
 class CallableWrapper(Generic[ReturnTypeT]):
+    __slots__ = (
+        '_callable',
+        '_sig',
+        '_var_args_name',
+        '_var_kwargs_name',
+        '_is_async',
+        '_last_args',
+        '_last_bound_args'
+    )
     def __init__(
         self,
         __obj: Callable[..., Union[Awaitable[ReturnTypeT], ReturnTypeT]],
@@ -166,6 +175,8 @@ class CallableWrapper(Generic[ReturnTypeT]):
 
 
 class MiddlewareCallable(CallableWrapper[ReturnTypeT]):
+    __slots__ = ('_inheritable', )
+
     def __init__(
         self,
         __obj: Callable[..., Union[Awaitable[ReturnTypeT], ReturnTypeT]],
@@ -180,7 +191,7 @@ class MiddlewareCallable(CallableWrapper[ReturnTypeT]):
         return self._inheritable
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HandlerMeta:
     """
     Represents metadata about a handler.
@@ -213,6 +224,16 @@ class HandlerMeta:
 
 
 class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerTypeT]):
+    __slots__ = (
+        '_handler_manager',
+        '_handler_id',
+        '_meta',
+        '_middlewares',
+        '_as_task',
+        '_filter',
+        '_on_event',
+    )
+
     def __init__(
         self,
         __obj: Callable[..., Union[Awaitable[ReturnTypeT], ReturnTypeT]],
