@@ -11,11 +11,11 @@ __all__ = [
 
 import inspect
 from dataclasses import dataclass
-from copy import copy
-from collections import OrderedDict, deque
+from collections import deque
 from collections.abc import Callable, Sequence, Awaitable
 
 from typing_extensions import TYPE_CHECKING, Any, Type, Union, Generic, TypeVar
+from types import FunctionType, MethodType
 
 from eventry.config import FromData
 
@@ -78,10 +78,14 @@ class CallableWrapper(Generic[ReturnTypeT]):
         :param __obj: Callable to wrap. Can be a normal function, coroutine
                       function, or object with sync/async __call__.
         """
+        _callable = __obj
+        while not isinstance(__obj, FunctionType | MethodType):
+            if not callable(_callable):
+                raise TypeError(f'Expected callable, got {type(__obj).__name__}')
+            _callable = getattr(_callable, '__call__')
+
+        self._callable = _callable
         self._is_method = not isinstance(__obj, FunctionType)
-        self._callable: FunctionType | MethodType = (
-            getattr(__obj, '__call__') if self._is_method else __obj
-        )
 
         self._argcount = self._callable.__code__.co_argcount
         self._kwonlyargcount = self._callable.__code__.co_kwonlyargcount
