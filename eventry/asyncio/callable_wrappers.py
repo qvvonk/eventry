@@ -76,8 +76,6 @@ class CallableWrapper(Generic[ReturnTypeT]):
 
         Behavior of extra data:
           - If the callable has varkw, extra keys from ``data`` go there.
-          - Else, if the callable has varargs but no varkw, extra values from
-            ``data`` are appended to it.
           - Otherwise, extra keys are ignored.
 
         :param __obj: Callable to wrap. Can be a normal function, coroutine
@@ -193,18 +191,16 @@ class CallableWrapper(Generic[ReturnTypeT]):
 
         # passing only unbound arg names with default values (positional and kw-only) to **kwargs
         else:
-            names_to_bind: set[str] = set(
-                *self._arg_names[bound_pos_arg_names_count:self._argcount],
-                *self._arg_names[self._argcount+self._non_default_kwargs_count:]
-            )
-            kwargs.update({k: data[k] for k in names_to_bind if k in data})
-            # If there is a *varargs in callable signatures - passing all other values from
-            # data dict to it.
-            if self._has_varargs:
-                bound_pos_arg_names = set(self._arg_names[:bound_pos_arg_names_count])
-                pos_args.extend(
-                    v for k, v in data.items() if k not in kwargs and k not in bound_pos_arg_names
-                )
+            for name_index in range(bound_pos_arg_names_count, self._argcount):
+                name = self._arg_names[name_index]
+                if name in data:
+                    kwargs[name] = data[name]
+            for name_index in range(
+                self._argcount+self._non_default_kwargs_count, self._total_argcount
+            ):
+                name = self._arg_names[name_index]
+                if name in data:
+                    kwargs[name] = data[name]
 
         if self._is_async:
             return await self._callable(*pos_args, **kwargs)  # type: ignore
