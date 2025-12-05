@@ -65,12 +65,14 @@ class CallableWrapper(Generic[ReturnTypeT]):
         any signature.
 
         Usage:
+            >>> import asyncio
             >>> def my_function(arg1, arg2, arg3='some', **kwargs):
             >>>     print(arg1, arg2, arg3, kwargs)
             >>> wrapper = CallableWrapper(my_function)
             >>> positional_args = (1, )
             >>> data = {'arg2': 2, 'arg3': 'overwrite', 'another': 'value', 'one': 'more'}
-            >>> await wrapper(positional_args, data)
+            >>> loop = asyncio.new_event_loop()
+            >>> loop.run_until_complete(wrapper(positional_args, data))
             1, 2, 'overwrite', {'another': 'value', 'one': 'more'}
 
         Behavior of extra data:
@@ -180,7 +182,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
 
         # passing only unbound arg names with default values (positional and kw-only) to **kwargs
         else:
-            names_to_bind = set(
+            names_to_bind: set[str] = set(
                 *self._arg_names[bound_pos_args_count:self._argcount],
                 *self._arg_names[self._argcount+self._non_default_kwargs_count:]
             )
