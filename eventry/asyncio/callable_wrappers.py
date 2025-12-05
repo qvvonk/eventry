@@ -42,7 +42,6 @@ class CallableWrapper(Generic[ReturnTypeT]):
         '_is_method',
         '_callable',
         '_argcount',
-        '_posonlyargcount',
         '_kwonlyargcount',
         '_non_default_args_count',
         '_non_default_kwargs_count',
@@ -99,12 +98,6 @@ class CallableWrapper(Generic[ReturnTypeT]):
         if self._argcount and self._is_method:
             self._argcount -= 1
 
-        # Amount of positional-only args, excluding `self` (if callable is a method),
-        # *varargs and **varkwargs
-        self._posonlyargcount = self._callable.__code__.co_posonlyargcount
-        if self._posonlyargcount and self._is_method:
-            self._posonlyargcount -= 1
-
         # Amount of kwonly args, excluding **varkwargs
         self._kwonlyargcount = self._callable.__code__.co_kwonlyargcount
 
@@ -149,23 +142,41 @@ class CallableWrapper(Generic[ReturnTypeT]):
         pos_args = [i if type(i) is not FromData else data[i] for i in args] if args else []
 
         # if there is no *varargs and too many args passed - an exception should be already raised
-        # if len(passed args) > len(not-kw-only-args) => excessive passed args will go to *varargs
-        bound_pos_args_count = len(pos_args) if len(pos_args) <= self._argcount else self._argcount
+        # if len(passed args) > len(positional args) => excessive passed args will go to *varargs
+        #
+        # Example:
+        # def function(a, b, c, d, *args): ...
+        # Passed args: (1, 2, 3, 4, 5, 6) (`5` and `6` goes to `*args`).
+        bound_pos_arg_names_count = (
+            len(pos_args) if len(pos_args) <= self._argcount else self._argcount
+        )
 
         # We are still before the "kw-only args area".
-        if bound_pos_args_count < self._non_default_args_count:
-            for arg_name_index in range(bound_pos_args_count, self._non_default_args_count):
+        # If there are some unbound non-default non-kwonly (positional) args,
+        # we need to locate their values in data dict.
+        #
+        # Example:
+        # def function(a, b, c, d): ...
+        # Passed args: (1, 2, 3) (`d` has no value).
+        if bound_pos_arg_names_count < self._non_default_args_count:
+            for arg_name_index in range(bound_pos_arg_names_count, self._non_default_args_count):
                 name = self._arg_names[arg_name_index]
                 if name not in data:
                     raise ValueError(f'Cannot find value in provided data dict '
                                      f'for non-default positional argument {name!r}.')
                 pos_args.append(data[name])
-                bound_pos_args_count += 1
-        # At this state all non-default positional args are bound.
+                bound_pos_arg_names_count += 1
+        # At this state all non-default non-kwonly (positional) args are bound.
+        # Example:
+        # def function(a, b, c, d): ...
+        # Passed args: (1, 2, 3) => (a=1, b=2, c=3)
+        # Passed data dict: {'d': 4, 'another': 5} => d=4
 
-        # Binding non-default kw-only args
+        # Binding non-default kw-only args if they exist.
         kwargs = {}
         if self._non_default_kwargs_count:
+            # From the last positional arg name (exclusive) to the last arg name,
+            # i.e., kw-only args.
             for arg_name_index in range(self._argcount, self._total_argcount):
                 name = self._arg_names[arg_name_index]
                 if name not in data:
@@ -177,16 +188,23 @@ class CallableWrapper(Generic[ReturnTypeT]):
         # default values.
 
         if self._has_varkw: # passing all names except bound positional args to **kwargs
-            bound_pos_arg_names = set(self._arg_names[:bound_pos_args_count])
+            bound_pos_arg_names = set(self._arg_names[:bound_pos_arg_names_count])
             kwargs.update({k: v for k, v in data.items() if k not in bound_pos_arg_names})
 
         # passing only unbound arg names with default values (positional and kw-only) to **kwargs
         else:
             names_to_bind: set[str] = set(
-                *self._arg_names[bound_pos_args_count:self._argcount],
+                *self._arg_names[bound_pos_arg_names_count:self._argcount],
                 *self._arg_names[self._argcount+self._non_default_kwargs_count:]
             )
             kwargs.update({k: data[k] for k in names_to_bind if k in data})
+            # If there is a *varargs in callable signatures - passing all other values from
+            # data dict to it.
+            if self._has_varargs:
+                bound_pos_arg_names = set(self._arg_names[:bound_pos_arg_names_count])
+                pos_args.extend(
+                    v for k, v in data.items() if k not in kwargs and k not in bound_pos_arg_names
+                )
 
         if self._is_async:
             return await self._callable(*pos_args, **kwargs)  # type: ignore
