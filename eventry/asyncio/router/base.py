@@ -24,7 +24,7 @@ class Router:
     def __init__(self, name: str):
         self._name = name
         self._parent: Self | None = None
-        self._children: dict[str, Self] = {}
+        self._sub_routers: dict[str, Self] = {}
         self._managers: dict[type[Event], HandlerManager[Any, Any, Any, Self]] = {}
         self._managers_by_id: dict[str, HandlerManager[Any, Any, Any, Self]] = {}
         self._default_handler_manager: HandlerManager[Any, Any, Any, Self] | None = None
@@ -34,7 +34,7 @@ class Router:
             if handler_id in manager.handlers:
                 return manager.handlers[handler_id]
 
-        for router in self._children.values():
+        for router in self._sub_routers.values():
             result = router.get_handler_by_id(handler_id)
             if result is not None:
                 return result
@@ -81,7 +81,7 @@ class Router:
         self,
         event: Event,
     ) -> Generator[HandlerManager[Any, Any, Any, Self], None]:
-        for router in self.chain_to_last_router:
+        for router in self.chain_to_tails:
             yield router.get_handler_manager(event)
 
     def connect_router(self, router: Router) -> None:
@@ -116,10 +116,74 @@ class Router:
             curr_router = curr_router.parent_router
 
     @property
-    def chain_to_last_router(self) -> Generator[Self, None, None]:
-        yield self
-        for r in self._children.values():
-            yield from r.chain_to_last_router
+    def chain_to_tails(self) -> Generator[Self, bool | None, None]:
+        """
+        Generator that traverses the router chain from the current router to all sub-routers (tail nodes).
+
+        The traversal is performed in depth-first order: first the current router, then recursively
+        all its sub-routers. The generator supports a branch-skipping mechanism: if you send ``True``
+        to the generator, the sub-routers of the current node will be skipped.
+
+        :yields: Routers in depth-first traversal order.
+        :rtype: Generator[Self, None, None]
+
+        .. note::
+           This property uses generator.send() protocol to allow skipping branches during traversal.
+           Sending ``True`` will skip the sub-routers of the last yielded router.
+
+        **Examples:**
+
+        Basic iteration over all routers::
+
+        .. code-block:: python
+            for router in main_router.chain_to_tails:
+                print(router.name)
+
+        Skipping sub-routers conditionally:
+
+        .. code-block:: python
+            def should_skip(router: Router) -> bool:
+                return router.name == 'router_to_skip'
+
+            def process_router(router: Router) -> None:
+                gen = main_router.chain_to_tails
+
+                try:
+                    current_router = next(gen)
+                except StopIteration:
+                    return
+
+                while True:
+                    try:
+                        if should_skip(current_router):
+                            current_router = gen.send(True) # Skip sub-routers of this node
+                            continue
+
+                        # Do something with current_router
+                        ...
+                    except StopIteration:
+                        return
+        """
+        skip_current = yield self
+
+        if skip_current:
+            return
+
+        for sub_router in self._sub_routers.values():
+            sub_router_gen = sub_router.chain_to_tails
+
+            try:
+                current = next(sub_router_gen)
+            except StopIteration:
+                continue
+
+            while True:
+                skip = yield current
+
+                try:
+                    current = sub_router_gen.send(skip)
+                except StopIteration:
+                    break
 
     @property
     def parent_router(self) -> Self | None:
@@ -154,7 +218,7 @@ class Router:
         # todo: add name check
 
         self._parent = router
-        router._children[self.name] = self
+        router._sub_routers[self.name] = self
 
         router_logger.info(
             f"Router '{self.name}' connected to router '{router.name}'.",

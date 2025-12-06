@@ -28,6 +28,7 @@ from eventry.asyncio.filter import convert_filters
 from eventry.asyncio.default_types import FilterType, HandlerType, MiddlewareType
 from eventry.asyncio.callable_wrappers import Handler, HandlerMeta, CallableWrapper
 from eventry.asyncio.middleware_manager import MiddlewareManager, MiddlewareManagerTypes
+from eventry.asyncio.filter import Filter, FilterFromFunction
 
 
 if TYPE_CHECKING:
@@ -87,6 +88,14 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
             MiddlewareManagerTypes,
             MiddlewareManager[MiddlewareT],
         ] = {}
+
+        self._filter: Filter | None = None
+
+    def set_filter(self, filter: FilterT | Filter) -> None:
+        self._filter = filter if isinstance(filter, Filter) else FilterFromFunction(filter)
+
+    def remove_filter(self) -> None:
+        self._filter = None
 
     def _create_handler_obj(
         self,
@@ -252,6 +261,10 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
     @property
     def config(self) -> HandlerManagerConfig:
         return self._config
+
+    @property
+    def filter(self) -> FilterT | None:
+        return self._filter
 
 
 def gen_default_handler_id(

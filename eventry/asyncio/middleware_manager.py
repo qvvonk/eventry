@@ -16,7 +16,7 @@ from collections.abc import Iterable, Sequence, Awaitable, Generator, AsyncGener
 
 from typing_extensions import Any, Union, Generic, TypeVar, Callable, overload
 
-from eventry.exceptions import Return, EarlyFinalized, FinalizingError
+from eventry.exceptions import Return, _EarlyFinalized, FinalizingError
 from eventry.asyncio.default_types import MiddlewareType
 
 from .callable_wrappers import CallableWrapper, MiddlewareCallable
@@ -50,6 +50,7 @@ class MiddlewareWrappedCallable(Generic[R]):
         middlewares_args: Sequence[Any],
         data: dict[str, Any],
         executor: MiddlewaresExecutor | None = None,
+        finalize_on_callable_exception: bool = True,
         finalize: bool = True,
     ) -> R | None:
         """
@@ -59,13 +60,13 @@ class MiddlewareWrappedCallable(Generic[R]):
 
         1. **Middleware pre-processing**: Executes the first part of all middlewares.
            If an exception occurs during this stage, all already started middlewares
-           are finalized. If all finalizers complete without errors, `EarlyFinalized` is
+           are finalized. If all finalizers complete without errors, `_EarlyFinalized` is
            raised with the original exception in `__cause__`. If a finalizer raises
            an unhandled exception, that exception is propagated instead.
 
         2. **Callable execution**: Calls the original callable wrapped by this object.
            If an exception occurs during execution, all middlewares are finalized,
-           and `EarlyFinalized` is raised with the original exception in `__cause__`.
+           and `_EarlyFinalized` is raised with the original exception in `__cause__`.
 
         3. **Middleware finalization**: If `finalize` is True, finalizes all middlewares
            after callable execution. If an exception occurs during finalization, it is
@@ -77,12 +78,14 @@ class MiddlewareWrappedCallable(Generic[R]):
         :param data: Shared dictionary passed to middlewares and the callable.
         :param executor: Optional `MiddlewaresExecutor` instance to manage middleware
                          execution. If None, a new executor is created.
+        :param finalize_on_callable_exception: Whether to finalize middlewares if an
+            exception occurred while executing wrapped callable.
         :param finalize: Whether to finalize middlewares after callable execution.
 
         :return: The result of the wrapped callable, or None if execution was stopped
                  by a middleware raising `Return`.
 
-        :raises EarlyFinalized: Raised if a middleware throws an exception during pre-processing,
+        :raises _EarlyFinalized: Raised if a middleware throws an exception during pre-processing,
                             and all finalizers ran without errors.
         :raises FinalizingError: Raised if an exception occurs during middleware
                                  finalization after successful callable execution.
@@ -94,17 +97,19 @@ class MiddlewareWrappedCallable(Generic[R]):
 
         try:
             await executor.execute_middlewares(middlewares_args, data)
-        except (Return, EarlyFinalized) as e:
-            raise EarlyFinalized from e
-        # other exceptions go out
+        except (Return, _EarlyFinalized) as e:
+            raise _EarlyFinalized from e
+        # propagate outside any other exception
         # except:
         #     raise
 
         try:
             result = await self._callable(callable_args, data)
         except Exception as e:
+            if not finalize_on_callable_exception:
+                raise
             await executor.finalize_middlewares(exception=e)
-            raise EarlyFinalized from e
+            raise _EarlyFinalized from e
 
         if not finalize:
             return result
@@ -171,7 +176,7 @@ class MiddlewaresExecutor:
         their second part (after `yield`) and throws the original exception into them.
 
         If none of the finalizers handle the exception, the original exception is raised.
-        If all finalizers complete without errors, raises `EarlyFinalized` with the original
+        If all finalizers complete without errors, raises `_EarlyFinalized` with the original
         exception in `__cause__`.
 
         If a `Return` exception is raised during execution of a middleware, all started
@@ -182,7 +187,7 @@ class MiddlewaresExecutor:
                      middleware results if they return a dict.
 
         :raises Return: If a middleware explicitly raises `Return`.
-        :raises EarlyFinalized: If an exception occurs during middleware execution and
+        :raises _EarlyFinalized: If an exception occurs during middleware execution and
                            all finalizers succeed.
         """
         try:
@@ -203,7 +208,7 @@ class MiddlewaresExecutor:
             raise
         except Exception as e:
             await self.finalize_middlewares(exception=e)
-            raise EarlyFinalized from e
+            raise _EarlyFinalized from e
 
     async def finalize_middlewares(
         self,

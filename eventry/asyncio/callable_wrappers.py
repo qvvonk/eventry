@@ -19,7 +19,7 @@ from types import FunctionType, MethodType
 
 from eventry.config import FromData
 
-from ..exceptions import EarlyFinalized
+from ..exceptions import _EarlyFinalized
 
 
 if TYPE_CHECKING:
@@ -30,8 +30,8 @@ if TYPE_CHECKING:
 
 HandlerManagerTypeT = TypeVar(
     'HandlerManagerTypeT',
-    default='HandlerManager',
-    bound='HandlerManager',
+    default='HandlerManager[Any, Any, Any, Any]',
+    bound='HandlerManager[Any, Any, Any, Any]',
 )
 
 ReturnTypeT = TypeVar('ReturnTypeT', default=Any)
@@ -327,6 +327,13 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
         inherited_outer_middlewares: deque[MiddlewareCallable[Any]] | None = None,
         inherited_inner_middlewares: deque[MiddlewareCallable[Any]] | None = None,
     ) -> None:
+        """
+        Executes current handler wrapped with filter and outer-inner-handler middlewares.
+
+        If an exception occurred while executing the filter or handler, finalizes all middlewares
+        and returns `None`.
+        If there is an unhandled exception after middlewares are finalized, raises it.
+        """
         from eventry.asyncio.middleware_manager import (
             MiddlewaresExecutor,
             MiddlewareManagerTypes,
@@ -362,7 +369,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
                 finalize=False,
                 executor=executor,
             )
-        except EarlyFinalized:
+        except _EarlyFinalized:
             return
 
         if not r:
@@ -379,7 +386,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
                 finalize=True,
                 executor=executor,
             )
-        except EarlyFinalized:
+        except _EarlyFinalized:
             return
 
         # todo: hook to handler return

@@ -41,7 +41,7 @@ class Filter:
         super().__init__(*args, **kwargs)
 
         self._call_id = id(self.__call__)
-        self._call_wrapper: CallableWrapper[bool] = CallableWrapper(self.__call__)
+        self._call_wrapper: CallableWrapper[bool | dict[str, Any]] = CallableWrapper(self.__call__)
 
     async def __call__(self, *args: Any, **kwargs: Any) -> bool | dict[str, Any]:
         return True
