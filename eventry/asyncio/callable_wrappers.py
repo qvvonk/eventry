@@ -127,7 +127,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
         # Total list of all arg names, excluding `self` (if callable is a method),
         # *varargs and **varkwargs
         self._arg_names = self._callable.__code__.co_varnames[
-            self._is_method : self._argcount + self._kwonlyargcount
+            self._is_method : self._argcount + self._kwonlyargcount + 1
         ]
 
         self._is_async = bool(self._callable.__code__.co_flags & 0x80)
