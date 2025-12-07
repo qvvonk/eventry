@@ -4,13 +4,20 @@ from __future__ import annotations
 __all__ = ['Router']
 
 
-from collections.abc import Generator
+from collections.abc import Generator, AsyncGenerator
 
 from typing_extensions import TYPE_CHECKING, Any, Self, Type, TypeVar
 
+from eventry.config import DispatcherConfig
 from eventry.loggers import router_logger
+from eventry.exceptions import FinalizingError, _EarlyFinalized
 from eventry.asyncio.handler_manager import HandlerManager
 from eventry.asyncio.callable_wrappers import Handler
+from eventry.asyncio.middleware_manager import (
+    MiddlewaresExecutor,
+    MiddlewareManagerTypes,
+    MiddlewareWrappedCallable,
+)
 
 
 if TYPE_CHECKING:
@@ -28,6 +35,10 @@ class Router:
         self._managers: dict[type[Event], HandlerManager[Any, Any, Any, Self]] = {}
         self._managers_by_id: dict[str, HandlerManager[Any, Any, Any, Self]] = {}
         self._default_handler_manager: HandlerManager[Any, Any, Any, Self] | None = None
+
+    def set_default_handler_manager(self, manager: HandlerManager[Any, Any, Any, Self]):
+        self._default_handler_manager = manager
+        self._managers_by_id[manager.id] = manager
 
     def get_handler_by_id(self, handler_id: str, /) -> Handler[Any, Any] | None:
         for manager in self._managers.values():
@@ -97,6 +108,79 @@ class Router:
                 return self._default_handler_manager
             return self._managers_by_id[item]
         return self.get_handler_manager(item)
+
+    async def propagate_event(
+        self,
+        config: DispatcherConfig,
+        event: Event,
+        event_context: dict[str, Any],
+        silent: bool = False,
+    ) -> AsyncGenerator[Exception, None]:
+        """
+        :raises FinalizingError: If an error occurred during finalizing manager-level middlewares.
+        """
+        manager = self[event]
+        manager_middlewares_executor = MiddlewaresExecutor()
+        wrapped_filter = MiddlewareWrappedCallable(
+            manager.filter.execute,
+            middlewares=manager.collect_middlewares(MiddlewareManagerTypes.MANAGER_OUTER) or [],
+        )
+
+        try:
+            filter_result = await wrapped_filter(
+                callable_args=(
+                    manager._config.filter_positional_only_args,
+                    event_context,
+                ),
+                middlewares_args=manager._config.middleware_positional_only_args,
+                data=event_context,
+                finalize=False,
+                executor=manager_middlewares_executor,
+            )
+        except _EarlyFinalized:
+            filter_result = False
+        except FinalizingError as e:
+            yield e.__cause__
+            return
+
+        if not filter_result:
+            try:
+                await manager_middlewares_executor.finalize_middlewares()
+            except FinalizingError as e:
+                yield e.__cause__
+            return
+
+        wrapped_execute_manager_handlers = MiddlewareWrappedCallable(
+            manager.execute_handlers,
+            middlewares=manager.collect_middlewares(MiddlewareManagerTypes.MANAGER_INNER) or [],
+        )
+
+        try:
+            gen = await wrapped_execute_manager_handlers(
+                callable_args=(config, event, event_context, silent),
+                middlewares_args=manager._config.middleware_positional_only_args,
+                data=event_context,
+                executor=manager_middlewares_executor,
+                finalize=False,
+            )
+        except _EarlyFinalized:
+            return
+        except FinalizingError as e:
+            yield e.__cause__
+            return
+
+        async for exception in gen:
+            yield exception
+
+        if not event.propagation_stopped:
+            for subrouter in self._sub_routers.values():
+                async for e in subrouter.propagate_event(config, event, event_context, silent):
+                    yield e
+
+        try:
+            await manager_middlewares_executor.finalize_middlewares()
+        except FinalizingError as e:
+            yield e.__cause__
 
     @property
     def name(self) -> str:

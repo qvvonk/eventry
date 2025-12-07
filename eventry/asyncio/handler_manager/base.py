@@ -7,9 +7,12 @@ __all__ = [
 
 
 import sys
+import time
+import asyncio
 import inspect
 import pathlib
 from types import MappingProxyType
+from collections import deque
 from collections.abc import Callable, AsyncGenerator
 
 from typing_extensions import (
@@ -22,13 +25,17 @@ from typing_extensions import (
     Optional,
 )
 
-from eventry.config import HandlerManagerConfig
+from eventry.config import DispatcherConfig, HandlerManagerConfig
 from eventry.loggers import router_logger
-from eventry.asyncio.filter import convert_filters
+from eventry.exceptions import FinalizingError
+from eventry.asyncio.filter import Filter, FilterFromFunction, convert_filters
 from eventry.asyncio.default_types import FilterType, HandlerType, MiddlewareType
 from eventry.asyncio.callable_wrappers import Handler, HandlerMeta, CallableWrapper
-from eventry.asyncio.middleware_manager import MiddlewareManager, MiddlewareManagerTypes
-from eventry.asyncio.filter import Filter, FilterFromFunction
+from eventry.asyncio.middleware_manager import (
+    MiddlewareManager,
+    MiddlewaresExecutor,
+    MiddlewareManagerTypes,
+)
 
 
 if TYPE_CHECKING:
@@ -40,6 +47,9 @@ RouterT = TypeVar('RouterT', bound='Router', default='Router')
 HandlerT = TypeVar('HandlerT', bound=HandlerType, default=HandlerType)
 FilterT = TypeVar('FilterT', bound=FilterType, default=FilterType)
 MiddlewareT = TypeVar('MiddlewareT', bound=MiddlewareType, default=MiddlewareType)
+
+
+DummyFilter = FilterFromFunction(lambda *args: True)
 
 
 class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
@@ -89,13 +99,13 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
             MiddlewareManager[MiddlewareT],
         ] = {}
 
-        self._filter: Filter | None = None
+        self._filter: Filter = DummyFilter
 
     def set_filter(self, filter: FilterT | Filter) -> None:
         self._filter = filter if isinstance(filter, Filter) else FilterFromFunction(filter)
 
     def remove_filter(self) -> None:
-        self._filter = None
+        self._filter = DummyFilter
 
     def _create_handler_obj(
         self,
@@ -205,6 +215,24 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
     def middleware_manager(self, _type: MiddlewareManagerTypes) -> MiddlewareManager[Any] | None:
         return self._middleware_managers.get(_type)
 
+    def collect_middlewares(self, _type: MiddlewareManagerTypes) -> deque[MiddlewareT]:
+        total_middlewares: deque[MiddlewareT] = deque()
+        middlewares = self.middleware_manager(_type)
+        if middlewares is None:
+            return total_middlewares
+
+        total_middlewares.extend(middlewares)
+
+        for router in self.router.chain_to_root_router:
+            if router is self.router:
+                continue
+            curr_manager: HandlerManager = router._managers_by_id[self._handler_manager_id]
+            middlewares = curr_manager.middleware_manager(_type)
+            if not middlewares:
+                continue
+            total_middlewares.extendleft(reversed(middlewares.inheritable_middlewares))
+        return total_middlewares
+
     def __call__(
         self,
         filter: Optional[FilterT] = None,
@@ -263,8 +291,116 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         return self._config
 
     @property
-    def filter(self) -> FilterT | None:
+    def filter(self) -> Filter:
         return self._filter
+
+    async def execute_handlers(
+        self,
+        config: DispatcherConfig,
+        event: Event,
+        event_context: dict[str, Any],
+        silent: bool,
+    ) -> AsyncGenerator[Exception, None]:
+        """
+        Executes handling-process middlewares and each handler in this manager
+        (every filter, outer-inner-handler middlewares and handler itself).
+
+        If an unhandled exception occurred during executing filter, outer-inner-handler middlewares
+        or handler itself - yields it (if `silent` is `False`), otherwise ignores it.
+
+        If an exception occurred during handling-process middlewares execution,
+        raises `_EarlyFinalized` exception, if an exception handled by finalizers, otherwise
+        yields it.
+
+        For each handler creates a new copy of `event_context` and adds `handler` and `data` keys.
+
+        Returns a generator of exceptions raised during handler execution.
+        If `silent` is `True` - no exceptions are yielded.
+
+        :raises _EarlyFinalized: If an error occurred during handling-process middlewares execution,
+            but was successfully handled by finalizers.
+        """
+        middlewares_executor = MiddlewaresExecutor()
+        middlewares_executor.add_middlewares(
+            *(self.collect_middlewares(MiddlewareManagerTypes.HANDLING_PROCESS) or []),
+        )
+
+        try:
+            await middlewares_executor.execute_middlewares(
+                middlewares_args=self._config.middleware_positional_only_args,
+                data=event_context,
+            )
+        except FinalizingError as e:
+            yield e.__cause__
+        # except _EarlyFinalized: raise
+        # No other exceptions are expected here.
+
+        async for h in self.get_matching_handlers(event):
+            event_context = {
+                **event_context,
+                config.default_names_remap.get('handler', 'handler'): h,
+            }
+            event_context[config.default_names_remap.get('data', 'data')] = event_context
+
+            try:
+                await self._execute_handler(event, h, event_context=event_context)
+            except Exception as e:
+                if not silent:
+                    yield e
+
+            if event.propagation_stopped:
+                router_logger.debug(f'({id(event)}) Event propagation stopped.')
+                break
+
+        try:
+            await middlewares_executor.finalize_middlewares()
+        except FinalizingError as e:
+            yield e.__cause__
+        # No other exceptions are expected here.
+
+    async def _execute_handler(
+        self,
+        event: Event,
+        handler: Handler[Any],
+        event_context: dict[str, Any],
+    ) -> None:
+        """
+        Executes handler with filter and outer-inner-handler middlewares.
+
+        :raises Exception: If an unhandled exception occurred during executing process and it was
+            not handled by finalizers.
+        """
+        router_logger.debug(
+            '(%d) Executing handler %s -> %s -> %s...',
+            id(event),
+            self.router.name,
+            self.id,
+            handler.id,
+        )
+
+        start = time.time()
+        try:
+            if not handler.as_task:
+                return await handler.execute_wrapped(data=event_context)
+            asyncio.create_task(handler.execute_wrapped(data=event_context))
+        except FinalizingError as e:
+            router_logger.error(
+                '(%d) An error occurred while executing handler %s -> %s -> %s.',
+                id(event),
+                self.router.name,
+                self.id,
+                handler.id,
+                exc_info=e.__cause__,
+            )
+            raise
+        finally:
+            stop = time.time() - start
+            router_logger.debug(
+                "(%d) Handler '%s' executed in %.10f seconds.",
+                id(event),
+                handler.id,
+                stop,
+            )
 
 
 def gen_default_handler_id(

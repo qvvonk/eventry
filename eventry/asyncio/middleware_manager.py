@@ -9,14 +9,15 @@ __all__ = [
 ]
 
 
-from dataclasses import field, dataclass
+from typing import Literal
+from dataclasses import dataclass
 from enum import Enum, auto
 from collections import deque
-from collections.abc import Iterable, Sequence, Awaitable, Generator, AsyncGenerator
+from collections.abc import Iterable, Iterator, Sequence, Awaitable, Generator, AsyncGenerator
 
 from typing_extensions import Any, Union, Generic, TypeVar, Callable, overload
 
-from eventry.exceptions import Return, _EarlyFinalized, FinalizingError
+from eventry.exceptions import Return, FinalizingError, _EarlyFinalized
 from eventry.asyncio.default_types import MiddlewareType
 
 from .callable_wrappers import CallableWrapper, MiddlewareCallable
@@ -27,7 +28,9 @@ R = TypeVar('R', default=Any)
 
 
 class MiddlewareManagerTypes(Enum):
-    GLOBAL = auto()
+    MANAGER_OUTER = auto()
+    MANAGER_INNER = auto()
+    HANDLING_PROCESS = auto()
     OUTER_PER_HANDLER = auto()
     INNER_PER_HANDLER = auto()
 
@@ -43,6 +46,28 @@ class MiddlewareWrappedCallable(Generic[R]):
             __callable if isinstance(__callable, CallableWrapper) else CallableWrapper(__callable)
         )
         self._middlewares = middlewares
+
+    @overload
+    async def __call__(
+        self,
+        callable_args: Sequence[Any],
+        middlewares_args: Sequence[Any],
+        data: dict[str, Any],
+        executor: MiddlewaresExecutor | None = None,
+        finalize_on_callable_exception: bool = True,
+        finalize: Literal[False] = False,
+    ) -> R | None: ...
+
+    @overload
+    async def __call__(
+        self,
+        callable_args: Sequence[Any],
+        middlewares_args: Sequence[Any],
+        data: dict[str, Any],
+        executor: MiddlewaresExecutor | None = None,
+        finalize_on_callable_exception: bool = True,
+        finalize: Literal[True] = True,
+    ) -> Any: ...
 
     async def __call__(
         self,
@@ -61,8 +86,7 @@ class MiddlewareWrappedCallable(Generic[R]):
         1. **Middleware pre-processing**: Executes the first part of all middlewares.
            If an exception occurs during this stage, all already started middlewares
            are finalized. If all finalizers complete without errors, `_EarlyFinalized` is
-           raised with the original exception in `__cause__`. If a finalizer raises
-           an unhandled exception, that exception is propagated instead.
+           raised with the original exception in `__cause__`.
 
         2. **Callable execution**: Calls the original callable wrapped by this object.
            If an exception occurs during execution, all middlewares are finalized,
@@ -82,26 +106,19 @@ class MiddlewareWrappedCallable(Generic[R]):
             exception occurred while executing wrapped callable.
         :param finalize: Whether to finalize middlewares after callable execution.
 
-        :return: The result of the wrapped callable, or None if execution was stopped
-                 by a middleware raising `Return`.
+        :return: The result of wrapped callable, if `finalize` is `False`, otherwise the return
+        of the last finalizer.
 
-        :raises _EarlyFinalized: Raised if a middleware throws an exception during pre-processing,
+        :raises _EarlyFinalized: Raised if the middleware throws an exception during pre-processing,
                             and all finalizers ran without errors.
-        :raises FinalizingError: Raised if an exception occurs during middleware
-                                 finalization after successful callable execution.
-        :raises Exception: todo: if an unhandled exception occurs in finalizer and handler
-        not executed.
+        :raises FinalizingError: Raised if an exception occurs during middleware finalization.
+        :raises Exception: If an exception occurred during callable execution and
+            `finalize_on_callable_exception` is `False`.
         """
         executor = executor or MiddlewaresExecutor()
         executor.add_middlewares(*self._middlewares)
 
-        try:
-            await executor.execute_middlewares(middlewares_args, data)
-        except (Return, _EarlyFinalized) as e:
-            raise _EarlyFinalized from e
-        # propagate outside any other exception
-        # except:
-        #     raise
+        await executor.execute_middlewares(middlewares_args, data)
 
         try:
             result = await self._callable(callable_args, data)
@@ -114,11 +131,7 @@ class MiddlewareWrappedCallable(Generic[R]):
         if not finalize:
             return result
 
-        try:
-            await executor.finalize_middlewares()
-            return result
-        except Exception as e:
-            raise FinalizingError(callable_return=result) from e
+        return await executor.finalize_middlewares(result)
 
 
 @dataclass
@@ -126,12 +139,16 @@ class MiddlewaresExecutor:
     """
     Middlewares executor.
     """
+
     def __init__(self, middlewares: Iterable[CallableWrapper] | None = None) -> None:
-        self.middlewares = [
-            i if isinstance(i, CallableWrapper) else CallableWrapper(i) for i in middlewares
-        ] if middlewares else []
+        self.middlewares = (
+            [i if isinstance(i, CallableWrapper) else CallableWrapper(i) for i in middlewares]
+            if middlewares
+            else []
+        )
         self._middleware_index: int = 0
         self._to_finalize: deque[Generator[Any, Any, Any] | AsyncGenerator[Any, Any]] = deque()
+        self._finalized: bool = False
 
     def __iter__(self) -> MiddlewaresExecutor:
         return self
@@ -147,19 +164,6 @@ class MiddlewaresExecutor:
     def middleware_index(self) -> int:
         return self._middleware_index
 
-    @property
-    def done(self) -> bool:
-        if self._to_finalize:
-            return False
-
-        if len(self.middlewares) == 0:
-            return True
-
-        if self.middleware_index == len(self.middlewares) - 1:
-            return True
-
-        return False
-
     def add_middlewares(self, *middlewares: Callable[..., Any] | CallableWrapper[Any]) -> None:
         for i in middlewares:
             self.middlewares.append(i if isinstance(i, CallableWrapper) else CallableWrapper(i))
@@ -172,78 +176,100 @@ class MiddlewaresExecutor:
         """
         Execute the first part of all middlewares (up to the first `yield` or return).
 
-        If an error occurs while executing, finalizes all started middlewares by running
+        If the `Return` exception was raised, passes value from it to the first finalizer
+        and finalizes all "opened" middlewares.
+
+        If an error occurs while executing, finalizes all "opened" middlewares by running
         their second part (after `yield`) and throws the original exception into them.
 
         If none of the finalizers handle the exception, the original exception is raised.
-        If all finalizers complete without errors, raises `_EarlyFinalized` with the original
-        exception in `__cause__`.
+        If after the finalization process an unhandled exception remains, raises
+        `FinalizingError` with it in `__cause__`.
 
-        If a `Return` exception is raised during execution of a middleware, all started
-        middlewares are finalized and the `Return` exception is propagated.
+        If all finalizers complete without errors, raises `_EarlyFinalized` with the original
+        exception in `__cause__` (including `Return` exception).
 
         :param middlewares_args: Positional arguments to pass to each middleware.
         :param data: Dictionary containing data to pass to middlewares. Updated with
                      middleware results if they return a dict.
 
-        :raises Return: If a middleware explicitly raises `Return`.
         :raises _EarlyFinalized: If an exception occurs during middleware execution and
-                           all finalizers succeed.
+            all finalizers succeed.
+
+        :raises FinalizingError: If an exception occurs during finalization.
         """
         try:
             for curr_middleware in self:
                 gen = await curr_middleware(middlewares_args, data)
-                if not isinstance(gen, Generator | AsyncGenerator):
-                    if isinstance(gen, dict):
-                        data.update(gen)
-                    continue
-
-                r = next(gen) if isinstance(gen, Generator) else await anext(gen)
+                if isinstance(gen, (Generator, AsyncGenerator)):
+                    r = next(gen) if isinstance(gen, Generator) else await anext(gen)
+                    self._to_finalize.appendleft(gen)
+                else:
+                    r = gen
                 if isinstance(r, dict):
                     data.update(r)
-                self._to_finalize.appendleft(gen)
-
-        except Return:
-            await self.finalize_middlewares()
-            raise
         except Exception as e:
-            await self.finalize_middlewares(exception=e)
+            if isinstance(e, Return):
+                await self.finalize_middlewares(value=e.value)
+            else:
+                await self.finalize_middlewares(exception=e)
             raise _EarlyFinalized from e
 
     async def finalize_middlewares(
         self,
+        value: Any = None,
         exception: Exception | None = None,
-    ) -> None:
+    ) -> Any:
         """
         Finalize all started middlewares by executing the second part of generators
         (code after `yield`) in reverse order of their start.
 
-        If an exception is provided, it is thrown into each generator. If a generator
-        raises an exception during finalization, it replaces the previous exception
-        to be propagated.
+        Sending `value` to the first middleware to finalize.
 
-        After all generators are finalized, if any exception remains, it is raised.
+        The returned value of the current finalizer will be sent to the next finalizer. But this
+        works only for synchronous middlewares.
+        For async middlewares raise `Return(value)` exception to return a value.
+
+        If a finalizer raises a `Return` exception, the value from it will be sent to the following
+        finalizer, instead of the original `wrapped_callable_return`.
+
+        If an exception is provided, it will be thrown to the first finalizer. If this finalizer
+        is not handling it, it will be propagated to the next finalizer and so on.
+
+        After all middlewares are finalized, if there is an unhandled exception remaining,
+        `FinalizingError` will be raised with it in `__cause__`.
+
+        :param value: The value returned by the callable,
+        that was wrapped by the middlewares.
 
         :param exception: Optional exception to throw into middleware generators
-                          during finalization.
-        :raises Exception: Any exception raised by a middleware finalizer that was not
-                           handled by earlier finalizers.
+            during finalization.
+
+        :raises FinalizingError: If an exception occurred during finalization,
+            and it *was not handled* by the following finalizers.
+
+        :returns: The return value of the last finalizer or original `value` if there were
+        no middlewares to finalize.
         """
         while self._to_finalize:
             gen = self._to_finalize.popleft()
             try:
                 if isinstance(gen, Generator):
-                    gen.throw(exception) if exception is not None else next(gen)
+                    gen.throw(exception) if exception is not None else gen.send(value)
                 elif isinstance(gen, AsyncGenerator):
-                    await gen.athrow(exception) if exception is not None else await anext(gen)
+                    await gen.athrow(exception) if exception is not None else await gen.asend(
+                        value,
+                    )
                 exception = None
-            except (StopIteration, StopAsyncIteration):
+            except (StopAsyncIteration, StopIteration, Return) as e:
                 exception = None
+                value = e.value if isinstance(e, (StopIteration, Return)) else None
             except Exception as e:
                 exception = e
 
         if exception is not None:
-            raise exception
+            raise FinalizingError from exception
+        return value
 
 
 class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[MiddlewareCallable[Any]]):
@@ -317,6 +343,9 @@ class MiddlewareManager(Generic[MiddlewareTypeT], Sequence[MiddlewareCallable[An
 
     def __bool__(self) -> bool:
         return bool(len(self._middlewares))
+
+    def __reversed__(self) -> Iterator[MiddlewareCallable]:
+        return reversed(self._middlewares)
 
     @property
     def inheritable_middlewares(self) -> tuple[MiddlewareCallable[Any], ...]:

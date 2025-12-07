@@ -11,11 +11,10 @@ __all__ = [
 
 import inspect
 from dataclasses import dataclass
-from collections import deque
+from types import MethodType, FunctionType
 from collections.abc import Callable, Sequence, Awaitable
 
 from typing_extensions import TYPE_CHECKING, Any, Type, Union, Generic, TypeVar
-from types import FunctionType, MethodType
 
 from eventry.config import FromData
 
@@ -51,6 +50,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
         '_arg_names',
         '_is_async',
     )
+
     def __init__(
         self,
         __obj: Callable[..., Union[Awaitable[ReturnTypeT], ReturnTypeT]],
@@ -62,6 +62,10 @@ class CallableWrapper(Generic[ReturnTypeT]):
 
         Supports sync and async functions / objects with sync and async `__call__` method with
         any signature.
+
+        .. warning::
+            Callable wrapper doesn't work with `functools.partial` objects, and callables
+            implemented in C.
 
         Usage:
             >>> import asyncio
@@ -116,12 +120,14 @@ class CallableWrapper(Generic[ReturnTypeT]):
         if not self._callable.__kwdefaults__:
             self._non_default_kwargs_count = self._kwonlyargcount
         else:
-            self._non_default_kwargs_count = self._kwonlyargcount - len(self._callable.__kwdefaults__)
+            self._non_default_kwargs_count = self._kwonlyargcount - len(
+                self._callable.__kwdefaults__
+            )
 
         # Total list of all arg names, excluding `self` (if callable is a method),
         # *varargs and **varkwargs
         self._arg_names = self._callable.__code__.co_varnames[
-            self._is_method:self._argcount + self._kwonlyargcount
+            self._is_method : self._argcount + self._kwonlyargcount
         ]
 
         self._is_async = bool(self._callable.__code__.co_flags & 0x80)
@@ -132,7 +138,9 @@ class CallableWrapper(Generic[ReturnTypeT]):
         data: dict[str, Any] | None = None,
     ) -> ReturnTypeT:
         if len(args) > self._argcount and not self._has_varargs:
-            raise ValueError(f'Too many ({len(args)}) positional arguments. Max: {self._argcount}.')
+            raise ValueError(
+                f'Too many ({len(args)}) positional arguments. Max: {self._argcount}.'
+            )
 
         if data is None:
             data = {}
@@ -160,8 +168,10 @@ class CallableWrapper(Generic[ReturnTypeT]):
             for arg_name_index in range(bound_pos_arg_names_count, self._non_default_args_count):
                 name = self._arg_names[arg_name_index]
                 if name not in data:
-                    raise ValueError(f'Cannot find value in provided data dict '
-                                     f'for non-default positional argument {name!r}.')
+                    raise ValueError(
+                        f'Cannot find value in provided data dict '
+                        f'for non-default positional argument {name!r}.'
+                    )
                 pos_args.append(data[name])
                 bound_pos_arg_names_count += 1
         # At this state all non-default non-kwonly (positional) args are bound.
@@ -178,14 +188,16 @@ class CallableWrapper(Generic[ReturnTypeT]):
             for arg_name_index in range(self._argcount, self._total_argcount):
                 name = self._arg_names[arg_name_index]
                 if name not in data:
-                    raise ValueError(f'Cannot find value in provided data dict '
-                                     f'for non-default kw-only argument {name!r}.')
+                    raise ValueError(
+                        f'Cannot find value in provided data dict '
+                        f'for non-default kw-only argument {name!r}.'
+                    )
                 kwargs[name] = data[name]
         # At this state all non-default kw-only args are bound.
         # We need to find value overrides for positional and kw-only args with existing
         # default values.
 
-        if self._has_varkw: # passing all names except bound positional args to **kwargs
+        if self._has_varkw:  # passing all names except bound positional args to **kwargs
             bound_pos_arg_names = set(self._arg_names[:bound_pos_arg_names_count])
             kwargs.update({k: v for k, v in data.items() if k not in bound_pos_arg_names})
 
@@ -196,7 +208,8 @@ class CallableWrapper(Generic[ReturnTypeT]):
                 if name in data:
                     kwargs[name] = data[name]
             for name_index in range(
-                self._argcount+self._non_default_kwargs_count, self._total_argcount
+                self._argcount + self._non_default_kwargs_count,
+                self._total_argcount,
             ):
                 name = self._arg_names[name_index]
                 if name in data:
@@ -208,7 +221,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
 
 
 class MiddlewareCallable(CallableWrapper[ReturnTypeT]):
-    __slots__ = ('_inheritable', )
+    __slots__ = ('_inheritable',)
 
     def __init__(
         self,
@@ -324,15 +337,21 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
     async def execute_wrapped(
         self,
         data: dict[str, Any] | None = None,
-        inherited_outer_middlewares: deque[MiddlewareCallable[Any]] | None = None,
-        inherited_inner_middlewares: deque[MiddlewareCallable[Any]] | None = None,
     ) -> None:
         """
         Executes current handler wrapped with filter and outer-inner-handler middlewares.
 
         If an exception occurred while executing the filter or handler, finalizes all middlewares
         and returns `None`.
+
         If there is an unhandled exception after middlewares are finalized, raises it.
+
+        :return None: If an exception occurred during the executing process and it *was handled*
+        by middleware finalizers.
+
+        :raises FinalizingError: If an exception occurred during the executing process,
+         and it was *not handled* in middleware finalizers. The original exception will be stored in
+         `FinalizingError.__cause__`.
         """
         from eventry.asyncio.middleware_manager import (
             MiddlewaresExecutor,
@@ -342,18 +361,13 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
 
         data = data if data is not None else {}
 
-        outer_middlewares = inherited_outer_middlewares or deque()
-        inner_middlewares = inherited_inner_middlewares or deque()
-
-        curr_outer = (
-            self.manager.middleware_manager(MiddlewareManagerTypes.OUTER_PER_HANDLER) or []
+        outer_middlewares = self.manager.collect_middlewares(
+            MiddlewareManagerTypes.OUTER_PER_HANDLER,
         )
-        curr_inner = (
-            self.manager.middleware_manager(MiddlewareManagerTypes.INNER_PER_HANDLER) or []
+        inner_middlewares = self.manager.collect_middlewares(
+            MiddlewareManagerTypes.INNER_PER_HANDLER,
         )
-
-        outer_middlewares = outer_middlewares + deque(curr_outer)
-        inner_middlewares = inner_middlewares + deque(curr_inner) + deque(self.middlewares)
+        inner_middlewares.extend(self.middlewares)
 
         executor = MiddlewaresExecutor()
         wrapped_filter = MiddlewareWrappedCallable(self._filter.execute, outer_middlewares)
@@ -371,8 +385,11 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
             )
         except _EarlyFinalized:
             return
+        # except FinalizingError: raise
+        # No other exceptions are expected here.
 
         if not r:
+            # Only FinalizingError can be raised here.
             await executor.finalize_middlewares()
             return
 
@@ -380,13 +397,12 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
 
         try:
             await wrapped_handler(
-                self.manager._config.handler_positional_only_args,
-                self.manager._config.middleware_positional_only_args,
-                data,
-                finalize=True,
+                callable_args=self.manager._config.handler_positional_only_args,
+                middlewares_args=self.manager._config.middleware_positional_only_args,
+                data=data,
                 executor=executor,
             )
         except _EarlyFinalized:
             return
-
-        # todo: hook to handler return
+        # except FinalizingError: raise
+        # No other exceptions are expected here.

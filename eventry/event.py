@@ -5,11 +5,8 @@ __all__ = ['Event', 'ExtendedEvent']
 
 
 from types import MappingProxyType
-from collections import deque
 
 from typing_extensions import Any
-
-from eventry.asyncio.callable_wrappers import MiddlewareCallable
 
 
 class Event:
@@ -19,9 +16,6 @@ class Event:
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.__inherited_outer_middlewares__: deque[MiddlewareCallable] = deque()
-        self.__inherited_inner_middlewares__: deque[MiddlewareCallable] = deque()
-
         self._propagation_stopped = False
 
     def stop_propagation(self) -> None:

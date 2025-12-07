@@ -9,10 +9,12 @@ class DefaultRouter(Router):
     def __init__(self, name: str):
         super().__init__(name=name)
 
-        self._default_handler_manager: DefaultHandlerManager = DefaultHandlerManager(
-            self,
-            handler_manager_id='default',
-            event_type_filter=None,
+        self.set_default_handler_manager(
+            DefaultHandlerManager(
+                self,
+                handler_manager_id='default',
+                event_type_filter=None,
+            ),
         )
 
     @property
