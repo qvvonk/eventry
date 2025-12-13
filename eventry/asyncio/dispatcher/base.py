@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 class Dispatcher(Router):
     def __init__(
         self,
-        error_event_factory: Callable[[Exception], Event],
+        error_event_factory: Callable[[Event, Exception], Event],
         workflow_data: dict[str, Any] | None = None,
         config: DispatcherConfig | None = None,
     ) -> None:
@@ -29,7 +29,7 @@ class Dispatcher(Router):
 
         self._workflow_data = workflow_data if workflow_data is not None else {}
         self._config = config or DispatcherConfig()
-        self._error_event_factory: Callable[[Exception], Event] = error_event_factory
+        self._error_event_factory: Callable[[Event, Exception], Event] = error_event_factory
 
     async def event_entry(
         self,
@@ -56,7 +56,7 @@ class Dispatcher(Router):
                 continue
 
             try:
-                error_event = self._error_event_factory(exception)
+                error_event = self._error_event_factory(event, exception)
             except Exception as e:
                 dispatcher_logger.error(f'An error occurred while creating error event: {e}')
                 continue

@@ -1,6 +1,6 @@
 [project]
 name = "eventry"
-version = "0.2.3"
+version = "0.2.4"
 description = "sync/async event bus implementation with no dependencies."
 requires-python = ">=3.10"
 
