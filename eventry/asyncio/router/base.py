@@ -125,6 +125,10 @@ class Router:
             manager.filter.execute,
             middlewares=manager.collect_middlewares(MiddlewareManagerTypes.MANAGER_OUTER) or [],
         )
+        event_context = {
+            **event_context,
+            config.default_names_remap.get('router', 'router'): self,
+        }
 
         try:
             filter_result = await wrapped_filter(
