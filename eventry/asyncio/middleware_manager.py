@@ -201,18 +201,18 @@ class MiddlewaresExecutor:
         try:
             for curr_middleware in self:
                 gen = await curr_middleware(middlewares_args, data)
-                if isinstance(gen, (Generator, AsyncGenerator)):
-                    r = next(gen) if isinstance(gen, Generator) else await anext(gen)
-                    self._to_finalize.appendleft(gen)
-                else:
-                    r = gen
+                try:
+                    if isinstance(gen, (Generator, AsyncGenerator)):
+                        r = next(gen) if isinstance(gen, Generator) else await anext(gen)
+                        self._to_finalize.appendleft(gen)
+                    else:
+                        r = gen
+                except (StopIteration, StopAsyncIteration, Return) as e:
+                    r = e.value if isinstance(e, (StopIteration, Return)) else None
                 if isinstance(r, dict):
                     data.update(r)
         except Exception as e:
-            if isinstance(e, Return):
-                await self.finalize_middlewares(value=e.value)
-            else:
-                await self.finalize_middlewares(exception=e)
+            await self.finalize_middlewares(exception=e)
             raise _EarlyFinalized from e
 
     async def finalize_middlewares(
