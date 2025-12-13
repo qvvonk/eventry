@@ -34,4 +34,5 @@ class FinalizingError(Exception):
     pass
 
 
-class _HandlerFound(Exception): pass
+class _HandlerFound(Exception):
+    pass

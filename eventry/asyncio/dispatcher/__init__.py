@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 
-__all__ = ['Dispatcher', 'DefaultDispatcher', 'ErrorContext', 'ErrorEvent']
+__all__ = ['Dispatcher', 'DefaultDispatcher', 'ErrorEvent']
 
 
-from .base import Dispatcher, ErrorContext
+from .base import Dispatcher
 from .default import ErrorEvent, DefaultDispatcher

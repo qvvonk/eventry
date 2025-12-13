@@ -4,9 +4,7 @@ from __future__ import annotations
 __all__ = ['Dispatcher', 'ErrorContext']
 
 
-from dataclasses import dataclass
 from collections.abc import Callable
-from functools import cmp_to_key
 
 from typing_extensions import TYPE_CHECKING, Any
 
@@ -17,7 +15,7 @@ from eventry.asyncio.router import Router
 
 
 if TYPE_CHECKING:
-    from eventry.asyncio.callable_wrappers import Handler
+    pass
 
 
 class Dispatcher(Router):

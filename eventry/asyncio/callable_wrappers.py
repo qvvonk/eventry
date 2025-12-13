@@ -121,7 +121,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
             self._non_default_kwargs_count = self._kwonlyargcount
         else:
             self._non_default_kwargs_count = self._kwonlyargcount - len(
-                self._callable.__kwdefaults__
+                self._callable.__kwdefaults__,
             )
 
         # Total list of all arg names, excluding `self` (if callable is a method),
@@ -139,7 +139,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
     ) -> ReturnTypeT:
         if len(args) > self._argcount and not self._has_varargs:
             raise ValueError(
-                f'Too many ({len(args)}) positional arguments. Max: {self._argcount}.'
+                f'Too many ({len(args)}) positional arguments. Max: {self._argcount}.',
             )
 
         if data is None:
@@ -170,7 +170,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
                 if name not in data:
                     raise ValueError(
                         f'Cannot find value in provided data dict '
-                        f'for non-default positional argument {name!r}.'
+                        f'for non-default positional argument {name!r}.',
                     )
                 pos_args.append(data[name])
                 bound_pos_arg_names_count += 1
@@ -190,7 +190,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
                 if name not in data:
                     raise ValueError(
                         f'Cannot find value in provided data dict '
-                        f'for non-default kw-only argument {name!r}.'
+                        f'for non-default kw-only argument {name!r}.',
                     )
                 kwargs[name] = data[name]
         # At this state all non-default kw-only args are bound.

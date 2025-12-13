@@ -9,25 +9,27 @@ from typing_extensions import Any
 from eventry.asyncio.event import ExtendedEvent
 from eventry.asyncio.router import DefaultRouter
 
-from .base import Dispatcher, ErrorContext
+from .base import Dispatcher
 
 
 class ErrorEvent(ExtendedEvent):
-    def __init__(self, context: ErrorContext) -> None:
+    def __init__(self, exception: Exception) -> None:
         super().__init__()
-        self._context = context
+        self._exception = exception
 
     @property
-    def context(self) -> ErrorContext:
-        return self._context
+    def exception(self) -> Exception:
+        return self._exception
 
     @property
     def event_context_injection(self) -> dict[str, Any]:
-        return {'context': self.context}
+        return {
+            'exception': self._exception,
+        }
 
 
-def error_event_factory(context: ErrorContext) -> ErrorEvent:
-    return ErrorEvent(context)
+def error_event_factory(exception: Exception) -> ErrorEvent:
+    return ErrorEvent(exception)
 
 
 class DefaultDispatcher(Dispatcher, DefaultRouter):
