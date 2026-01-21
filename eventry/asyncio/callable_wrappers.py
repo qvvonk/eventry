@@ -278,7 +278,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
         __obj: Callable[..., Union[Awaitable[ReturnTypeT], ReturnTypeT]],
         /,
         handler_id: str,
-        handler_manager: HandlerManager,
+        handler_manager: HandlerManager[Any, Any, Any],
         event_filter: EventFilter | None,
         filter: Union[Filter, None],
         middlewares: list[CallableWrapper[Any]],

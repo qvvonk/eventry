@@ -8,6 +8,12 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from typing_extensions import Any
+from collections import defaultdict
+
+
+if TYPE_CHECKING:
+    from eventry.asyncio.middleware_manager import MiddlewareManagerTypes
+    from eventry.asyncio.handler_manager import HandlerManager
 
 
 class EventBase:
@@ -41,6 +47,34 @@ class Event(EventBase, name='event'):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._propagation_stopped = False
+
+        self.__inherited_middlewares__: dict[
+            MiddlewareManagerTypes,
+            dict[HandlerManager, list[Any]]
+        ] = defaultdict(lambda: defaultdict(list))
+
+    def __enter_manager__(self, handler_manager: HandlerManager) -> None:
+        from eventry.asyncio.middleware_manager import MiddlewareManagerTypes
+
+        for i in MiddlewareManagerTypes:
+            manager = handler_manager.middleware_manager(i)
+            if manager is None:
+                continue
+            self.__inherited_middlewares__[i][handler_manager].extend(
+                manager.inheritable_middlewares
+            )
+
+    def __exit_manager__(self, handler_manager: HandlerManager) -> None:
+        for middleware_type, data in self.__inherited_middlewares__.items():
+            if handler_manager in data:
+                del self.__inherited_middlewares__[middleware_type][handler_manager]
+
+    def __get_inherited_middlewares__(self, middleware_type: MiddlewareManagerTypes) -> list[Any]:
+        return [
+            mdw
+            for mdw_list in self.__inherited_middlewares__[middleware_type].values()
+            for mdw in mdw_list
+        ]
 
     def stop_propagation(self) -> None:
         """
@@ -118,3 +152,5 @@ class ExtendedEvent(Event, name='event'):
     @property
     def data(self) -> MappingProxyType[Any, Any]:
         return MappingProxyType(self._data)
+
+

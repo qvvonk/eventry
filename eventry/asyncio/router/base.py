@@ -32,14 +32,17 @@ class Router:
         self._name = name
         self._parent: Self | None = None
         self._sub_routers: dict[str, Self] = {}
-        self._handler_managers: dict[type[Event], HandlerManager[Any, Any, Any, Self]] = {}
+        self._handler_managers: dict[str, HandlerManager[Any, Any, Any, Self]] = {}
         self._default_handler_manager: HandlerManager[Any, Any, Any, Self] | None = None
 
     def set_default_handler_manager(self, manager: HandlerManager[Any, Any, Any, Self]):
+        if self._default_handler_manager is not None:
+            raise RuntimeError('Default handler manager already set.')
+
         self._default_handler_manager = manager
         self._handler_managers[manager.name] = manager
 
-    def get_handler_by_id(self, handler_id: str, /) -> Handler[Any, Any] | None:
+    def get_handler_by_id(self, handler_id: str, /) -> Handler[Any] | None:
         for manager in self._handler_managers.values():
             if handler_id in manager.handlers:
                 return manager.handlers[handler_id]
@@ -51,48 +54,30 @@ class Router:
         return None
 
     def _add_handler_manager(self, handler_manager: HandlerManagerT, /) -> HandlerManagerT:
-        if not handler_manager.event_type_filter:
-            raise ValueError(
-                'Cannot add handler manager without event type filter. '
-                'Assign it as default handler manager.',
-            )  # todo: improve
+        # if not handler_manager.event_filter:
+        #     raise ValueError(
+        #         'Cannot add handler manager without event type filter. '
+        #         'Assign it as default handler manager.',
+        #     )
+        # todo: warning
 
-        if handler_manager.name in self._managers_by_id or (
-            self._default_handler_manager
-            and self._default_handler_manager.name == handler_manager.name
-        ):
+        if handler_manager.name in self._handler_managers:
             raise ValueError(
                 f'Manager with name {handler_manager.name!r} already added to router {self._name!r}. ',
             )
 
-        self._handler_managers[handler_manager.event_type_filter] = handler_manager
-        self._managers_by_id[handler_manager.name] = handler_manager
+        self._handler_managers[handler_manager.name] = handler_manager
         return handler_manager
 
-    def get_handler_manager(
-        self,
-        event: Event | Type[Event],
-        /,
-    ) -> HandlerManager[Any, Any, Any, Self]:
-        event_type = event if isinstance(event, type) else type(event)
-        if event_type in self._handler_managers:
-            return self._handler_managers[event_type]
-
-        for i in self._handler_managers:
-            if issubclass(event_type, i):
-                return self._handler_managers[i]
+    def get_handler_manager(self, event: Event, /) -> HandlerManager[Any, Any, Any, Self] | None:
+        for i in self._handler_managers.values():
+            if i.check_event(event):
+                return i
 
         if self._default_handler_manager:
             return self._default_handler_manager
 
-        raise RuntimeError('No handler manager with this event type.')  # todo
-
-    def _get_handler_managers_to_tail(
-        self,
-        event: Event,
-    ) -> Generator[HandlerManager[Any, Any, Any, Self], None]:
-        for router in self.chain_to_tails:
-            yield router.get_handler_manager(event)
+        return None
 
     def connect_router(self, router: Router) -> None:
         router.parent_router = self
@@ -101,11 +86,7 @@ class Router:
         for i in routers:
             i.parent_router = self
 
-    def __getitem__(self, item: str | Event | type[Event]) -> HandlerManager[Any, Any, Any, Self]:
-        if isinstance(item, str):
-            if self._default_handler_manager and self._default_handler_manager.name == item:
-                return self._default_handler_manager
-            return self._managers_by_id[item]
+    def __getitem__(self, item: Event) -> HandlerManager[Any, Any, Any, Self] | None:
         return self.get_handler_manager(item)
 
     async def propagate_event(
@@ -119,7 +100,41 @@ class Router:
         :raises FinalizingError: If an error occurred during finalizing manager-level middlewares.
         """
         manager = self[event]
-        manager_middlewares_executor = MiddlewaresExecutor()
+        manager_middlewares_executor = None
+
+        if manager is not None:
+            manager_middlewares_executor = MiddlewaresExecutor()
+            async for i in  self._inner_propagate_event(
+                config,
+                event,
+                event_context,
+                manager,
+                manager_middlewares_executor,
+                silent=silent,
+            ):
+                yield i
+
+        if not event.propagation_stopped:
+            for subrouter in self._sub_routers.values():
+                async for e in subrouter.propagate_event(config, event, event_context, silent):
+                    yield e
+
+        if manager_middlewares_executor:
+            try:
+                await manager_middlewares_executor.finalize_middlewares()
+            except FinalizingError as e:
+                yield e.__cause__
+
+    async def _inner_propagate_event(
+        self,
+        config: DispatcherConfig,
+        event: Event,
+        event_context: dict[str, Any],
+        manager: HandlerManager,
+        manager_middlewares_executor: MiddlewaresExecutor,
+        silent: bool = False,
+    ):
+
         wrapped_filter = MiddlewareWrappedCallable(
             manager.filter.execute,
             middlewares=manager.collect_middlewares(MiddlewareManagerTypes.MANAGER_OUTER) or [],
@@ -174,16 +189,6 @@ class Router:
 
         async for exception in gen:
             yield exception
-
-        if not event.propagation_stopped:
-            for subrouter in self._sub_routers.values():
-                async for e in subrouter.propagate_event(config, event, event_context, silent):
-                    yield e
-
-        try:
-            await manager_middlewares_executor.finalize_middlewares()
-        except FinalizingError as e:
-            yield e.__cause__
 
     @property
     def name(self) -> str:

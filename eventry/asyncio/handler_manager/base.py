@@ -72,7 +72,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
     Handlers can be registered via ``@manager`` / ``@manager(...)`` decorators.
 
     :param router: The `Router` instance this manager is associated with.
-    :param event_name-filter: # todo
+    :param event_filter: event filter.
     """
 
     def __init__(
@@ -88,7 +88,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         :param event_filter: event name filter.
         :param config: `HandlerManagerConfig` instance.
         """
-        self._handlers: dict[str, Handler[Any, Self]] = {}
+        self._handlers: dict[str, Handler[Any]] = {}
         self._router = router
         self._event_filter = event_filter
         self._name = name
@@ -124,20 +124,24 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         as_task: bool = False,
         meta: HandlerMeta | None = None,
     ) -> Handler[Any]:
-        handler_obj = Handler(handler,
-                              handler_id=handler_id or gen_default_handler_id(handler, self),
-                              handler_manager=self, event_filter=event_filter,
-                              filter=convert_filters([filter])[0] if filter is not None else None,
-                              middlewares=[CallableWrapper(i) for i in middlewares]
-                              if middlewares is not None
-                              else [], as_task=as_task, meta=meta
-                                                             or HandlerMeta.from_callable(
+        handler_obj = Handler(
+            handler,
+            handler_id=handler_id or gen_default_handler_id(handler, self),
+            handler_manager=self,
+            event_filter=event_filter,
+            filter=convert_filters([filter])[0] if filter is not None else None,
+            middlewares=[CallableWrapper(i) for i in middlewares]
+            if middlewares is not None
+            else [],
+            as_task=as_task,
+            meta=meta or HandlerMeta.from_callable(
                 _callable=handler,
                 registration_frame=inspect.stack()[1],
-            ))
+            )
+        )
         return handler_obj
 
-    def _register_handler(self, handler: Handler[Any, Self]) -> None:
+    def _register_handler(self, handler: Handler[Any]) -> None:
         """
         Registers handler to this handler manager.
 
@@ -170,10 +174,10 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
             f"[{self.router.name} -> {self.name}] Registered handler '{handler.id}'.",
         )
 
-    def get_handler(self, handler_id: str) -> Handler[Any, Self] | None:
+    def get_handler(self, handler_id: str) -> Handler[Any] | None:
         return self._handlers.get(handler_id, None)
 
-    def remove_handler(self, handler_id: str) -> Handler[Any, Self] | None:
+    def remove_handler(self, handler_id: str) -> Handler[Any] | None:
         """
         Removes handler from this handler manager.
 
@@ -181,10 +185,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         """
         return self._handlers.pop(handler_id, None)
 
-    async def get_matching_handlers(
-        self,
-        event: Event,
-    ) -> AsyncGenerator[Handler[Any, Self], None]:
+    async def get_matching_handlers(self, event: Event) -> AsyncGenerator[Handler[Any], None]:
         """
         Iterates through all registered handlers and yields those whose filters
         match the given event.
@@ -195,7 +196,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         """
 
         for handler in self._handlers.values():
-            if handler.event_filter is not None and type(event) != handler.event_filter:
+            if not handler.check_event(event):
                 continue
             yield handler
 
@@ -234,7 +235,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         filter: Optional[FilterT] = None,
         /,
         *,
-        on_event: Type[Event] | None = None,
+        event_filter: EventFilter | None = None,
         handler_id: str | None = None,
         middlewares: list[MiddlewareT] | None = None,
         as_task: bool = False,
@@ -244,17 +245,23 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
                 handler,
                 registration_frame=inspect.stack()[1],
             )
-            handler_obj = self._create_handler_obj(handler=handler, event_filter=on_event,
-                                                   handler_id=handler_id, filter=filter,
-                                                   middlewares=middlewares, as_task=as_task,
-                                                   meta=meta)
+            handler_obj = self._create_handler_obj(
+                handler=handler,
+                event_filter=event_filter,
+                handler_id=handler_id,
+                filter=filter,
+                middlewares=middlewares,
+                as_task=as_task,
+                meta=meta
+            )
+
             self._register_handler(handler_obj)
             return handler
 
         return inner
 
     @property
-    def handlers(self) -> MappingProxyType[str, Handler[Any, Self]]:
+    def handlers(self) -> MappingProxyType[str, Handler[Any]]:
         """
         A read-only mapping of handler IDs to their corresponding ``Handler`` instances,
         registered in this manager.
@@ -358,7 +365,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         """
         Executes handler with filter and outer-inner-handler middlewares.
 
-        :raises Exception: If an unhandled exception occurred during executing process and it was
+        :raises Exception: If an unhandled exception occurred during executing process, and it was
             not handled by finalizers.
         """
         router_logger.debug(
