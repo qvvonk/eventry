@@ -21,17 +21,19 @@ class EventBase:
         __event_name__: str
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
-        if 'name' not in kwargs:
-            raise TypeError(f'{cls.__name__} must be defined with keyword argument \'name\'.')
+        name = kwargs.pop('name', None)
 
-        name = kwargs.pop('name')
-        if not isinstance(name, str):
-            raise ValueError(
-                f'Event name for class {cls.__name__} must be a string, '
-                f'got {type(name).__name__}.'
-            )
+        if not getattr(cls, '__event_name__', None):
+            if name is None:
+                raise TypeError(f'{cls.__name__} must be defined with keyword argument \'name\'.')
 
-        cls.__event_name__ = name
+            if not isinstance(name, str):
+                raise ValueError(
+                    f'Event name for class {cls.__name__} must be a string, '
+                    f'got {type(name).__name__}.'
+                )
+
+            cls.__event_name__ = name
         super().__init_subclass__(**kwargs)
 
     @property
