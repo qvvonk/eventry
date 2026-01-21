@@ -32,68 +32,52 @@ class Router:
         self._name = name
         self._parent: Self | None = None
         self._sub_routers: dict[str, Self] = {}
-        self._managers: dict[type[Event], HandlerManager[Any, Any, Any, Self]] = {}
-        self._managers_by_id: dict[str, HandlerManager[Any, Any, Any, Self]] = {}
+        self._handler_managers: dict[str, HandlerManager[Any, Any, Any, Self]] = {}
         self._default_handler_manager: HandlerManager[Any, Any, Any, Self] | None = None
 
     def set_default_handler_manager(self, manager: HandlerManager[Any, Any, Any, Self]):
-        self._default_handler_manager = manager
-        self._managers_by_id[manager.id] = manager
+        if self._default_handler_manager is not None:
+            raise RuntimeError('Default handler manager already set.')
 
-    def get_handler_by_id(self, handler_id: str, /) -> Handler[Any, Any] | None:
-        for manager in self._managers.values():
+        self._default_handler_manager = manager
+        self._handler_managers[manager.name] = manager
+
+    def get_handler(self, handler_id: str, /) -> Handler[Any] | None:
+        for manager in self._handler_managers.values():
             if handler_id in manager.handlers:
                 return manager.handlers[handler_id]
 
         for router in self._sub_routers.values():
-            result = router.get_handler_by_id(handler_id)
+            result = router.get_handler(handler_id)
             if result is not None:
                 return result
         return None
 
     def _add_handler_manager(self, handler_manager: HandlerManagerT, /) -> HandlerManagerT:
-        if not handler_manager.event_type_filter:
-            raise ValueError(
-                'Cannot add handler manager without event type filter. '
-                'Assign it as default handler manager.',
-            )  # todo: improve
+        # if not handler_manager.event_filter:
+        #     raise ValueError(
+        #         'Cannot add handler manager without event type filter. '
+        #         'Assign it as default handler manager.',
+        #     )
+        # todo: warning
 
-        if handler_manager.id in self._managers_by_id or (
-            self._default_handler_manager
-            and self._default_handler_manager.id == handler_manager.id
-        ):
+        if handler_manager.name in self._handler_managers:
             raise ValueError(
-                f'Manager with id {handler_manager.id!r} already added to router {self._name!r}. ',
+                f'Manager with name {handler_manager.name!r} already added to router {self._name!r}. ',
             )
 
-        self._managers[handler_manager.event_type_filter] = handler_manager
-        self._managers_by_id[handler_manager.id] = handler_manager
+        self._handler_managers[handler_manager.name] = handler_manager
         return handler_manager
 
-    def get_handler_manager(
-        self,
-        event: Event | Type[Event],
-        /,
-    ) -> HandlerManager[Any, Any, Any, Self]:
-        event_type = event if isinstance(event, type) else type(event)
-        if event_type in self._managers:
-            return self._managers[event_type]
-
-        for i in self._managers:
-            if issubclass(event_type, i):
-                return self._managers[i]
+    def get_handler_manager(self, event: Event, /) -> HandlerManager[Any, Any, Any, Self] | None:
+        for i in self._handler_managers.values():
+            if i.check_event(event):
+                return i
 
         if self._default_handler_manager:
             return self._default_handler_manager
 
-        raise RuntimeError('No handler manager with this event type.')  # todo
-
-    def _get_handler_managers_to_tail(
-        self,
-        event: Event,
-    ) -> Generator[HandlerManager[Any, Any, Any, Self], None]:
-        for router in self.chain_to_tails:
-            yield router.get_handler_manager(event)
+        return None
 
     def connect_router(self, router: Router) -> None:
         router.parent_router = self
@@ -102,11 +86,7 @@ class Router:
         for i in routers:
             i.parent_router = self
 
-    def __getitem__(self, item: str | Event | type[Event]) -> HandlerManager[Any, Any, Any, Self]:
-        if isinstance(item, str):
-            if self._default_handler_manager and self._default_handler_manager.id == item:
-                return self._default_handler_manager
-            return self._managers_by_id[item]
+    def __getitem__(self, item: Event) -> HandlerManager[Any, Any, Any, Self] | None:
         return self.get_handler_manager(item)
 
     async def propagate_event(
@@ -119,11 +99,52 @@ class Router:
         """
         :raises FinalizingError: If an error occurred during finalizing manager-level middlewares.
         """
+        router_logger.debug('Event %s entering router %s.', id(event), self.name)
         manager = self[event]
-        manager_middlewares_executor = MiddlewaresExecutor()
+        manager_middlewares_executor = None
+
+        if manager is not None:
+            router_logger.debug('Found suitable handler manager for event %s.', id(event))
+            manager_middlewares_executor = MiddlewaresExecutor()
+            async for i in self._inner_propagate_event(
+                config,
+                event,
+                event_context,
+                manager,
+                manager_middlewares_executor,
+                silent=silent,
+            ):
+                yield i
+
+        if not event.propagation_stopped:
+            if manager is not None:
+                event.__inherit_manager__(manager)
+            for subrouter in self._sub_routers.values():
+                async for e in subrouter.propagate_event(config, event, event_context, silent):
+                    yield e
+
+        if manager is not None:
+            event.__renounce_manager__(manager)
+
+        if manager_middlewares_executor:
+            try:
+                await manager_middlewares_executor.finalize_middlewares()
+            except FinalizingError as e:
+                yield e.__cause__
+
+    async def _inner_propagate_event(
+        self,
+        config: DispatcherConfig,
+        event: Event,
+        event_context: dict[str, Any],
+        manager: HandlerManager,
+        manager_middlewares_executor: MiddlewaresExecutor,
+        silent: bool = False,
+    ):
+
         wrapped_filter = MiddlewareWrappedCallable(
             manager.filter.execute,
-            middlewares=manager.collect_middlewares(MiddlewareManagerTypes.MANAGER_OUTER) or [],
+            middlewares=manager.collect_middlewares(MiddlewareManagerTypes.MANAGER_OUTER, event),
         )
         event_context = {
             **event_context,
@@ -156,7 +177,7 @@ class Router:
 
         wrapped_execute_manager_handlers = MiddlewareWrappedCallable(
             manager.execute_handlers,
-            middlewares=manager.collect_middlewares(MiddlewareManagerTypes.MANAGER_INNER) or [],
+            middlewares=manager.collect_middlewares(MiddlewareManagerTypes.MANAGER_INNER, event),
         )
 
         try:
@@ -175,16 +196,6 @@ class Router:
 
         async for exception in gen:
             yield exception
-
-        if not event.propagation_stopped:
-            for subrouter in self._sub_routers.values():
-                async for e in subrouter.propagate_event(config, event, event_context, silent):
-                    yield e
-
-        try:
-            await manager_middlewares_executor.finalize_middlewares()
-        except FinalizingError as e:
-            yield e.__cause__
 
     @property
     def name(self) -> str:
@@ -308,6 +319,4 @@ class Router:
         self._parent = router
         router._sub_routers[self.name] = self
 
-        router_logger.info(
-            f"Router '{self.name}' connected to router '{router.name}'.",
-        )
+        router_logger.info('Router %s connected to router %s.', self.name, router.name)

@@ -13,7 +13,7 @@ class DefaultRouter(Router):
             DefaultHandlerManager(
                 self,
                 handler_manager_id='default',
-                event_type_filter=None,
+                event_filter=None,
             ),
         )
 

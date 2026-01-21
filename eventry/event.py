@@ -3,13 +3,43 @@ from __future__ import annotations
 
 __all__ = ['Event', 'ExtendedEvent']
 
-
+from collections.abc import Iterator
 from types import MappingProxyType
+from typing import TYPE_CHECKING
 
 from typing_extensions import Any
+from collections import defaultdict
 
 
-class Event:
+if TYPE_CHECKING:
+    from eventry.asyncio.middleware_manager import MiddlewareManagerTypes
+    from eventry.asyncio.handler_manager import HandlerManager
+
+
+class EventBase:
+    if TYPE_CHECKING:
+        __event_name__: str
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        if 'name' not in kwargs:
+            raise TypeError(f'{cls.__name__} must be defined with keyword argument \'name\'.')
+
+        name = kwargs.pop('name')
+        if not isinstance(name, str):
+            raise ValueError(
+                f'Event name for class {cls.__name__} must be a string, '
+                f'got {type(name).__name__}.'
+            )
+
+        cls.__event_name__ = name
+        super().__init_subclass__(**kwargs)
+
+    @property
+    def name(self) -> str:
+        return self.__event_name__
+
+
+class Event(EventBase, name='event'):
     """
     Base event class.
     """
@@ -17,6 +47,34 @@ class Event:
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._propagation_stopped = False
+
+        self.__inherited_middlewares__: dict[
+            MiddlewareManagerTypes,
+            dict[HandlerManager, list[Any]]
+        ] = defaultdict(lambda: defaultdict(list))
+
+    def __inherit_manager__(self, handler_manager: HandlerManager) -> None:
+        from eventry.asyncio.middleware_manager import MiddlewareManagerTypes
+
+        for i in MiddlewareManagerTypes:
+            manager = handler_manager.middleware_manager(i)
+            if manager is None:
+                continue
+            self.__inherited_middlewares__[i][handler_manager].extend(
+                manager.inheritable_middlewares
+            )
+
+    def __renounce_manager__(self, handler_manager: HandlerManager) -> None:
+        for middleware_type, data in self.__inherited_middlewares__.items():
+            if handler_manager in data:
+                del self.__inherited_middlewares__[middleware_type][handler_manager]
+
+    def __get_inherited_middlewares__(self, middleware_type: MiddlewareManagerTypes) -> list[Any]:
+        return [
+            mdw
+            for mdw_list in self.__inherited_middlewares__[middleware_type].values()
+            for mdw in mdw_list
+        ]
 
     def stop_propagation(self) -> None:
         """
@@ -49,7 +107,7 @@ class Event:
         return self._propagation_stopped
 
 
-class ExtendedEvent(Event):
+class ExtendedEvent(Event, name='event'):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """
         Extended event class with flags and data features.
@@ -67,6 +125,9 @@ class ExtendedEvent(Event):
 
     def __contains__(self, key: Any) -> bool:
         return key in self._data
+
+    def __iter__(self) -> Iterator[Any]:
+        return iter(self._data)
 
     def set_flag(self, flag: Any) -> None:
         self._flags.add(flag)
@@ -91,3 +152,5 @@ class ExtendedEvent(Event):
     @property
     def data(self) -> MappingProxyType[Any, Any]:
         return MappingProxyType(self._data)
+
+
