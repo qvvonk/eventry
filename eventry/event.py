@@ -3,13 +3,37 @@ from __future__ import annotations
 
 __all__ = ['Event', 'ExtendedEvent']
 
-
+from collections.abc import Iterator
 from types import MappingProxyType
+from typing import TYPE_CHECKING
 
 from typing_extensions import Any
 
 
-class Event:
+class EventBase:
+    if TYPE_CHECKING:
+        __event_name__: str
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        if 'name' not in kwargs:
+            raise TypeError(f'{cls.__name__} must be defined with keyword argument \'name\'.')
+
+        name = kwargs.pop('name')
+        if not isinstance(name, str):
+            raise ValueError(
+                f'Event name for class {cls.__name__} must be a string, '
+                f'got {type(name).__name__}.'
+            )
+
+        cls.__event_name__ = name
+        super().__init_subclass__(**kwargs)
+
+    @property
+    def event_name(self) -> str:
+        return self.__event_name__
+
+
+class Event(EventBase, name='event'):
     """
     Base event class.
     """
@@ -49,7 +73,7 @@ class Event:
         return self._propagation_stopped
 
 
-class ExtendedEvent(Event):
+class ExtendedEvent(Event, name='event'):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """
         Extended event class with flags and data features.
@@ -67,6 +91,9 @@ class ExtendedEvent(Event):
 
     def __contains__(self, key: Any) -> bool:
         return key in self._data
+
+    def __iter__(self) -> Iterator[Any]:
+        return iter(self._data)
 
     def set_flag(self, flag: Any) -> None:
         self._flags.add(flag)
