@@ -32,16 +32,15 @@ class Router:
         self._name = name
         self._parent: Self | None = None
         self._sub_routers: dict[str, Self] = {}
-        self._managers: dict[type[Event], HandlerManager[Any, Any, Any, Self]] = {}
-        self._managers_by_id: dict[str, HandlerManager[Any, Any, Any, Self]] = {}
+        self._handler_managers: dict[type[Event], HandlerManager[Any, Any, Any, Self]] = {}
         self._default_handler_manager: HandlerManager[Any, Any, Any, Self] | None = None
 
     def set_default_handler_manager(self, manager: HandlerManager[Any, Any, Any, Self]):
         self._default_handler_manager = manager
-        self._managers_by_id[manager.id] = manager
+        self._handler_managers[manager.name] = manager
 
     def get_handler_by_id(self, handler_id: str, /) -> Handler[Any, Any] | None:
-        for manager in self._managers.values():
+        for manager in self._handler_managers.values():
             if handler_id in manager.handlers:
                 return manager.handlers[handler_id]
 
@@ -58,16 +57,16 @@ class Router:
                 'Assign it as default handler manager.',
             )  # todo: improve
 
-        if handler_manager.id in self._managers_by_id or (
+        if handler_manager.name in self._managers_by_id or (
             self._default_handler_manager
-            and self._default_handler_manager.id == handler_manager.id
+            and self._default_handler_manager.name == handler_manager.name
         ):
             raise ValueError(
-                f'Manager with id {handler_manager.id!r} already added to router {self._name!r}. ',
+                f'Manager with name {handler_manager.name!r} already added to router {self._name!r}. ',
             )
 
-        self._managers[handler_manager.event_type_filter] = handler_manager
-        self._managers_by_id[handler_manager.id] = handler_manager
+        self._handler_managers[handler_manager.event_type_filter] = handler_manager
+        self._managers_by_id[handler_manager.name] = handler_manager
         return handler_manager
 
     def get_handler_manager(
@@ -76,12 +75,12 @@ class Router:
         /,
     ) -> HandlerManager[Any, Any, Any, Self]:
         event_type = event if isinstance(event, type) else type(event)
-        if event_type in self._managers:
-            return self._managers[event_type]
+        if event_type in self._handler_managers:
+            return self._handler_managers[event_type]
 
-        for i in self._managers:
+        for i in self._handler_managers:
             if issubclass(event_type, i):
-                return self._managers[i]
+                return self._handler_managers[i]
 
         if self._default_handler_manager:
             return self._default_handler_manager
@@ -104,7 +103,7 @@ class Router:
 
     def __getitem__(self, item: str | Event | type[Event]) -> HandlerManager[Any, Any, Any, Self]:
         if isinstance(item, str):
-            if self._default_handler_manager and self._default_handler_manager.id == item:
+            if self._default_handler_manager and self._default_handler_manager.name == item:
                 return self._default_handler_manager
             return self._managers_by_id[item]
         return self.get_handler_manager(item)

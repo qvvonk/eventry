@@ -29,7 +29,7 @@ class EventBase:
         super().__init_subclass__(**kwargs)
 
     @property
-    def event_name(self) -> str:
+    def name(self) -> str:
         return self.__event_name__
 
 

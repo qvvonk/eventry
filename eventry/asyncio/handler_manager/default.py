@@ -31,11 +31,8 @@ class DefaultHandlerManager(HandlerManager[FilterT, HandlerT, MiddlewareT, Route
         handler_manager_id: str,
         event_type_filter: Type[Event] | None = None,
     ):
-        super().__init__(
-            router=router,
-            handler_manager_id=handler_manager_id,
-            event_type_filter=event_type_filter,
-        )
+        super().__init__(router=router, name=handler_manager_id,
+                         event_type_filter=event_type_filter)
 
         self._add_middleware_manager(MiddlewareManagerTypes.MANAGER_OUTER, MiddlewareManager())
         self._add_middleware_manager(MiddlewareManagerTypes.MANAGER_INNER, MiddlewareManager())

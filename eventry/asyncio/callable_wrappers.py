@@ -25,16 +25,9 @@ if TYPE_CHECKING:
     from .event import Event
     from .filter import Filter
     from .handler_manager import HandlerManager
-
-
-HandlerManagerTypeT = TypeVar(
-    'HandlerManagerTypeT',
-    default='HandlerManager[Any, Any, Any, Any]',
-    bound='HandlerManager[Any, Any, Any, Any]',
-)
+    from .handler_manager.base import EventFilter
 
 ReturnTypeT = TypeVar('ReturnTypeT', default=Any)
-
 
 class CallableWrapper(Generic[ReturnTypeT]):
     __slots__ = (
@@ -269,7 +262,7 @@ class HandlerMeta:
         )
 
 
-class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerTypeT]):
+class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
     __slots__ = (
         '_handler_manager',
         '_handler_id',
@@ -277,7 +270,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
         '_middlewares',
         '_as_task',
         '_filter',
-        '_on_event',
+        '_event_filter',
     )
 
     def __init__(
@@ -285,13 +278,19 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
         __obj: Callable[..., Union[Awaitable[ReturnTypeT], ReturnTypeT]],
         /,
         handler_id: str,
-        handler_manager: HandlerManagerTypeT,
-        on_event: Type[Event] | None,
+        handler_manager: HandlerManager,
+        event_filter: EventFilter | None,
         filter: Union[Filter, None],
         middlewares: list[CallableWrapper[Any]],
         as_task: bool,
         meta: HandlerMeta,
     ):
+        if event_filter is not None and handler_manager.event_filter is not None:
+            raise ValueError(
+                'An event filter is already defined for this handler manager; '
+                'specifying another event filter is not allowed.'
+            )
+
         from eventry.asyncio.filter import FilterFromFunction
 
         super().__init__(__obj)
@@ -301,13 +300,10 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
         self._middlewares = middlewares
         self._as_task = as_task
         self._filter = filter if filter is not None else FilterFromFunction(lambda *args: True)
-
-        if self._handler_manager.event_type_filter and on_event:
-            raise ValueError('')  # todo: err message
-        self._on_event = on_event
+        self._event_filter = event_filter
 
     @property
-    def manager(self) -> HandlerManagerTypeT:
+    def manager(self) -> HandlerManager:
         return self._handler_manager
 
     @property
@@ -327,12 +323,20 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT, HandlerManagerT
         return self._handler_id
 
     @property
-    def on_event(self) -> Type[Event] | None:
-        return self.manager.event_type_filter or self._on_event
+    def event_filter(self) -> EventFilter | None:
+        return self.manager.event_filter or self._event_filter
 
     @property
     def middlewares(self) -> list[CallableWrapper[Any]]:
         return self._middlewares
+
+    def check_event(self, event: Event) -> bool:
+        if self.event_filter is None:
+            return True
+        elif isinstance(self.event_filter, str):
+            return self.event_filter == event.name
+
+        return self.event_filter(event)
 
     async def execute_wrapped(
         self,

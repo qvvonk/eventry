@@ -50,6 +50,8 @@ MiddlewareT = TypeVar('MiddlewareT', bound=MiddlewareType, default=MiddlewareTyp
 
 
 DummyFilter = FilterFromFunction(lambda *args: True)
+EventFilterCallable = Callable[[Event], bool]
+EventFilter = EventFilterCallable | str
 
 
 class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
@@ -70,29 +72,26 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
     Handlers can be registered via ``@manager`` / ``@manager(...)`` decorators.
 
     :param router: The `Router` instance this manager is associated with.
-    :param event_type_filter:
-        Optional ``Event`` type to restrict the handlers managed by this instance.
-        If set, only events of this exact type (``type(event) is event_type_filter``)
-        will be processed.
+    :param event_name-filter: # todo
     """
 
     def __init__(
         self,
         router: RouterT,
-        handler_manager_id: str,
-        event_type_filter: Type[Event] | None = None,
+        name: str,
+        event_filter: EventFilter | None = None,
         config: HandlerManagerConfig | None = None,
     ) -> None:
         """
         :param router: `Router` instance this manager is associated with.
-        :param handler_manager_id: handler manager ID (name).
-        :param event_type_filter: event type.
+        :param name: handler manager name.
+        :param event_filter: event name filter.
         :param config: `HandlerManagerConfig` instance.
         """
         self._handlers: dict[str, Handler[Any, Self]] = {}
         self._router = router
-        self._event_type_filter = event_type_filter
-        self._handler_manager_id = handler_manager_id
+        self._event_filter = event_filter
+        self._name = name
         self._config = config or HandlerManagerConfig()
         self._middleware_managers: dict[
             MiddlewareManagerTypes,
@@ -107,38 +106,35 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
     def remove_filter(self) -> None:
         self._filter = DummyFilter
 
+    def check_event(self, event: Event) -> bool:
+        if self.event_filter is None:
+            return True
+        if isinstance(self.event_filter, str):
+            return self.event_filter == event.name
+
+        return self.event_filter(event)
+
     def _create_handler_obj(
         self,
         handler: HandlerT,
-        on_event: Type[Event] | None = None,
+        event_filter: EventFilter | None = None,
         handler_id: str | None = None,
         filter: Optional[FilterT] = None,
         middlewares: list[MiddlewareT] | None = None,
         as_task: bool = False,
         meta: HandlerMeta | None = None,
-    ) -> Handler[Any, Self]:
-        if self._event_type_filter is not None and on_event is not None:
-            raise ValueError(
-                'Event type specification is not allowed in handler managers with '
-                'event type filter.\n',
-            )
-
-        handler_obj = Handler(
-            handler,
-            handler_id=handler_id or gen_default_handler_id(handler, self),
-            handler_manager=self,
-            on_event=on_event,
-            filter=convert_filters([filter])[0] if filter is not None else None,
-            middlewares=[CallableWrapper(i) for i in middlewares]
-            if middlewares is not None
-            else [],
-            as_task=as_task,
-            meta=meta
-            or HandlerMeta.from_callable(
+    ) -> Handler[Any]:
+        handler_obj = Handler(handler,
+                              handler_id=handler_id or gen_default_handler_id(handler, self),
+                              handler_manager=self, event_filter=event_filter,
+                              filter=convert_filters([filter])[0] if filter is not None else None,
+                              middlewares=[CallableWrapper(i) for i in middlewares]
+                              if middlewares is not None
+                              else [], as_task=as_task, meta=meta
+                                                             or HandlerMeta.from_callable(
                 _callable=handler,
                 registration_frame=inspect.stack()[1],
-            ),
-        )
+            ))
         return handler_obj
 
     def _register_handler(self, handler: Handler[Any, Self]) -> None:
@@ -171,7 +167,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
             )
         self._handlers[handler.id] = handler
         router_logger.info(
-            f"[{self.router.name} -> {self.id}] Registered handler '{handler.id}'.",
+            f"[{self.router.name} -> {self.name}] Registered handler '{handler.id}'.",
         )
 
     def get_handler(self, handler_id: str) -> Handler[Any, Self] | None:
@@ -199,7 +195,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         """
 
         for handler in self._handlers.values():
-            if handler.on_event is not None and type(event) != handler.on_event:
+            if handler.event_filter is not None and type(event) != handler.event_filter:
                 continue
             yield handler
 
@@ -226,7 +222,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         for router in self.router.chain_to_root_router:
             if router is self.router:
                 continue
-            curr_manager: HandlerManager = router._managers_by_id[self._handler_manager_id]
+            curr_manager: HandlerManager = router._managers_by_id[self._name]
             middlewares = curr_manager.middleware_manager(_type)
             if not middlewares:
                 continue
@@ -248,15 +244,10 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
                 handler,
                 registration_frame=inspect.stack()[1],
             )
-            handler_obj = self._create_handler_obj(
-                handler=handler,
-                handler_id=handler_id,
-                as_task=as_task,
-                filter=filter,
-                on_event=on_event,
-                middlewares=middlewares,
-                meta=meta,
-            )
+            handler_obj = self._create_handler_obj(handler=handler, event_filter=on_event,
+                                                   handler_id=handler_id, filter=filter,
+                                                   middlewares=middlewares, as_task=as_task,
+                                                   meta=meta)
             self._register_handler(handler_obj)
             return handler
 
@@ -279,12 +270,12 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         return self._router
 
     @property
-    def id(self) -> str:
-        return self._handler_manager_id
+    def name(self) -> str:
+        return self._name
 
     @property
-    def event_type_filter(self) -> Type[Event] | None:
-        return self._event_type_filter
+    def event_filter(self) -> EventFilter | None:
+        return self._event_filter
 
     @property
     def config(self) -> HandlerManagerConfig:
@@ -374,7 +365,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
             '(%d) Executing handler %s -> %s -> %s...',
             id(event),
             self.router.name,
-            self.id,
+            self.name,
             handler.id,
         )
 
@@ -388,7 +379,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
                 '(%d) An error occurred while executing handler %s -> %s -> %s.',
                 id(event),
                 self.router.name,
-                self.id,
+                self.name,
                 handler.id,
                 exc_info=e.__cause__,
             )
@@ -424,4 +415,4 @@ def gen_default_handler_id(
 
     module_path = '.'.join(rel_path.parts)
 
-    return f'{manager.router.name}.{manager.id}--{module_path}.{handler.__qualname__}'
+    return f'{manager.router.name}.{manager.name}--{module_path}.{handler.__qualname__}'
