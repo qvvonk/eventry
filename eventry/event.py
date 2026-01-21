@@ -33,6 +33,7 @@ class EventBase:
                     f'got {type(name).__name__}.'
                 )
 
+        if name is not None:
             cls.__event_name__ = name
         super().__init_subclass__(**kwargs)
 

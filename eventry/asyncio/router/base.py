@@ -71,7 +71,7 @@ class Router:
 
     def get_handler_manager(self, event: Event, /) -> HandlerManager[Any, Any, Any, Self] | None:
         for i in self._handler_managers.values():
-            if i.check_event(event):
+            if i is not self._default_handler_manager and i.check_event(event):
                 return i
 
         if self._default_handler_manager:
@@ -104,7 +104,11 @@ class Router:
         manager_middlewares_executor = None
 
         if manager is not None:
-            router_logger.debug('Found suitable handler manager for event %s.', id(event))
+            router_logger.debug(
+                'Found suitable handler manager for event %s: %s.',
+                id(event),
+                manager.name
+            )
             manager_middlewares_executor = MiddlewaresExecutor()
             async for i in self._inner_propagate_event(
                 config,
