@@ -42,13 +42,13 @@ class Router:
         self._default_handler_manager = manager
         self._handler_managers[manager.name] = manager
 
-    def get_handler_by_id(self, handler_id: str, /) -> Handler[Any] | None:
+    def get_handler(self, handler_id: str, /) -> Handler[Any] | None:
         for manager in self._handler_managers.values():
             if handler_id in manager.handlers:
                 return manager.handlers[handler_id]
 
         for router in self._sub_routers.values():
-            result = router.get_handler_by_id(handler_id)
+            result = router.get_handler(handler_id)
             if result is not None:
                 return result
         return None
@@ -99,11 +99,11 @@ class Router:
         """
         :raises FinalizingError: If an error occurred during finalizing manager-level middlewares.
         """
+        router_logger.debug('Entering router %s.', self.name)
         manager = self[event]
         manager_middlewares_executor = None
 
         if manager is not None:
-            event.__enter_manager__(manager)
             manager_middlewares_executor = MiddlewaresExecutor()
             async for i in self._inner_propagate_event(
                 config,
@@ -116,12 +116,14 @@ class Router:
                 yield i
 
         if not event.propagation_stopped:
+            if manager is not None:
+                event.__inherit_manager__(manager)
             for subrouter in self._sub_routers.values():
                 async for e in subrouter.propagate_event(config, event, event_context, silent):
                     yield e
 
         if manager is not None:
-            event.__exit_manager__(manager)
+            event.__renounce_manager__(manager)
 
         if manager_middlewares_executor:
             try:

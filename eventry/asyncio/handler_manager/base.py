@@ -153,7 +153,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         """
         root_router = self.router.root_router
 
-        if (exists_handler := root_router.get_handler_by_id(handler.id)) is not None:
+        if (exists_handler := root_router.get_handler(handler.id)) is not None:
             raise ValueError(
                 f'Handler with ID {handler.id} already exists.\n'
                 f"Original handler registered in router '{exists_handler.manager.router.name}':\n"
@@ -171,17 +171,6 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         router_logger.info(
             f"[{self.router.name} -> {self.name}] Registered handler '{handler.id}'.",
         )
-
-    def get_handler(self, handler_id: str) -> Handler[Any] | None:
-        return self._handlers.get(handler_id, None)
-
-    def remove_handler(self, handler_id: str) -> Handler[Any] | None:
-        """
-        Removes handler from this handler manager.
-
-        :returns: deleted ``Handler`` instance or ``None``, if ID was not found.
-        """
-        return self._handlers.pop(handler_id, None)
 
     async def get_matching_handlers(self, event: Event) -> AsyncGenerator[Handler[Any], None]:
         """

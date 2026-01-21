@@ -53,7 +53,7 @@ class Event(EventBase, name='event'):
             dict[HandlerManager, list[Any]]
         ] = defaultdict(lambda: defaultdict(list))
 
-    def __enter_manager__(self, handler_manager: HandlerManager) -> None:
+    def __inherit_manager__(self, handler_manager: HandlerManager) -> None:
         from eventry.asyncio.middleware_manager import MiddlewareManagerTypes
 
         for i in MiddlewareManagerTypes:
@@ -64,7 +64,7 @@ class Event(EventBase, name='event'):
                 manager.inheritable_middlewares
             )
 
-    def __exit_manager__(self, handler_manager: HandlerManager) -> None:
+    def __renounce_manager__(self, handler_manager: HandlerManager) -> None:
         for middleware_type, data in self.__inherited_middlewares__.items():
             if handler_manager in data:
                 del self.__inherited_middlewares__[middleware_type][handler_manager]
