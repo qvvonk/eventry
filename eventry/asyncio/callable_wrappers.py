@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from .filter import Filter
     from .handler_manager import HandlerManager
     from .handler_manager.base import EventFilter
+    from eventry.asyncio.event import Event
 
 ReturnTypeT = TypeVar('ReturnTypeT', default=Any)
 
@@ -340,6 +341,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
 
     async def execute_wrapped(
         self,
+        event: Event,
         data: dict[str, Any] | None = None,
     ) -> None:
         """
@@ -366,10 +368,10 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
         data = data if data is not None else {}
 
         outer_middlewares = self.manager.collect_middlewares(
-            MiddlewareManagerTypes.OUTER_PER_HANDLER,
+            MiddlewareManagerTypes.OUTER_PER_HANDLER, event
         )
         inner_middlewares = self.manager.collect_middlewares(
-            MiddlewareManagerTypes.INNER_PER_HANDLER,
+            MiddlewareManagerTypes.INNER_PER_HANDLER, event
         )
         inner_middlewares.extend(self.middlewares)
 

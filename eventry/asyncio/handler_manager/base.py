@@ -12,14 +12,11 @@ import asyncio
 import inspect
 import pathlib
 from types import MappingProxyType
-from collections import deque
 from collections.abc import Callable, AsyncGenerator
 
 from typing_extensions import (
     TYPE_CHECKING,
     Any,
-    Self,
-    Type,
     Generic,
     TypeVar,
     Optional,
@@ -42,6 +39,9 @@ if TYPE_CHECKING:
     from eventry.asyncio.event import Event
     from eventry.asyncio.router.base import Router
 
+    EventFilterCallable = Callable[[Event], bool]
+    EventFilter = EventFilterCallable | str
+
 
 RouterT = TypeVar('RouterT', bound='Router', default='Router')
 HandlerT = TypeVar('HandlerT', bound=HandlerType, default=HandlerType)
@@ -50,8 +50,6 @@ MiddlewareT = TypeVar('MiddlewareT', bound=MiddlewareType, default=MiddlewareTyp
 
 
 DummyFilter = FilterFromFunction(lambda *args: True)
-EventFilterCallable = Callable[[Event], bool]
-EventFilter = EventFilterCallable | str
 
 
 class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
@@ -212,22 +210,13 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
     def middleware_manager(self, _type: MiddlewareManagerTypes) -> MiddlewareManager[Any] | None:
         return self._middleware_managers.get(_type)
 
-    def collect_middlewares(self, _type: MiddlewareManagerTypes) -> deque[MiddlewareT]:
-        total_middlewares: deque[MiddlewareT] = deque()
+    def collect_middlewares(self, _type: MiddlewareManagerTypes, event: Event) -> list[MiddlewareT]:
+        total_middlewares: list[MiddlewareT] = event.__get_inherited_middlewares__(_type)
         middlewares = self.middleware_manager(_type)
         if middlewares is None:
             return total_middlewares
 
         total_middlewares.extend(middlewares)
-
-        for router in self.router.chain_to_root_router:
-            if router is self.router:
-                continue
-            curr_manager: HandlerManager = router._managers_by_id[self._name]
-            middlewares = curr_manager.middleware_manager(_type)
-            if not middlewares:
-                continue
-            total_middlewares.extendleft(reversed(middlewares.inheritable_middlewares))
         return total_middlewares
 
     def __call__(
@@ -320,7 +309,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         """
         middlewares_executor = MiddlewaresExecutor()
         middlewares_executor.add_middlewares(
-            *(self.collect_middlewares(MiddlewareManagerTypes.HANDLING_PROCESS) or []),
+            *(self.collect_middlewares(MiddlewareManagerTypes.HANDLING_PROCESS, event)),
         )
 
         try:
@@ -379,8 +368,8 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         start = time.time()
         try:
             if not handler.as_task:
-                return await handler.execute_wrapped(data=event_context)
-            asyncio.create_task(handler.execute_wrapped(data=event_context))
+                return await handler.execute_wrapped(event, data=event_context)
+            asyncio.create_task(handler.execute_wrapped(event, data=event_context))
         except FinalizingError as e:
             router_logger.error(
                 '(%d) An error occurred while executing handler %s -> %s -> %s.',

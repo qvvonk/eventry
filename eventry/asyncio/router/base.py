@@ -103,8 +103,9 @@ class Router:
         manager_middlewares_executor = None
 
         if manager is not None:
+            event.__enter_manager__(manager)
             manager_middlewares_executor = MiddlewaresExecutor()
-            async for i in  self._inner_propagate_event(
+            async for i in self._inner_propagate_event(
                 config,
                 event,
                 event_context,
@@ -118,6 +119,9 @@ class Router:
             for subrouter in self._sub_routers.values():
                 async for e in subrouter.propagate_event(config, event, event_context, silent):
                     yield e
+
+        if manager is not None:
+            event.__exit_manager__(manager)
 
         if manager_middlewares_executor:
             try:
@@ -137,7 +141,7 @@ class Router:
 
         wrapped_filter = MiddlewareWrappedCallable(
             manager.filter.execute,
-            middlewares=manager.collect_middlewares(MiddlewareManagerTypes.MANAGER_OUTER) or [],
+            middlewares=manager.collect_middlewares(MiddlewareManagerTypes.MANAGER_OUTER, event),
         )
         event_context = {
             **event_context,
@@ -170,7 +174,7 @@ class Router:
 
         wrapped_execute_manager_handlers = MiddlewareWrappedCallable(
             manager.execute_handlers,
-            middlewares=manager.collect_middlewares(MiddlewareManagerTypes.MANAGER_INNER) or [],
+            middlewares=manager.collect_middlewares(MiddlewareManagerTypes.MANAGER_INNER, event),
         )
 
         try:
