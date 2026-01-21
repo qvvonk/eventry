@@ -325,7 +325,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
                     yield e
 
             if event.propagation_stopped:
-                router_logger.debug(f'({id(event)}) Event propagation stopped.')
+                router_logger.debug(f'Propagation for event %s has been stopped.', id(event))
                 break
 
         try:

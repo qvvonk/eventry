@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-__all__ = ['Dispatcher', 'ErrorContext']
+__all__ = ['Dispatcher']
 
 
 from collections.abc import Callable
@@ -37,7 +37,7 @@ class Dispatcher(Router):
         event_context_injection: dict[str, Any] | None = None,
         silent: bool = False,
     ) -> None:
-        dispatcher_logger.debug(f'New event {id(event)}: {type(event)}')
+        dispatcher_logger.debug(f'New event %s: %s', event.name, id(event))
 
         if event_context_injection is None:
             event_context_injection = {}
@@ -57,8 +57,11 @@ class Dispatcher(Router):
 
             try:
                 error_event = self._error_event_factory(event, exception)
-            except Exception as e:
-                dispatcher_logger.error(f'An error occurred while creating error event: {e}')
+            except:
+                dispatcher_logger.error(
+                    f'An error occurred while creating error event.',
+                    exc_info=True
+                )
                 continue
 
             await self.event_entry(error_event, silent=True)

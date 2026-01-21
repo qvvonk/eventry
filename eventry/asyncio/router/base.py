@@ -99,11 +99,12 @@ class Router:
         """
         :raises FinalizingError: If an error occurred during finalizing manager-level middlewares.
         """
-        router_logger.debug('Entering router %s.', self.name)
+        router_logger.debug('Event %s entering router %s.', id(event), self.name)
         manager = self[event]
         manager_middlewares_executor = None
 
         if manager is not None:
+            router_logger.debug('Found suitable handler manager for event %s.', id(event))
             manager_middlewares_executor = MiddlewaresExecutor()
             async for i in self._inner_propagate_event(
                 config,
@@ -318,6 +319,4 @@ class Router:
         self._parent = router
         router._sub_routers[self.name] = self
 
-        router_logger.info(
-            f"Router '{self.name}' connected to router '{router.name}'.",
-        )
+        router_logger.info('Router %s connected to router %s.', self.name, router.name)
