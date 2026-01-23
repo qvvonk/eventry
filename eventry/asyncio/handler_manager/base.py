@@ -362,11 +362,12 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         start = time.time()
         try:
             if not handler.as_task:
-                await handler.execute_wrapped(event, data=event_context)
-            return asyncio.create_task(
-                handler.execute_wrapped(event, data=event_context),
-                name=f'eventry_handler_task: {handler._handler_id}'
-            )
+                return await handler.execute_wrapped(event, data=event_context)
+            else:
+                return asyncio.create_task(
+                    handler.execute_wrapped(event, data=event_context),
+                    name=f'eventry_handler_task: {handler._handler_id}'
+                )
         except FinalizingError as e:
             router_logger.error(
                 '(%d) An error occurred while executing handler %s -> %s -> %s.',
