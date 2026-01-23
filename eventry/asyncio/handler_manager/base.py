@@ -276,7 +276,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         event: Event,
         event_context: dict[str, Any],
         silent: bool,
-    ) -> AsyncGenerator[Exception, None]:
+    ) -> AsyncGenerator[Exception | asyncio.Task[Any], None]:
         """
         Executes handling-process middlewares and each handler in this manager
         (every filter, outer-inner-handler middlewares and handler itself).
@@ -319,10 +319,15 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
             event_context[config.default_names_remap.get('data', 'data')] = event_context
 
             try:
-                await self._execute_handler(event, h, event_context=event_context)
+                result = await self._execute_handler(event, h, event_context=event_context)
+                if isinstance(result, asyncio.Task):
+                    yield result
             except Exception as e:
                 if not silent:
-                    yield e
+                    if isinstance(e, FinalizingError) and e.__cause__:
+                        yield e.__cause__
+                    else:
+                        yield e
 
             if event.propagation_stopped:
                 router_logger.debug(f'Propagation for event %s has been stopped.', id(event))
@@ -338,8 +343,8 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         self,
         event: Event,
         handler: Handler[Any],
-        event_context: dict[str, Any],
-    ) -> None:
+        event_context: dict[str, Any]
+    ) -> asyncio.Task[Any] | None:
         """
         Executes handler with filter and outer-inner-handler middlewares.
 
@@ -358,7 +363,10 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         try:
             if not handler.as_task:
                 return await handler.execute_wrapped(event, data=event_context)
-            asyncio.create_task(handler.execute_wrapped(event, data=event_context))
+            return asyncio.create_task(
+                handler.execute_wrapped(event, data=event_context),
+                name=f'eventry_handler_task: {handler._handler_id}'
+            )
         except FinalizingError as e:
             router_logger.error(
                 '(%d) An error occurred while executing handler %s -> %s -> %s.',

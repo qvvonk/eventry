@@ -198,8 +198,8 @@ class Router:
             yield e.__cause__
             return
 
-        async for exception in gen:
-            yield exception
+        async for task_or_exception in gen:
+            yield task_or_exception
 
     @property
     def name(self) -> str:
