@@ -362,7 +362,7 @@ class HandlerManager(Generic[FilterT, HandlerT, MiddlewareT, RouterT]):
         start = time.time()
         try:
             if not handler.as_task:
-                return await handler.execute_wrapped(event, data=event_context)
+                await handler.execute_wrapped(event, data=event_context)
             return asyncio.create_task(
                 handler.execute_wrapped(event, data=event_context),
                 name=f'eventry_handler_task: {handler._handler_id}'

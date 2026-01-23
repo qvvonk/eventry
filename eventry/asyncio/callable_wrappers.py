@@ -399,6 +399,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
             await executor.finalize_middlewares()
             return
 
+        event.__handled__ = True  # todo: move it inside middlewares execution with dummy function
         wrapped_handler = MiddlewareWrappedCallable(self._callable, inner_middlewares)
 
         try:

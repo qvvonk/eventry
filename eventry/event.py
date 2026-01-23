@@ -20,6 +20,8 @@ class EventBase:
     if TYPE_CHECKING:
         __event_name__: str
 
+    __handled__: bool = False
+
     def __init_subclass__(cls, **kwargs: Any) -> None:
         name = kwargs.pop('name', None)
 

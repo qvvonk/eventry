@@ -52,7 +52,12 @@ class Dispatcher(Router):
         }
         event_context[self._config.default_names_remap.get('data', 'data')] = event_context
 
-        async for task_or_exception in self.propagate_event(self._config, event, event_context, silent):
+        async for task_or_exception in self.propagate_event(
+            self._config,
+            event,
+            event_context,
+            silent
+        ):
             if isinstance(task_or_exception, asyncio.Task):
                 task_or_exception.add_done_callback(
                     partial(self._task_done_callback_wrapped, event, silent)
@@ -80,6 +85,7 @@ class Dispatcher(Router):
     ) -> None:
         try:
             task.result()
+            event.__handled__ = True
         except Exception as e:
             if not silent:
                 await self._propagate_error_event(event, e)
@@ -103,3 +109,7 @@ class Dispatcher(Router):
             return
 
         await self.event_entry(error_event, silent=True)
+        if not error_event.__handled__:
+            dispatcher_logger.error(
+                f'An error occurred while propagating event %s.', id(event), exc_info=True
+            )
