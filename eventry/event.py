@@ -23,11 +23,13 @@ class EventBase:
     __handled__: bool = False
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
-        name = kwargs.pop('name', None)
+        name = kwargs.pop('event_name', None)
 
         if not getattr(cls, '__event_name__', None):
             if name is None:
-                raise TypeError(f'{cls.__name__} must be defined with keyword argument \'name\'.')
+                raise TypeError(
+                    f'{cls.__name__} must be defined with keyword argument \'event_name\'.'
+                )
 
             if not isinstance(name, str):
                 raise ValueError(
