@@ -12,7 +12,7 @@ from eventry.asyncio.router import DefaultRouter
 from .base import Dispatcher
 
 
-class ErrorEvent(ExtendedEvent, name='error'):
+class ErrorEvent(ExtendedEvent, event_name='error'):
     def __init__(self, event: Event, exception: Exception) -> None:
         super().__init__()
         self._exception = exception
@@ -34,9 +34,6 @@ class ErrorEvent(ExtendedEvent, name='error'):
 
 
 def error_event_factory(event: Event, exception: Exception) -> ErrorEvent:
-    import traceback
-    print(exception)
-    print(exception.__traceback__)
     return ErrorEvent(event, exception)
 
 
