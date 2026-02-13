@@ -46,7 +46,7 @@ class EventBase:
         return self.__event_name__
 
 
-class Event(EventBase, name='event'):
+class Event(EventBase, event_name='event'):
     """
     Base event class.
     """
@@ -114,7 +114,7 @@ class Event(EventBase, name='event'):
         return self._propagation_stopped
 
 
-class ExtendedEvent(Event, name='event'):
+class ExtendedEvent(Event, event_name='event'):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """
         Extended event class with flags and data features.
