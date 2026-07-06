@@ -215,7 +215,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
             if self._init_wrapper is not None:
                 pos_args, kwargs = self._init_wrapper.collect_args(args, data)
             else:
-                pos_args, kwargs = (), {}
+                pos_args, kwargs = [], {}
             instance = self._class(*pos_args, **kwargs)
             _callable = instance.__call__
 
