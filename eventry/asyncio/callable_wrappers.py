@@ -19,7 +19,7 @@ class FromData(str): ...
 class CallableWrapper(Generic[ReturnTypeT]):
     def __init__(
         self,
-        __obj: Callable[..., ReturnTypeT] | Callable[..., Awaitable[ReturnTypeT]],
+        __obj: Callable[..., Awaitable[ReturnTypeT]] | Callable[..., ReturnTypeT],
         /,
         *,
         init_method: bool = False,
