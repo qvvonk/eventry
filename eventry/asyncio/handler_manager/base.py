@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from eventry.loggers import router_logger
 from eventry.asyncio.filter import Filter, FilterFromFunction, convert_filters, dummy_filter
-from eventry.asyncio.callable_wrappers import Handler
+from eventry.asyncio.callable_wrappers import Handler, Inheritable, InheritableMark
 from eventry.config import HandlerManagerConfig
 
 

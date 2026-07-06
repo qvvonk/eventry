@@ -2,10 +2,14 @@ from __future__ import annotations
 __all__ = [
     'CallableWrapper',
     'FromData',
+    'Handler',
+    'MiddlewareCallable',
+    'Inheritable'
 ]
 
 
-from typing import Generic, TypeVar, TYPE_CHECKING, Any
+from enum import StrEnum
+from typing import Generic, TypeVar, TYPE_CHECKING, Any, Literal
 from collections.abc import Callable, Awaitable, Sequence
 from types import MethodType, FunctionType
 import inspect
@@ -234,6 +238,30 @@ class CallableWrapper(Generic[ReturnTypeT]):
     @property
     def is_class(self) -> bool:
         return self._class is not None
+
+
+class Inheritable(StrEnum):
+    ALL = 'all'
+    DIRECT = 'direct'
+    NONE = 'none'
+
+
+InheritableMark = Inheritable | Literal['all', 'direct', 'none'] | Literal[False]
+
+
+class MiddlewareCallable(CallableWrapper[ReturnTypeT]):
+    def __init__(
+        self,
+        __obj: Callable[..., Awaitable[ReturnTypeT]] | Callable[..., ReturnTypeT],
+        /,
+        inheritable: InheritableMark = False,
+    ) -> None:
+        super().__init__(__obj)
+        self._inheritable = Inheritable(inheritable) if inheritable is not False else Inheritable.NONE
+
+    @property
+    def inheritable(self) -> Inheritable:
+        return self._inheritable
 
 
 class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
