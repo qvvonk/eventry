@@ -1,13 +1,20 @@
+from __future__ import annotations
 __all__ = [
     'CallableWrapper',
     'FromData',
 ]
 
 
-from typing import Generic, TypeVar, Any
+from typing import Generic, TypeVar, TYPE_CHECKING, Any
 from collections.abc import Callable, Awaitable, Sequence
 from types import MethodType, FunctionType
 import inspect
+
+
+if TYPE_CHECKING:
+    from eventry.asyncio.filter import Filter
+    from eventry.asyncio.handler_manager.base import EventFilter
+    from eventry.event import Event
 
 
 ReturnTypeT = TypeVar('ReturnTypeT')
@@ -227,3 +234,46 @@ class CallableWrapper(Generic[ReturnTypeT]):
     @property
     def is_class(self) -> bool:
         return self._class is not None
+
+
+class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
+    def __init__(
+        self,
+        __obj: Callable[..., Awaitable[ReturnTypeT]] | Callable[..., ReturnTypeT],
+        /,
+        handler_id: str,
+        event_filter: EventFilter | None,
+        filter: Filter | None,
+        as_task: bool,
+    ):
+        from eventry.asyncio.filter import dummy_filter
+
+        super().__init__(__obj)
+        self._handler_id = handler_id
+        self._as_task = as_task
+        self._filter = filter if filter is not None else dummy_filter()
+        self._event_filter = event_filter
+
+    @property
+    def filter(self) -> Filter:
+        return self._filter
+
+    @property
+    def as_task(self) -> bool:
+        return self._as_task
+
+    @property
+    def id(self) -> str:
+        return self._handler_id
+
+    @property
+    def event_filter(self) -> EventFilter | None:
+        return self._event_filter
+
+    def check_event(self, event: Event) -> bool:
+        if self.event_filter is None:
+            return True
+        elif isinstance(self.event_filter, str):
+            return self.event_filter == event.name
+
+        return self.event_filter(event)

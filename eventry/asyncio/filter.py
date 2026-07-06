@@ -10,6 +10,7 @@ __all__ = [
     'any_of',
     'all_of',
     'not_',
+    'dummy_filter',
 ]
 
 
@@ -157,6 +158,10 @@ class FilterFromFunction(LogicalFilter):
     def __init__(self, function: CallableFilter) -> None:
         setattr(self, '__call__', function)
         super().__init__()
+
+
+def dummy_filter() -> FilterFromFunction:
+    return FilterFromFunction(lambda *args: True)
 
 
 def convert_filters(filters: Iterable[CallableFilter | Filter]) -> list[Filter]:
