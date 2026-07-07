@@ -3,21 +3,30 @@ __all__ = [
 ]
 
 
-from .callable_wrappers import MiddlewareCallable
+from .callable_wrappers import MiddlewareCallable, CallableWrapper
 from collections.abc import Sequence, Iterator, Callable
 from typing import Any, TypeVar, overload
-from eventry.asyncio.callable_wrappers import InheritableMark
+from enum import Enum
 
 
 T = TypeVar('T')
+
+
+class MiddlewareManagerType(Enum):
+    ROUTER_OUTER = 'router.outer'
+    ROUTER_INNER = 'router.inner'
+    MANAGER_OUTER = 'manager.outer'
+    MANAGER_INNER = 'manager.inner'
+    HANDLER_OUTER = 'handler.outer'
+    HANDLER_INNER = 'handler.inner'
 
 
 class MiddlewareManager(Sequence[MiddlewareCallable[Any]]):
     def __init__(self) -> None:
         self._middlewares: list[MiddlewareCallable[Any]] = []
 
-    def register_middleware(self, middleware: T, inheritable: InheritableMark = False) -> T:
-        m = MiddlewareCallable(middleware, inheritable=inheritable)
+    def register_middleware(self, middleware: T) -> T:
+        m = MiddlewareCallable(middleware)
         self._middlewares.append(m)
         return middleware
 
@@ -26,27 +35,16 @@ class MiddlewareManager(Sequence[MiddlewareCallable[Any]]):
         pass
 
     @overload
-    def __call__(
-        self,
-        /,
-        *,
-        inheritable: bool = False,
-    ) -> Callable[[T], T]:
+    def __call__(self) -> Callable[[T], T]:
         pass
 
     @overload
-    def __call__(self, func: T, /, *, inheritable: bool = False) -> T:
+    def __call__(self, func: T, /) -> T:
         pass
 
-    def __call__(
-        self,
-        func: T | None = None,
-        /,
-        *,
-        inheritable: InheritableMark = False,
-    ) -> T | Callable[[T], T]:
+    def __call__(self, func: T | None = None, /) -> T | Callable[[T], T]:
         def inner(middleware: T) -> T:
-            self.register_middleware(middleware, inheritable=inheritable)
+            self.register_middleware(middleware)
             return middleware
 
         if func is None:
@@ -73,3 +71,25 @@ class MiddlewareManager(Sequence[MiddlewareCallable[Any]]):
 
     def __reversed__(self) -> Iterator[MiddlewareCallable]:
         return reversed(self._middlewares)
+
+    wrap_with_middlewares = staticmethod(wrap_with_middlewares)
+
+
+def wrap_with_middlewares(
+    callable_to_wrap: Callable[..., Any] | CallableWrapper[Any],
+    middlewares: Sequence[Callable[..., Any] | MiddlewareCallable[Any]],
+):
+    def _wrap(wrapping_callable: Any, wrapped_callable: Any = None):
+        async def _wrapped(args, data):
+            call = wrapping_callable
+            if not isinstance(call, CallableWrapper):
+                call = CallableWrapper(call)
+            if wrapped_callable is not None:
+                data = data | {'next_call': wrapped_callable, 'args': args, 'data': data}
+            return await call(args, data)
+        return _wrapped
+
+    current_call = _wrap(callable_to_wrap)
+    for middleware in reversed(middlewares):
+        current_call = _wrap(middleware, current_call)
+    return current_call

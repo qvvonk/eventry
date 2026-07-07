@@ -11,12 +11,13 @@ import inspect
 from types import MappingProxyType
 from collections.abc import Callable, AsyncGenerator
 
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Literal
 
 from eventry.loggers import router_logger
 from eventry.asyncio.filter import Filter, FilterFromFunction, convert_filters, dummy_filter
-from eventry.asyncio.callable_wrappers import Handler, Inheritable, InheritableMark
+from eventry.asyncio.callable_wrappers import Handler
 from eventry.config import HandlerManagerConfig
+from eventry.asyncio.middleware_manager import MiddlewareManager, MiddlewareManagerType
 
 
 if TYPE_CHECKING:
@@ -27,6 +28,18 @@ if TYPE_CHECKING:
 
 
 T = TypeVar('T')
+
+
+ManagerScopeMiddlewareTypes = Literal[
+    MiddlewareManagerType.MANAGER_OUTER,
+    MiddlewareManagerType.MANAGER_INNER,
+    MiddlewareManagerType.HANDLER_OUTER,
+    MiddlewareManagerType.HANDLER_INNER,
+    'manager.outer',
+    'manager.inner',
+    'handler.outer',
+    'handler.inner'
+]
 
 
 class HandlerManager:
@@ -45,6 +58,7 @@ class HandlerManager:
         self._event_filter = event_filter
         self._name = name
         self._config = config or HandlerManagerConfig()
+        self._middleware_managers: dict[MiddlewareManagerType, MiddlewareManager] = {}
 
         self._filter: Filter = dummy_filter()
 
@@ -53,6 +67,45 @@ class HandlerManager:
 
     def remove_filter(self) -> None:
         self._filter = dummy_filter()
+
+    def get_middleware_manager(
+        self,
+        manager_type: ManagerScopeMiddlewareTypes
+    ) -> MiddlewareManager | None:
+        try:
+            mdw_type = MiddlewareManagerType(manager_type)
+        except ValueError:
+            return None
+
+        if manager_type not in [
+            MiddlewareManagerType.MANAGER_OUTER,
+            MiddlewareManagerType.MANAGER_INNER,
+            MiddlewareManagerType.HANDLER_OUTER,
+            MiddlewareManagerType.HANDLER_INNER
+        ]:
+            return None
+        return self._middleware_managers.get(mdw_type)
+
+    def set_middleware_manager(
+        self,
+        manager_type: ManagerScopeMiddlewareTypes,
+        manager: MiddlewareManager | None
+    ) -> None:
+        if manager is not None and not isinstance(manager, MiddlewareManager):
+            raise TypeError(
+                f'Middleware manager must be an instance of MiddlewareManager, '
+                f'not {type(manager)!r}.'
+            )
+
+        try:
+            mdw_type = MiddlewareManagerType(manager_type)
+        except ValueError:
+            raise ValueError(f'Invalid middleware manager type: {manager_type!r}.') from None
+
+        if manager is not None:
+            self._middleware_managers[mdw_type] = manager
+        else:
+            self._middleware_managers.pop(mdw_type, None)
 
     def check_event(self, event: Event) -> bool:
         if self.event_filter is None:
