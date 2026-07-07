@@ -1,12 +1,34 @@
 __all__ = [
-    'MiddlewareManager'
+    'MiddlewareManager',
+    'wrap_with_middlewares',
+    'MiddlewareRegistrar',
 ]
 
 
 from .callable_wrappers import MiddlewareCallable, CallableWrapper
 from collections.abc import Sequence, Iterator, Callable
-from typing import Any, TypeVar, overload
+from typing import Any, TypeVar, overload, Protocol, Generic, Literal
 from enum import Enum
+
+
+def wrap_with_middlewares(
+    callable_to_wrap: Callable[..., Any] | CallableWrapper[Any],
+    middlewares: Sequence[Callable[..., Any] | MiddlewareCallable[Any]],
+):
+    def _wrap(wrapping_callable: Any, wrapped_callable: Any = None):
+        async def _wrapped(args, data):
+            call = wrapping_callable
+            if not isinstance(call, CallableWrapper):
+                call = CallableWrapper(call)
+            if wrapped_callable is not None:
+                data = data | {'next_call': wrapped_callable, 'args': args, 'data': data}
+            return await call(args, data)
+        return _wrapped
+
+    current_call = _wrap(callable_to_wrap)
+    for middleware in reversed(middlewares):
+        current_call = _wrap(middleware, current_call)
+    return current_call
 
 
 T = TypeVar('T')
@@ -75,21 +97,35 @@ class MiddlewareManager(Sequence[MiddlewareCallable[Any]]):
     wrap_with_middlewares = staticmethod(wrap_with_middlewares)
 
 
-def wrap_with_middlewares(
-    callable_to_wrap: Callable[..., Any] | CallableWrapper[Any],
-    middlewares: Sequence[Callable[..., Any] | MiddlewareCallable[Any]],
-):
-    def _wrap(wrapping_callable: Any, wrapped_callable: Any = None):
-        async def _wrapped(args, data):
-            call = wrapping_callable
-            if not isinstance(call, CallableWrapper):
-                call = CallableWrapper(call)
-            if wrapped_callable is not None:
-                data = data | {'next_call': wrapped_callable, 'args': args, 'data': data}
-            return await call(args, data)
-        return _wrapped
+class RegistrarParent(Protocol):
+    _middleware_managers: dict[MiddlewareManagerType, MiddlewareManager]
 
-    current_call = _wrap(callable_to_wrap)
-    for middleware in reversed(middlewares):
-        current_call = _wrap(middleware, current_call)
-    return current_call
+
+A = TypeVar('A')
+B = TypeVar('B')
+
+
+class MiddlewareRegistrar(Generic[A]):
+    def __init__(
+        self,
+        parent: RegistrarParent,
+        allowed_mdw_types: list[MiddlewareManagerType]
+    ) -> None:
+        self._parent = parent
+        self._allowed_mdw_types = allowed_mdw_types
+
+    def __call__(self, scope: A) -> Callable[[B], B]:
+        try:
+            scope = MiddlewareManagerType(scope)
+        except ValueError:
+            raise ValueError(f'Invalid middleware scope: {scope}')
+
+        if scope not in self._parent._middleware_managers:
+            raise ValueError(f'Middleware manager for {scope} is not registered.')
+
+        manager = self._parent._middleware_managers[scope]
+
+        def register_middleware(middleware: B) -> B:
+            manager.register_middleware(middleware)
+            return middleware
+        return register_middleware

@@ -5,19 +5,17 @@ __all__ = [
     'HandlerManager',
 ]
 
-import time
-import asyncio
 import inspect
 from types import MappingProxyType
-from collections.abc import Callable, AsyncGenerator
+from collections.abc import Callable, Generator, Sequence
 
 from typing import TYPE_CHECKING, Any, TypeVar, Literal
 
-from eventry.loggers import router_logger
+import asyncio
 from eventry.asyncio.filter import Filter, FilterFromFunction, convert_filters, dummy_filter
 from eventry.asyncio.callable_wrappers import Handler
 from eventry.config import HandlerManagerConfig
-from eventry.asyncio.middleware_manager import MiddlewareManager, MiddlewareManagerType
+from eventry.asyncio.middleware_manager import MiddlewareManager, MiddlewareManagerType, MiddlewareRegistrar
 
 
 if TYPE_CHECKING:
@@ -41,6 +39,13 @@ ManagerScopeMiddlewareTypes = Literal[
     'handler.inner'
 ]
 
+ManagerMdwTypes = [
+    MiddlewareManagerType.MANAGER_OUTER,
+    MiddlewareManagerType.MANAGER_INNER,
+    MiddlewareManagerType.HANDLER_OUTER,
+    MiddlewareManagerType.HANDLER_INNER,
+]
+
 
 class HandlerManager:
     def __init__(
@@ -59,7 +64,9 @@ class HandlerManager:
         self._name = name
         self._config = config or HandlerManagerConfig()
         self._middleware_managers: dict[MiddlewareManagerType, MiddlewareManager] = {}
-
+        self.middleware: MiddlewareRegistrar[ManagerScopeMiddlewareTypes] = MiddlewareRegistrar(
+            self, ManagerMdwTypes
+        )
         self._filter: Filter = dummy_filter()
 
     def set_filter(self, filter: Any) -> None:
@@ -76,14 +83,6 @@ class HandlerManager:
             mdw_type = MiddlewareManagerType(manager_type)
         except ValueError:
             return None
-
-        if manager_type not in [
-            MiddlewareManagerType.MANAGER_OUTER,
-            MiddlewareManagerType.MANAGER_INNER,
-            MiddlewareManagerType.HANDLER_OUTER,
-            MiddlewareManagerType.HANDLER_INNER
-        ]:
-            return None
         return self._middleware_managers.get(mdw_type)
 
     def set_middleware_manager(
@@ -98,14 +97,19 @@ class HandlerManager:
             )
 
         try:
-            mdw_type = MiddlewareManagerType(manager_type)
+            manager_type = MiddlewareManagerType(manager_type)
         except ValueError:
             raise ValueError(f'Invalid middleware manager type: {manager_type!r}.') from None
 
+        if manager_type not in ManagerMdwTypes:
+            raise ValueError(
+                f'Handler manager does not support {manager_type!r} middleware manager.'
+            )
+
         if manager is not None:
-            self._middleware_managers[mdw_type] = manager
+            self._middleware_managers[manager_type] = manager
         else:
-            self._middleware_managers.pop(mdw_type, None)
+            self._middleware_managers.pop(manager_type, None)
 
     def check_event(self, event: Event) -> bool:
         if self.event_filter is None:
@@ -122,6 +126,8 @@ class HandlerManager:
         handler_id: str | None = None,
         filter: Any = None,
         as_task: bool = False,
+        inner_middlewares: Sequence[Any] | None = None,
+        outer_middlewares: Sequence[Any] | None = None,
     ) -> Handler[Any]:
         if not handler_id:
             handler_id = gen_default_handler_id(handler)
@@ -134,6 +140,8 @@ class HandlerManager:
             event_filter=event_filter,
             filter=convert_filters([filter])[0] if filter is not None else None,
             as_task=as_task,
+            inner_middlewares=inner_middlewares,
+            outer_middlewares=outer_middlewares,
         )
         return handler_obj
 
@@ -153,7 +161,7 @@ class HandlerManager:
             raise ValueError(f'Handler with ID {handler.id} already exists in this manager.')
         self._handlers[handler.id] = handler
 
-    async def get_matching_handlers(self, event: Event) -> AsyncGenerator[Handler[Any], None]:
+    def get_matching_handlers(self, event: Event) -> Generator[Handler[Any], None]:
         """
         Iterates through all registered handlers and yields those whose filters
         match the given event.
@@ -162,11 +170,13 @@ class HandlerManager:
 
         :return: An async generator yielding handlers that should handle the event.
         """
-
         for handler in self._handlers.values():
-            if not handler.check_event(event):
-                continue
-            yield handler
+
+            if self.event_filter is not None:
+                yield handler
+            else:
+                if handler.check_event(event):
+                    yield handler
 
     def __call__(
         self,
@@ -176,6 +186,8 @@ class HandlerManager:
         event_filter: EventFilter | None = None,
         handler_id: str | None = None,
         as_task: bool = False,
+        inner_middlewares: Sequence[Any] | None = None,
+        outer_middlewares: Sequence[Any] | None = None,
     ) -> Callable[[T], T]:
         def inner(handler: T) -> T:
             handler_obj = self._create_handler_obj(
@@ -184,6 +196,8 @@ class HandlerManager:
                 handler_id=handler_id,
                 filter=filter,
                 as_task=as_task,
+                inner_middlewares=inner_middlewares,
+                outer_middlewares=outer_middlewares,
             )
 
             self._register_handler(handler_obj)
@@ -215,61 +229,68 @@ class HandlerManager:
     def filter(self) -> Filter:
         return self._filter
 
-    async def execute_handlers(
+    # ---- Big todo ----
+    async def execute_handler(
         self,
-        event: Event,
-        event_context: dict[str, Any],
-        handler_result_policy: Any = None,  # todo
-    ):
-        ...
-
-    async def _execute_handler(
-        self,
-        event: Event,
         handler: Handler[Any],
-        event_context: dict[str, Any]
-    ) -> asyncio.Task[Any] | None:
-        """
-        Executes handler with filter and outer-inner-handler middlewares.
+        args,
+        data: dict[str, Any]
+    ) -> None:
+        middlewares = list(self.get_middleware_manager('handler.inner') or [])
+        middlewares.extend(handler.inner_middlewares)
+        wrapped = MiddlewareManager.wrap_with_middlewares(middlewares, handler)
+        await wrapped(args, data)
 
-        :raises Exception: If an unhandled exception occurred during executing process, and it was
-            not handled by finalizers.
-        """
-        router_logger.debug(
-            '(%d) Executing handler %s -> %s -> %s...',
-            id(event),
-            self.router.name,
-            self.name,
-            handler.id,
+    async def execute_handler_with_filter(
+        self,
+        handler: Handler[Any],
+        args,
+        data: dict[str, Any]
+    ):
+        middlewares = list(self.get_middleware_manager('handler.outer') or [])
+        middlewares.extend(handler.outer_middlewares)
+
+        async def execute_handler_with_filter_inner():
+            r = await handler.filter.execute(args, data)
+            if not r:
+                return
+            await self.execute_handler(handler, args, data)
+
+        wrapped = MiddlewareManager.wrap_with_middlewares(
+            middlewares,
+            execute_handler_with_filter_inner
         )
+        await wrapped()
 
-        start = time.time()
-        try:
-            if not handler.as_task:
-                return await handler.execute_wrapped(event, data=event_context)
-            else:
-                return asyncio.create_task(
-                    handler.execute_wrapped(event, data=event_context),
-                    name=f'eventry_handler_task: {handler._handler_id}'
-                )
-        except FinalizingError as e:
-            router_logger.error(
-                '(%d) An error occurred while executing handler %s -> %s -> %s.',
-                id(event),
-                self.router.name,
-                self.name,
-                handler.id,
-                exc_info=e.__cause__,
-            )
-            raise
-        finally:
-            stop = time.time() - start
-            router_logger.debug(
-                "(%d) Handler '%s' executed in %.10f seconds.",
-                id(event),
-                handler.id,
-                stop,
-            )
+    async def execute_handlers(self, args, data: dict[str, Any], event) -> None:
+        async def execute_handlers_inner():
+            r = await self.filter.execute(args, data)
+            if not r:
+                return
+
+            for handler in self.get_matching_handlers(event.name):
+                if handler.as_task:
+                    asyncio.create_task(self.execute_handler_with_filter(handler, args, data))
+                else:
+                    await self.execute_handler_with_filter(handler, args, data)
+                if event.propagation_stopped:
+                    return
+
+        middlewares = list(self.get_middleware_manager('manager.inner') or [])
+        wrapped = MiddlewareManager.wrap_with_middlewares(middlewares, execute_handlers_inner)
+        await wrapped()
+
+    async def propagate_event(self, event, args, data):
+        async def inner():
+            result = await self.filter.execute(args, data)
+            if not result:
+                return
+            await self.execute_handlers(args, data, event)
+
+        middlewares = list(self.get_middleware_manager('manager.outer') or [])
+        wrapped = MiddlewareManager.wrap_with_middlewares(middlewares, inner)
+        await wrapped()
+    # ---- ---- ----
 
 
 def gen_default_handler_id(handler: Any):

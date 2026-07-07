@@ -256,18 +256,29 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
         self,
         __obj: Callable[..., Awaitable[ReturnTypeT]] | Callable[..., ReturnTypeT],
         /,
+        *,
         handler_id: str,
         event_filter: EventFilter | None,
         filter: Filter | None,
         as_task: bool,
+        outer_middlewares: Sequence[Any] | None = None,
+        inner_middlewares: Sequence[Any] | None = None,
     ):
         from eventry.asyncio.filter import dummy_filter
+        outer_middlewares = outer_middlewares or []
+        inner_middlewares = inner_middlewares or []
 
         super().__init__(__obj)
         self._handler_id = handler_id
         self._as_task = as_task
         self._filter = filter if filter is not None else dummy_filter()
         self._event_filter = event_filter
+        self._outer_middlewares = [
+            MiddlewareCallable(i) for i in outer_middlewares if not isinstance(i, MiddlewareCallable)
+        ]
+        self._inner_middlewares = [
+            MiddlewareCallable(i) for i in inner_middlewares if not isinstance(i, MiddlewareCallable)
+        ]
 
     @property
     def filter(self) -> Filter:
@@ -284,6 +295,14 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
     @property
     def event_filter(self) -> EventFilter | None:
         return self._event_filter
+
+    @property
+    def outer_middlewares(self) -> list[MiddlewareCallable[Any]]:
+        return self._outer_middlewares
+
+    @property
+    def inner_middlewares(self) -> list[MiddlewareCallable[Any]]:
+        return self._inner_middlewares
 
     def check_event(self, event: Event) -> bool:
         if self.event_filter is None:
