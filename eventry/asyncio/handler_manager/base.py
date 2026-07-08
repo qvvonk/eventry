@@ -230,7 +230,7 @@ class HandlerManager:
         return self._filter
 
     # ---- Big todo ----
-    async def execute_handler(
+    async def _execute_handler(
         self,
         handler: Handler[Any],
         args,
@@ -241,7 +241,7 @@ class HandlerManager:
         wrapped = MiddlewareManager.wrap_with_middlewares(middlewares, handler)
         await wrapped(args, data)
 
-    async def execute_handler_with_filter(
+    async def _execute_handler_with_filter(
         self,
         handler: Handler[Any],
         args,
@@ -250,11 +250,13 @@ class HandlerManager:
         middlewares = list(self.get_middleware_manager('handler.outer') or [])
         middlewares.extend(handler.outer_middlewares)
 
-        async def execute_handler_with_filter_inner():
+        # We need *_ and **__, so custom args and kwargs passed from user middleware
+        # will not break this call.
+        async def execute_handler_with_filter_inner(*_, **__):
             r = await handler.filter.execute(args, data)
             if not r:
                 return
-            await self.execute_handler(handler, args, data)
+            await self._execute_handler(handler, args, data)
 
         wrapped = MiddlewareManager.wrap_with_middlewares(
             middlewares,
@@ -263,25 +265,25 @@ class HandlerManager:
         await wrapped()
 
     async def execute_handlers(self, args, data: dict[str, Any], event) -> None:
-        async def execute_handlers_inner():
+        async def inner(*_, **__):
             r = await self.filter.execute(args, data)
             if not r:
                 return
 
             for handler in self.get_matching_handlers(event.name):
                 if handler.as_task:
-                    asyncio.create_task(self.execute_handler_with_filter(handler, args, data))
+                    asyncio.create_task(self._execute_handler_with_filter(handler, args, data))
                 else:
-                    await self.execute_handler_with_filter(handler, args, data)
+                    await self._execute_handler_with_filter(handler, args, data)
                 if event.propagation_stopped:
                     return
 
         middlewares = list(self.get_middleware_manager('manager.inner') or [])
-        wrapped = MiddlewareManager.wrap_with_middlewares(middlewares, execute_handlers_inner)
+        wrapped = MiddlewareManager.wrap_with_middlewares(middlewares, inner)
         await wrapped()
 
     async def propagate_event(self, event, args, data):
-        async def inner():
+        async def inner(*_, **__):
             result = await self.filter.execute(args, data)
             if not result:
                 return
