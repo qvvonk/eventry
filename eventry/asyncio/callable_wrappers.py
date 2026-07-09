@@ -4,12 +4,10 @@ __all__ = [
     'FromData',
     'Handler',
     'MiddlewareCallable',
-    'Inheritable'
 ]
 
 
-from enum import StrEnum
-from typing import Generic, TypeVar, TYPE_CHECKING, Any, Literal
+from typing import Generic, TypeVar, TYPE_CHECKING, Any
 from collections.abc import Callable, Awaitable, Sequence
 from types import MethodType, FunctionType
 import inspect
@@ -36,6 +34,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
         /,
         *,
         init_method: bool = False,
+        names: list[str] | None = None,
     ) -> None:
         """
         Wrapper around any callable to allow dynamic invocation with positional
@@ -67,18 +66,27 @@ class CallableWrapper(Generic[ReturnTypeT]):
                       function, or object with sync/async __call__.
         """
         _callable = __obj
+        self._names = names or []
+        self._name = getattr(__obj, '__name__', '<unknown>')
         self._class: type | None = None
         self._init_wrapper: CallableWrapper[None] | None = None
         self._init_method: bool = init_method
 
         if isinstance(__obj, type):
             if not hasattr(__obj, '__call__'):
-                raise TypeError('Class based handlers must implement `__call__` method.')
+                raise TypeError(
+                    f'Class passed to `{self.__class__.__name__}` '
+                    f'must implement `__call__` method.'
+                )
 
             _callable = __obj.__call__
             self._class = __obj
             if hasattr(__obj, '__init__') and isinstance(__obj.__init__, FunctionType):
-                self._init_wrapper = CallableWrapper(__obj.__init__, init_method=True)
+                self._init_wrapper = CallableWrapper(
+                    __obj.__init__,
+                    init_method=True,
+                    names=self._names + [self._name]
+                )
 
         for i in range(2):
             if isinstance(_callable, (FunctionType, MethodType)):
@@ -93,22 +101,15 @@ class CallableWrapper(Generic[ReturnTypeT]):
         self._has_self = self.is_class or self._init_method or hasattr(self._callable, '__self__')
         _callable = _callable if isinstance(_callable, FunctionType) else _callable.__func__
 
-        # Total amount of non-kwonly args, excluding `self` (if callable is a method),
-        # *varargs and **varkwargs
         self._argcount = _callable.__code__.co_argcount - self._has_self
-
-        # Amount of kwonly args, excluding **varkwargs
+        self._posonlyargcount = _callable.__code__.co_posonlyargcount - self._has_self
         self._kwonlyargcount = _callable.__code__.co_kwonlyargcount
-
-        # Total amount of all args, excluding `self` (if callable is a method),
-        # excluding *varargs, **varkwargs
         self._total_argcount = self._argcount + self._kwonlyargcount
 
         self._has_varargs = bool(_callable.__code__.co_flags & inspect.CO_VARARGS)
         self._has_varkw = bool(_callable.__code__.co_flags & inspect.CO_VARKEYWORDS)
 
         # Amount of non-default positional and keyword args.
-
         self._non_default_args_count = self._argcount - len(_callable.__defaults__ or ())
 
         # Amount of non-default kwonly args.
@@ -131,7 +132,8 @@ class CallableWrapper(Generic[ReturnTypeT]):
     ) -> tuple[list[Any], dict[str, Any]]:
         if len(args) > self._argcount and not self._has_varargs:
             raise ValueError(
-                f'Too many ({len(args)}) positional arguments. Max: {self._argcount}.',
+                f'{self.full_name!r} accepts at most {self._argcount} positional arguments, '
+                f'but {len(args)} were given.'
             )
 
         if data is None:
@@ -240,6 +242,14 @@ class CallableWrapper(Generic[ReturnTypeT]):
     @property
     def is_class(self) -> bool:
         return self._class is not None
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def full_name(self) -> str:
+        return '.'.join(self._names + [self.name])
 
 
 class MiddlewareCallable(CallableWrapper[ReturnTypeT]):

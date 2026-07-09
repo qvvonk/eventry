@@ -47,8 +47,7 @@ ManagerMdwTypes = [
 
 
 class HandlerManager:
-    def __init__(
-        self,
+    def __init__(self,
         name: str,
         event_filter: EventFilter | None = None,
         config: HandlerManagerConfig | None = None,
@@ -63,10 +62,11 @@ class HandlerManager:
         self._name = name
         self._config = config or HandlerManagerConfig()
         self._middleware_managers: dict[MiddlewareManagerType, MiddlewareManager] = {}
+        self._filter: Filter = dummy_filter()
+
         self.middleware: MiddlewareRegistrar[MgrMdwsType] = MiddlewareRegistrar(
             self, ManagerMdwTypes
         )
-        self._filter: Filter = dummy_filter()
 
     def set_filter(self, filter: Any) -> None:  # todo: ManagerFilterType
         self._filter = filter if isinstance(filter, Filter) else FilterFromFunction(filter)
