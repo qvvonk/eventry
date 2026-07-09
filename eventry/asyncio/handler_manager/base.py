@@ -69,7 +69,7 @@ class HandlerManager:
         )
         self._filter: Filter = dummy_filter()
 
-    def set_filter(self, filter: Any) -> None:
+    def set_filter(self, filter: Any) -> None:  # todo: ManagerFilterType
         self._filter = filter if isinstance(filter, Filter) else FilterFromFunction(filter)
 
     def remove_filter(self) -> None:
@@ -230,6 +230,19 @@ class HandlerManager:
         return self._filter
 
     # ---- Big todo ----
+    def _collect_args(self, di: dict[str, Any], template: str, amount: int | None = None) -> list[Any]:
+        if amount is None:
+            result = []
+            index = 0
+            while True:
+                key = template.format(index)
+                if key not in di:
+                    return result
+                result.append(di[key])
+                index += 1
+        else:
+            return [di[template.format(i)] for i in range(amount)]
+
     async def _execute_handler(
         self,
         handler: Handler[Any],

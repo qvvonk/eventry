@@ -3,15 +3,14 @@ __all__ = [
 ]
 
 
-from collections.abc import Sequence
+from collections.abc import Sequence, Callable, Awaitable
 from dataclasses import dataclass, field
 from typing import Any
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HandlerManagerConfig:
     handler_positional_args: Sequence[Any] = field(default_factory=list)
-    exclude_from_handler_call: set[str] = field(default_factory=set)
 
     manager_outer_mdw_positional_args: Sequence[Any] = field(default_factory=list)
     manager_inner_mdw_positional_args: Sequence[Any] = field(default_factory=list)
@@ -20,4 +19,11 @@ class HandlerManagerConfig:
     handler_inner_mdw_positional_args: Sequence[Any] = field(default_factory=list)
 
     filter_positional_args: Sequence[Any] = field(default_factory=list)
-    exclude_from_filter_call: set[str] = field(default_factory=set)
+
+    manager_filter_arg_key_template: str = '__eventry_manager_filter_arg_{index}__'
+    handler_filter_arg_key_template: str = '__eventry_handler_filter_arg_{index}__'
+    handler_arg_key_template: str = '__eventry_handler_arg_{index}__'
+    manager_outer_mdw_arg_key_template: str = '__eventry_manager_outer_mdw_arg_{index}__'
+    manager_inner_mdw_arg_key_template: str = '__eventry_manager_inner_mdw_arg_{index}__'
+    handler_outer_mdw_arg_key_template: str = '__eventry_handler_outer_mdw_arg_{index}__'
+    handler_inner_mdw_arg_key_template: str = '__eventry_handler_inner_mdw_arg_{index}__'
