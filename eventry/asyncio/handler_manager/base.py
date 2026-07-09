@@ -7,14 +7,13 @@ __all__ = [
 
 import inspect
 from types import MappingProxyType
-from collections.abc import Callable, Generator, Sequence
+from collections.abc import Callable, Generator, Sequence, Awaitable
 
 from typing import TYPE_CHECKING, Any, TypeVar, Literal
 
-import asyncio
 from eventry.asyncio.filter import Filter, FilterFromFunction, convert_filters, dummy_filter
-from eventry.asyncio.callable_wrappers import Handler
-from eventry.config import HandlerManagerConfig
+from eventry.asyncio.callable_wrappers import Handler, CallableWrapper
+from eventry.config import HandlerManagerConfig, _collect_args
 from eventry.asyncio.middleware_manager import MiddlewareManager, MiddlewareManagerType, MiddlewareRegistrar
 
 
@@ -230,81 +229,109 @@ class HandlerManager:
         return self._filter
 
     # ---- Big todo ----
-    def _collect_args(self, di: dict[str, Any], template: str, amount: int | None = None) -> list[Any]:
-        if amount is None:
-            result = []
-            index = 0
-            while True:
-                key = template.format(index)
-                if key not in di:
-                    return result
-                result.append(di[key])
-                index += 1
-        else:
-            return [di[template.format(i)] for i in range(amount)]
-
-    async def _execute_handler(
+    def _middleware_wrapper_factory_factory(
         self,
-        handler: Handler[Any],
-        args,
-        data: dict[str, Any]
-    ) -> None:
+        collect_args_callable
+    ) -> Callable[
+        [Callable[[dict[str, Any], Any]], Callable[[dict[str, Any], Any]] | None],
+        Callable[[dict[str, Any]], Any]
+    ]:
+        def middleware_wrapper_factory(wrapping_callable, wrapped_callable):
+            async def wrapped(di):
+                nonlocal wrapping_callable
+                if not isinstance(wrapping_callable, CallableWrapper):
+                    wrapping_callable = CallableWrapper(wrapping_callable)
+
+                data = di | {'di': di}
+                if wrapped_callable is not None:
+                    data.update({'next_call': wrapped_callable})
+                return await wrapping_callable(collect_args_callable(di), data)
+            return wrapped
+        return middleware_wrapper_factory
+
+    def _execute_handler_factory(self, handler: Handler[Any]) -> Callable[..., Awaitable[Any]]:
+        async def execute_handler(**di):
+            return await handler(self.config.collect_handler_args(di), di)
+        return execute_handler
+
+    async def _execute_handler(self, handler: Handler[Any], **di) -> Any:
         middlewares = list(self.get_middleware_manager('handler.inner') or [])
         middlewares.extend(handler.inner_middlewares)
-        wrapped = MiddlewareManager.wrap_with_middlewares(middlewares, handler)
-        await wrapped(args, data)
 
-    async def _execute_handler_with_filter(
-        self,
-        handler: Handler[Any],
-        args,
-        data: dict[str, Any]
-    ):
+        wrapped = MiddlewareManager.wrap_with_middlewares(
+            self._execute_handler_factory(handler),
+            middlewares,
+            self._middleware_wrapper_factory_factory(self.config.collect_handler_inner_mdw_args)
+        )
+        return await wrapped(di)
+
+    def _execute_handler_with_a_filter_factory(self, handler: Handler[Any]):
+        async def execute_handler_with_a_filter(**di):
+            r = await handler.filter.execute(self.config.collect_handler_filter_args(di), di)
+            if not r and not isinstance(r, dict):
+                return r
+
+            if isinstance(r, dict):
+                di = di | r
+            return await self._execute_handler(handler, **di)
+        return execute_handler_with_a_filter
+
+    async def _execute_handler_with_a_filter(self, handler: Handler[Any], **di):
         middlewares = list(self.get_middleware_manager('handler.outer') or [])
         middlewares.extend(handler.outer_middlewares)
 
-        # We need *_ and **__, so custom args and kwargs passed from user middleware
-        # will not break this call.
-        async def execute_handler_with_filter_inner(*_, **__):
-            r = await handler.filter.execute(args, data)
-            if not r:
-                return
-            await self._execute_handler(handler, args, data)
-
         wrapped = MiddlewareManager.wrap_with_middlewares(
+            self._execute_handler_with_a_filter_factory(handler),
             middlewares,
-            execute_handler_with_filter_inner
+            self._middleware_wrapper_factory_factory(self.config.collect_handler_outer_mdw_args)
         )
-        await wrapped()
+        return await wrapped(di)
 
-    async def execute_handlers(self, args, data: dict[str, Any], event) -> None:
-        async def inner(*_, **__):
-            r = await self.filter.execute(args, data)
-            if not r:
-                return
-
-            for handler in self.get_matching_handlers(event.name):
-                if handler.as_task:
-                    asyncio.create_task(self._execute_handler_with_filter(handler, args, data))
-                else:
-                    await self._execute_handler_with_filter(handler, args, data)
+    def _execute_handlers_factory(self, event: Event):
+        async def execute_handlers(**di):
+            for i in self.get_matching_handlers(event):
+                await self._execute_handler_with_a_filter(i, **di)
                 if event.propagation_stopped:
                     return
 
+        return execute_handlers
+
+    async def _execute_handlers(self, event: Event, **di):
         middlewares = list(self.get_middleware_manager('manager.inner') or [])
-        wrapped = MiddlewareManager.wrap_with_middlewares(middlewares, inner)
-        await wrapped()
 
-    async def propagate_event(self, event, args, data):
-        async def inner(*_, **__):
-            result = await self.filter.execute(args, data)
-            if not result:
-                return
-            await self.execute_handlers(args, data, event)
+        wrapped = MiddlewareManager.wrap_with_middlewares(
+            self._execute_handlers_factory(event),
+            middlewares,
+            self._middleware_wrapper_factory_factory(self.config.collect_manager_inner_mdw_args)
+        )
+        return await wrapped(di)
 
+    def _execute_handlers_with_mgr_filter_factory(self, event: Event):
+        async def execute_handlers_with_mgr_filter(**di):
+            r = await self.filter.execute(self.config.collect_manager_filter_args(di), di)
+            if r is False or r is None:
+                return r
+            return await self._execute_handlers(event, **di)
+        return execute_handlers_with_mgr_filter
+
+    async def propagate_event(self, event: Event, **di):
         middlewares = list(self.get_middleware_manager('manager.outer') or [])
-        wrapped = MiddlewareManager.wrap_with_middlewares(middlewares, inner)
-        await wrapped()
+
+        wrapped = MiddlewareManager.wrap_with_middlewares(
+            self._execute_handlers_with_mgr_filter_factory(event),
+            middlewares,
+            self._middleware_wrapper_factory_factory(self.config.collect_manager_outer_mdw_args)
+        )
+
+        self.config.update_di_with_manager_outer_mdw_args(di)
+        self.config.update_di_with_manager_filter_args(di)
+        self.config.update_di_with_manager_inner_mdw_args(di)
+        self.config.update_di_with_handler_outer_mdw_args(di)
+        self.config.update_di_with_handler_filter_args(di)
+        self.config.update_di_with_handler_inner_mdw_args(di)
+        self.config.update_di_with_handler_args(di)
+
+        return await wrapped(di)
     # ---- ---- ----
 
 
