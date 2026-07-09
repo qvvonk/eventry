@@ -12,7 +12,7 @@ from collections.abc import Callable, Generator, Sequence, Awaitable
 from typing import TYPE_CHECKING, Any, TypeVar, Literal
 
 from eventry.asyncio.filter import Filter, FilterFromFunction, convert_filters, dummy_filter
-from eventry.asyncio.callable_wrappers import Handler, CallableWrapper
+from eventry.asyncio.callable_wrappers import Handler, CallableWrapper, MiddlewareCallable
 from eventry.config import HandlerManagerConfig, _collect_args
 from eventry.asyncio.middleware_manager import MiddlewareManager, MiddlewareManagerType, MiddlewareRegistrar
 
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 T = TypeVar('T')
 
 
-ManagerScopeMiddlewareTypes = Literal[
+MgrMdwsType = Literal[
     MiddlewareManagerType.MANAGER_OUTER,
     MiddlewareManagerType.MANAGER_INNER,
     MiddlewareManagerType.HANDLER_OUTER,
@@ -63,7 +63,7 @@ class HandlerManager:
         self._name = name
         self._config = config or HandlerManagerConfig()
         self._middleware_managers: dict[MiddlewareManagerType, MiddlewareManager] = {}
-        self.middleware: MiddlewareRegistrar[ManagerScopeMiddlewareTypes] = MiddlewareRegistrar(
+        self.middleware: MiddlewareRegistrar[MgrMdwsType] = MiddlewareRegistrar(
             self, ManagerMdwTypes
         )
         self._filter: Filter = dummy_filter()
@@ -76,7 +76,7 @@ class HandlerManager:
 
     def get_middleware_manager(
         self,
-        manager_type: ManagerScopeMiddlewareTypes
+        manager_type: MgrMdwsType
     ) -> MiddlewareManager | None:
         try:
             mdw_type = MiddlewareManagerType(manager_type)
@@ -86,7 +86,7 @@ class HandlerManager:
 
     def set_middleware_manager(
         self,
-        manager_type: ManagerScopeMiddlewareTypes,
+        manager_type: MgrMdwsType,
         manager: MiddlewareManager | None
     ) -> None:
         if manager is not None and not isinstance(manager, MiddlewareManager):
@@ -229,6 +229,14 @@ class HandlerManager:
         return self._filter
 
     # ---- Big todo ----
+    def _middlewares(
+        self, scope: MgrMdwsType, extend_with: Sequence[MiddlewareCallable[Any]] | None = None
+    ) -> list[MiddlewareCallable[Any]]:
+        result = list(self.get_middleware_manager(scope) or [])
+        if extend_with:
+            result.extend(extend_with)
+        return result
+
     def _middleware_wrapper_factory_factory(
         self,
         collect_args_callable
@@ -255,12 +263,9 @@ class HandlerManager:
         return execute_handler
 
     async def _execute_handler(self, handler: Handler[Any], **di) -> Any:
-        middlewares = list(self.get_middleware_manager('handler.inner') or [])
-        middlewares.extend(handler.inner_middlewares)
-
         wrapped = MiddlewareManager.wrap_with_middlewares(
             self._execute_handler_factory(handler),
-            middlewares,
+            self._middlewares('handler.inner', handler.inner_middlewares),
             self._middleware_wrapper_factory_factory(self.config.collect_handler_inner_mdw_args)
         )
         return await wrapped(di)
@@ -277,12 +282,9 @@ class HandlerManager:
         return execute_handler_with_a_filter
 
     async def _execute_handler_with_a_filter(self, handler: Handler[Any], **di):
-        middlewares = list(self.get_middleware_manager('handler.outer') or [])
-        middlewares.extend(handler.outer_middlewares)
-
         wrapped = MiddlewareManager.wrap_with_middlewares(
             self._execute_handler_with_a_filter_factory(handler),
-            middlewares,
+            self._middlewares('handler.outer', handler.outer_middlewares),
             self._middleware_wrapper_factory_factory(self.config.collect_handler_outer_mdw_args)
         )
         return await wrapped(di)
@@ -297,11 +299,9 @@ class HandlerManager:
         return execute_handlers
 
     async def _execute_handlers(self, event: Event, **di):
-        middlewares = list(self.get_middleware_manager('manager.inner') or [])
-
         wrapped = MiddlewareManager.wrap_with_middlewares(
             self._execute_handlers_factory(event),
-            middlewares,
+            self._middlewares('manager.inner'),
             self._middleware_wrapper_factory_factory(self.config.collect_manager_inner_mdw_args)
         )
         return await wrapped(di)
@@ -315,11 +315,9 @@ class HandlerManager:
         return execute_handlers_with_mgr_filter
 
     async def propagate_event(self, event: Event, **di):
-        middlewares = list(self.get_middleware_manager('manager.outer') or [])
-
         wrapped = MiddlewareManager.wrap_with_middlewares(
             self._execute_handlers_with_mgr_filter_factory(event),
-            middlewares,
+            self._middlewares('manager.outer'),
             self._middleware_wrapper_factory_factory(self.config.collect_manager_outer_mdw_args)
         )
 
