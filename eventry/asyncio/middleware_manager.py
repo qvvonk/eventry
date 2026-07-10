@@ -25,6 +25,26 @@ def wrap_with_middlewares(
     return current_call
 
 
+def wrap_with_di_middlewares(
+    callable_to_wrap: Callable[..., Any] | CallableWrapper[Any],
+    middlewares: Sequence[Callable[..., Any] | MiddlewareCallable[Any]],
+    pos_args_collector: Callable[[dict[str, Any]], list[Any]] | None = None
+):
+    def wrapper_factory(wrapping_callable, wrapped_callable):
+        async def wrapped(di):
+            nonlocal wrapping_callable
+            if not isinstance(wrapping_callable, CallableWrapper):
+                wrapping_callable = CallableWrapper(wrapping_callable)
+
+            data = di | {'di': di}
+            if wrapped_callable is not None:
+                data.update({'next_call': wrapped_callable})
+            return await wrapping_callable(pos_args_collector(di), data)
+        return wrapped
+    return wrap_with_middlewares(callable_to_wrap, middlewares, wrapper_factory)
+
+
+
 T = TypeVar('T')
 
 
@@ -89,6 +109,7 @@ class MiddlewareManager(Sequence[MiddlewareCallable[Any]]):
         return reversed(self._middlewares)
 
     wrap_with_middlewares = staticmethod(wrap_with_middlewares)
+    wrap_with_di_middlewares = staticmethod(wrap_with_di_middlewares)
 
 
 class RegistrarParent(Protocol):
