@@ -269,10 +269,10 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
         *,
         handler_id: str,
         event_filter: EventFilter | None,
-        filter: Filter | None,
-        as_task: bool,
-        outer_middlewares: Sequence[Any] | None = None,
-        inner_middlewares: Sequence[Any] | None = None,
+        filter: Filter | None = None,
+        as_task: bool = False,
+        outer_middlewares: Sequence[MiddlewareCallable[Any] | Callable[..., Any]] | None = None,
+        inner_middlewares: Sequence[MiddlewareCallable[Any] | Callable[..., Any]] | None = None,
     ):
         from eventry.asyncio.filter import dummy_filter
         outer_middlewares = outer_middlewares or []
