@@ -6,10 +6,11 @@ __all__ = [
     'MiddlewareCallable',
 ]
 
-
+import asyncio
 from typing import Generic, TypeVar, TYPE_CHECKING, Any
-from collections.abc import Callable, Awaitable, Sequence
+from collections.abc import Callable, Awaitable, Sequence, Mapping
 from types import MethodType, FunctionType
+from functools import partial
 import inspect
 
 
@@ -20,11 +21,137 @@ if TYPE_CHECKING:
 
 
 ReturnTypeT = TypeVar('ReturnTypeT')
+R = TypeVar('R')
 T = TypeVar('T')
 RT = TypeVar('RT')
 
 
 class FromData(str): ...
+
+
+class CallableWrapper2(Generic[ReturnTypeT]):
+    def __init__(
+        self,
+        __obj: Callable[..., Awaitable[ReturnTypeT]] | Callable[..., ReturnTypeT],
+        /,
+    ) -> None:
+        if isinstance(__obj, partial):
+            self._partial_args = list(__obj.args)
+            self._partial_kwargs = __obj.keywords
+            _callable = __obj.func
+        else:
+            self._partial_args = []
+            self._partial_kwargs = {}
+            _callable = __obj
+
+        for i in range(2):
+            if isinstance(_callable, (FunctionType, MethodType)):
+                break
+            if not callable(_callable):
+                raise TypeError(f'Expected callable, got {type(__obj).__name__}')
+            _callable = getattr(_callable, '__call__')
+        else:
+            raise TypeError(f'Unable to find __call__ method in {type(__obj).__name__}.')
+
+
+        self._callable = _callable
+        _code = _callable.__code__
+        self._has_self = hasattr(self._callable, '__self__')
+        self._posonly_c = _code.co_posonlyargcount - self._has_self
+        self._args_c = _code.co_argcount - self._has_self
+        self._kwonly_c = _code.co_kwonlyargcount
+        self._total_args_c = self._posonly_c + self._args_c + self._kwonly_c
+
+        self._has_varargs = bool(_code.co_flags & inspect.CO_VARARGS)
+        self._has_varkw = bool(_code.co_flags & inspect.CO_VARKEYWORDS)
+
+        self._nondef_args_c = self._args_c - len(getattr(_callable, '__defaults__', []))
+        self._nondef_kwonly_c = self._kwonly_c - len(getattr(_callable, '__kwdefaults__', {}))
+        self._names = _code.co_varnames[self._has_self : self._args_c + self._kwonly_c]
+        self._kwargs_defaults = getattr(_callable, '__kwdefaults__', {})
+        self._is_async = bool(_code.co_flags & 0x80)
+
+    def collect_args(self, args: Sequence[Any], kwargs: Mapping[str, Any]) -> tuple[list[Any], dict[str, Any]]:
+        args = self._partial_args + list(args)
+        kwargs = self._partial_kwargs | dict(kwargs)
+
+        if len(args) > self._args_c and not self._has_varargs:
+            raise ValueError(
+                f'Too many positional arguments. '
+                f'Callable has no varargs and accepts at most {self._args_c} positional arguments, '
+                f'but {len(args)} were given.'
+            )
+
+        r_args = [i if type(i) is not FromData else kwargs[i] for i in args] if args else []
+
+        bound_args_c = len(r_args) if len(r_args) <= self._args_c else self._args_c
+        if bound_args_c < self._nondef_args_c:
+            for arg_name_index in range(bound_args_c, self._nondef_args_c):
+                name = self._names[arg_name_index]
+                if name not in kwargs:
+                    raise ValueError(
+                        f'Callable accepts {self._nondef_args_c} non-default arguments, '
+                        f'but only {len(args)} positional args were given.\n'
+                        f'Considering this, tried to find value for non-default argument '
+                        f'{arg_name_index} ({name!r}) in given kwargs dict, but no value was found.'
+                    )
+                r_args.append(kwargs[name])
+                bound_args_c += 1
+
+
+        r_kwargs = {}
+        if self._nondef_kwonly_c:
+            for arg_name_index in range(self._args_c, self._total_args_c):
+                name = self._names[arg_name_index]
+                if name in kwargs:
+                    r_kwargs[name] = kwargs[name]
+                    continue
+
+                if name in self._kwargs_defaults:
+                    r_kwargs[name] = self._kwargs_defaults[name]
+                    continue
+
+                raise ValueError(
+                    f'No value was found in given kwargs dict for non-default '
+                    f'kw-only argument {name!r}.'
+                )
+
+        if self._has_varkw:
+            bound_pos_arg_names = set(self._names[:bound_args_c])
+            r_kwargs.update({k: v for k, v in kwargs.items() if k not in bound_pos_arg_names})
+        else:
+            for name_index in range(bound_args_c, self._args_c):
+                name = self._names[name_index]
+                if name in kwargs:
+                    r_kwargs[name] = kwargs[name]
+            for name_index in range(self._args_c + self._nondef_kwonly_c, self._total_args_c):
+                name = self._names[name_index]
+                if name in kwargs:
+                    r_kwargs[name] = kwargs[name]
+
+        return r_args, r_kwargs
+
+    def __call__(
+        self,
+        args: Sequence[Any] = (),
+        data: dict[str, Any] | None = None,
+        to_thread: bool = True
+    ) -> ReturnTypeT:
+        pos_args, kwargs = self.collect_args(args, data)
+        if self._is_async:
+            return self._callable(*pos_args, **kwargs)
+        if to_thread:
+            return asyncio.to_thread(self._callable, *pos_args, **kwargs)
+        return self._blocking_async_call(self._callable, *pos_args, **kwargs)
+
+    async def _blocking_async_call(
+        self,
+        _call: Callable[..., R],
+        args: Sequence[Any],
+        kwargs: Mapping[str, Any]
+    ) -> R:
+        return _call(*args, **kwargs)
+
 
 
 class CallableWrapper(Generic[ReturnTypeT]):
