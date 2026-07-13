@@ -53,6 +53,7 @@ ManagerInnerMdwT = TypeVar('ManagerInnerMdwT')
 HandlerOuterMdwT = TypeVar('HandlerOuterMdwT')
 HandlerFilterT = TypeVar('HandlerFilterT')
 HandlerInnerMdwT = TypeVar('HandlerInnerMdwT')
+HandlerT = TypeVar('HandlerT')
 
 
 class HandlerManager(
@@ -63,6 +64,7 @@ class HandlerManager(
         HandlerOuterMdwT,
         HandlerFilterT,
         HandlerInnerMdwT,
+        HandlerT,
     ]
 ):
     def __init__(self,
@@ -197,8 +199,8 @@ class HandlerManager(
         as_task: bool = False,
         inner_middlewares: Sequence[HandlerInnerMdwT] | None = None,
         outer_middlewares: Sequence[HandlerOuterMdwT] | None = None,
-    ) -> Callable[[T], T]:
-        def inner(handler: T) -> T:
+    ) -> Callable[[HandlerT], HandlerT]:
+        def inner(handler: HandlerT) -> HandlerT:
             handler_obj = self._create_handler_obj(
                 handler=handler,
                 event_filter=event_filter,
