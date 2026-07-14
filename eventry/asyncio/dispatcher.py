@@ -1,6 +1,11 @@
+from collections.abc import Callable, Awaitable
+from dataclasses import dataclass
+
+from .callable_wrappers import Handler
 from .router import Router
 from typing import Any
 from eventry.event import Event
+from eventry.loggers import logger
 
 
 class Dispatcher:
@@ -41,3 +46,34 @@ class Dispatcher:
 
         context = self.event_context | event.dependencies_injection | (additional_context or {})
         await router.propagate_event(event, context)
+
+
+@dataclass
+class HandlerExecutionContext:
+    handler: Handler[Any]
+    event: Event
+    dispatcher: Dispatcher
+    router: Router
+    exception: Exception
+    context: dict[str, Any]
+
+
+async def on_handler_error_callback(execution_context: HandlerExecutionContext) -> None:
+    logger.error(
+        f'An error occurred while executing handler {execution_context.handler.id!r}@<router path> -> <manager_name> '
+        f'for event {execution_context.event.name!r}.',
+        exc_info=execution_context.exception
+    )
+
+
+async def on_handler_success_callback(execution_context: HandlerExecutionContext) -> None:
+    return
+
+
+@dataclass(kw_only=True)
+class EventDispatchingConfig:
+    single_handler: bool = False
+    on_handler_error: Callable[[HandlerExecutionContext], Awaitable[Any]] = on_handler_error_callback
+    on_handler_success: Callable[[HandlerExecutionContext], Awaitable[Any]] = on_handler_success_callback
+    on_manager_error: Callable[[HandlerExecutionContext], Awaitable[Any]] = on_handler_error_callback
+    on_router_error: Callable[[HandlerExecutionContext], Awaitable[Any]] = on_handler_error_callback
