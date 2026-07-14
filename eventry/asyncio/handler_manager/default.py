@@ -9,9 +9,9 @@ from collections.abc import Callable
 from .base import HandlerManager
 from eventry.asyncio.middleware_manager import MiddlewareManager
 from functools import partial
+from eventry.asyncio.filter import Filter
 
 if TYPE_CHECKING:
-    from eventry.asyncio.filter import Filter
     from .base import EventFilter
     from eventry.config import HandlerManagerConfig
 

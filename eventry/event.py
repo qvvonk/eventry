@@ -7,14 +7,10 @@ from collections.abc import Iterator
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:
-    from eventry.asyncio.handler_manager import HandlerManager
-
 
 class EventBase:
     if TYPE_CHECKING:
         __event_name__: str
-    __handled__: bool = False
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         name = kwargs.pop('event_name', None)
@@ -59,15 +55,7 @@ class Event(EventBase, event_name='event'):
         self._propagation_stopped = True
 
     @property
-    def event_context_injection(self) -> dict[str, Any]:
-        """
-        Data to inject into the event context.
-
-        Subclasses may override this property to provide additional
-        key-value pairs that will be merged into the event context.
-
-        :return: A dictionary with event-specific context data.
-        """
+    def dependencies_injection(self) -> dict[str, Any]:
         return {}
 
     @property
