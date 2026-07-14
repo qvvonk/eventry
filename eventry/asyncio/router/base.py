@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+from copy import copy
 
 if TYPE_CHECKING:
     from eventry.asyncio.handler_manager import HandlerManager
@@ -33,17 +34,16 @@ class Router:
         r._parent = None
         return r
 
-    async def propagate_event(self, event: Event, **di):
+    async def propagate_event(self, event: Event, di: dict[str, Any]):
         for i in self._handler_managers.values():
-            await i.propagate_event(event, di)
+            manager_di = copy(di)
+            await i.propagate_event(event, manager_di)
             if event.propagation_stopped:
                 return
 
-        if event.propagation_stopped:
-            return
-
         for r in self._sub_routers.values():
-            await r.propagate_event(event, **di)
+            subrouter_di = copy(di)
+            await r.propagate_event(event, subrouter_di)
             if event.propagation_stopped:
                 return
 

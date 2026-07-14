@@ -58,7 +58,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
         self._has_self = hasattr(_callable, '__self__')
         _callable = _callable if isinstance(self._callable, FunctionType) else _callable.__func__
         _code = _callable.__code__
-        self._posonly_c = _code.co_posonlyargcount - self._has_self
+        self._posonly_c = max(0, _code.co_posonlyargcount - self._has_self)
         self._args_c = _code.co_argcount - self._has_self
         self._kwonly_c = _code.co_kwonlyargcount
         self._total_args_c = self._args_c + self._kwonly_c
@@ -70,7 +70,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
         self._nondef_kwonly_c = self._kwonly_c - len(_callable.__kwdefaults__ or {})
         self._names = _code.co_varnames[self._has_self : self._args_c + self._kwonly_c + self._has_self]
         self._defaults = _callable.__defaults__ or ()
-        self._kwargs_defaults = getattr(_callable, '__kwdefaults__', {})
+        self._kwargs_defaults = _callable.__kwdefaults__ or {}
         self._is_async = bool(_code.co_flags & 0x80)
 
     def collect_args(self, args: Sequence[Any] = (), kwargs: Mapping[str, Any] | None = None) -> tuple[list[Any], dict[str, Any]]:
@@ -197,10 +197,15 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
         self._filter = filter if filter is not None else dummy_filter()
         self._event_filter = event_filter
         self._outer_middlewares = [
-            MiddlewareCallable(i) for i in outer_middlewares if not isinstance(i, MiddlewareCallable)
+            i if isinstance(i, MiddlewareCallable)
+            else MiddlewareCallable(i)
+            for i in outer_middlewares
         ]
+
         self._inner_middlewares = [
-            MiddlewareCallable(i) for i in inner_middlewares if not isinstance(i, MiddlewareCallable)
+            i if isinstance(i, MiddlewareCallable)
+            else MiddlewareCallable(i)
+            for i in inner_middlewares
         ]
 
     @property
