@@ -1,4 +1,9 @@
 from __future__ import annotations
+
+
+__all__ = ['Router']
+
+
 from typing import TYPE_CHECKING, Any
 from copy import copy
 
