@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from collections.abc import Callable
 from .base import HandlerManager
 from eventry.asyncio.middleware_manager import MiddlewareManager
+from functools import partial
 
 if TYPE_CHECKING:
     from eventry.asyncio.filter import Filter
@@ -56,18 +57,21 @@ class DefaultHandlerManager(
         self.set_middleware_manager('handler.outer', MiddlewareManager())
         self.set_middleware_manager('handler.inner', MiddlewareManager())
 
+    # Use partial to keep the decorator syntax consistent:
+    # all decorators are called with parentheses.
+    # todo: type hints
     @property
     def manager_outer_middleware(self):
-        return self.middleware('manager.inner')
+        return partial(self.middleware, scope='manager.outer')
 
     @property
     def manager_inner_middleware(self):
-        return self.middleware('manager.inner')
+        return partial(self.middleware, scope='manager.inner')
 
     @property
     def handler_outer_middleware(self):
-        return self.middleware('handler.outer')
+        return partial(self.middleware, scope='handler.outer')
 
     @property
     def handler_inner_middleware(self):
-        return self.middleware('handler.inner')
+        return partial(self.middleware, scope='handler.inner')

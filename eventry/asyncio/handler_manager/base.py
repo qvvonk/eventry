@@ -240,10 +240,12 @@ class HandlerManager(
     def filter(self) -> Filter:
         return self._filter
 
-    async def _execute_handler_inner(self, handler: Handler[Any], **_di):
-        return await handler(self.config.collect_handler_args(_di), _di)
+    async def _execute_handler_inner(self, handler: Handler[Any], di: dict[str, Any]):
+        di = copy(di)
+        return await handler(self.config.collect_handler_args(di), di)
 
-    async def _execute_handler(self, handler: Handler[Any], **di) -> Any:
+    async def _execute_handler(self, handler: Handler[Any], di: dict[str, Any]) -> Any:
+        di = copy(di)
         wrapped = MiddlewareManager.wrap_with_di_middlewares(
             partial(self._execute_handler_inner, handler),
             list(self.get_middleware_manager('handler.inner') or []) + handler.inner_middlewares,
@@ -251,18 +253,20 @@ class HandlerManager(
         )
         return await wrapped(di)
 
-    async def _execute_handler_with_filter_inner(self, handler: Handler[Any], **_di):
-        r = await handler.filter.execute(self.config.collect_handler_filter_args(_di), _di)
+    async def _execute_handler_with_filter_inner(self, handler: Handler[Any], di: dict[str, Any]):
+        di = copy(di)
+        r = await handler.filter.execute(self.config.collect_handler_filter_args(di), di)
         if not r and not isinstance(r, dict):
             return r
 
-        _di = copy(_di)
+        di = copy(di)
         if isinstance(r, Mapping):
-            _di |= r
+            di |= r
 
-        return await self._execute_handler(handler, **_di)
+        return await self._execute_handler(handler, di)
 
-    async def _execute_handler_with_filter(self, handler: Handler[Any], **di):
+    async def _execute_handler_with_filter(self, handler: Handler[Any], di: dict[str, Any]):
+        di = copy(di)
         wrapped = MiddlewareManager.wrap_with_di_middlewares(
             partial(self._execute_handler_with_filter_inner, handler),
             list(self.get_middleware_manager('handler.outer') or []) + handler.outer_middlewares,
@@ -270,33 +274,36 @@ class HandlerManager(
         )
         return await wrapped(di)
 
-    async def _execute_handlers_inner(self, event: Event, **_di):
+    async def _execute_handlers_inner(self, event: Event, di: dict[str, Any]):
+        di = copy(di)
         for i in self.get_matching_handlers(event):
-            await self._execute_handler_with_filter(i, **_di)
+            await self._execute_handler_with_filter(i, di)
             if event.propagation_stopped:
                 return
 
-    async def _execute_handlers(self, event: Event, **di):
+    async def _execute_handlers(self, event: Event, di: dict[str, Any]):
+        di = copy(di)
         wrapped = MiddlewareManager.wrap_with_di_middlewares(
-            partial(self._execute_handlers_inner, event),
+            partial(self._execute_handlers_inner, event, di),
             self.get_middleware_manager('manager.inner') or [],
             self.config.collect_manager_inner_mdw_args
         )
         return await wrapped(di)
 
-    async def _execute_handlers_with_mgr_filter(self, event: Event, **_di):
-        r = await self.filter.execute(self.config.collect_manager_filter_args(_di), _di)
+    async def _execute_handlers_with_mgr_filter(self, event: Event, di: dict[str, Any]):
+        di = copy(di)
+        r = await self.filter.execute(self.config.collect_manager_filter_args(di), di)
         if r is False or r is None:
             return r
-        return await self._execute_handlers(event, **_di)
 
-    async def propagate_event(self, event: Event, **di):
-        wrapped = MiddlewareManager.wrap_with_di_middlewares(
-            partial(self._execute_handlers_with_mgr_filter, event),
-            self.get_middleware_manager('manager.outer') or [],
-            self.config.collect_manager_outer_mdw_args
-        )
+        di = copy(di)
+        if isinstance(r, Mapping):
+            di |= r
 
+        return await self._execute_handlers(event, di)
+
+    async def propagate_event(self, event: Event, di: dict[str, Any]):
+        di = copy(di)
         self.config.update_di_with_manager_outer_mdw_args(di)
         self.config.update_di_with_manager_filter_args(di)
         self.config.update_di_with_manager_inner_mdw_args(di)
@@ -304,6 +311,12 @@ class HandlerManager(
         self.config.update_di_with_handler_filter_args(di)
         self.config.update_di_with_handler_inner_mdw_args(di)
         self.config.update_di_with_handler_args(di)
+
+        wrapped = MiddlewareManager.wrap_with_di_middlewares(
+            partial(self._execute_handlers_with_mgr_filter, event, di),
+            self.get_middleware_manager('manager.outer') or [],
+            self.config.collect_manager_outer_mdw_args
+        )
 
         return await wrapped(di)
 
