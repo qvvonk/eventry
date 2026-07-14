@@ -242,6 +242,9 @@ class HandlerManager(
 
     async def _execute_handler_inner(self, handler: Handler[Any], di: dict[str, Any]):
         di = copy(di)
+        print('---')
+        print(di)
+        print('---')
         return await handler(self.config.collect_handler_args(di), di)
 
     async def _execute_handler(self, handler: Handler[Any], di: dict[str, Any]) -> Any:
@@ -258,10 +261,6 @@ class HandlerManager(
         r = await handler.filter.execute(self.config.collect_handler_filter_args(di), di)
         if not r and not isinstance(r, dict):
             return r
-
-        di = copy(di)
-        if isinstance(r, Mapping):
-            di |= r
 
         return await self._execute_handler(handler, di)
 
@@ -295,10 +294,6 @@ class HandlerManager(
         r = await self.filter.execute(self.config.collect_manager_filter_args(di), di)
         if r is False or r is None:
             return r
-
-        di = copy(di)
-        if isinstance(r, Mapping):
-            di |= r
 
         return await self._execute_handlers(event, di)
 

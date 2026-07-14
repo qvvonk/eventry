@@ -35,7 +35,7 @@ class Router:
 
     async def propagate_event(self, event: Event, **di):
         for i in self._handler_managers.values():
-            await i.propagate_event(event, **di)
+            await i.propagate_event(event, di)
             if event.propagation_stopped:
                 return
 

@@ -30,20 +30,21 @@ def wrap_with_di_middlewares(
     middlewares: Sequence[Callable[..., Any] | MiddlewareCallable[Any]],
     pos_args_collector: Callable[[dict[str, Any]], list[Any]] | None = None
 ):
-    def wrapper_factory(wrapping_callable, wrapped_callable):
+    def wrapper_factory(wrapping_callable, next_call):
         async def wrapped(di):
             nonlocal wrapping_callable
             if not isinstance(wrapping_callable, CallableWrapper):
                 wrapping_callable = CallableWrapper(wrapping_callable)
 
             data = di | {'di': di}
-            if wrapped_callable is not None:
-                data.update({'next_call': wrapped_callable})
-            return await wrapping_callable(pos_args_collector(di), data)
+            if next_call is not None:
+                data.update({'next_call': next_call})
+
+            args = pos_args_collector(di) if next_call is not None and pos_args_collector is not None else []
+            return await wrapping_callable(args, data)
         return wrapped
+
     return wrap_with_middlewares(callable_to_wrap, middlewares, wrapper_factory)
-
-
 
 T = TypeVar('T')
 

@@ -80,8 +80,10 @@ class CallableWrapper(Generic[ReturnTypeT]):
         if len(args) > self._args_c and not self._has_varargs:
             raise ValueError(
                 f'Too many positional arguments. '
-                f'Callable has no varargs and accepts at most {self._args_c} positional arguments, '
-                f'but {len(args)} were given.'
+                f'Callable {self._callable.__qualname__!r} has no varargs '
+                f'and accepts at most {self._args_c} positional arguments, '
+                f'but {len(args)} were given.\n'
+                f'Passed args: {args}.'
             )
 
         r_args = [i if type(i) is not FromData else kwargs[i] for i in args] if args else []
@@ -92,7 +94,8 @@ class CallableWrapper(Generic[ReturnTypeT]):
                 name = self._names[arg_name_index]
                 if name not in kwargs:
                     raise ValueError(
-                        f'Callable accepts {self._nondef_args_c} non-default arguments, '
+                        f'Callable {self._callable.__qualname__!r} '
+                        f'accepts {self._nondef_args_c} non-default arguments, '
                         f'but only {len(args)} positional args were given.\n'
                         f'Considering this, tried to find value for non-default argument '
                         f'{arg_name_index} ({name!r}) in given kwargs dict, but no value was found.'
@@ -145,7 +148,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
         args: Sequence[Any] = (),
         data: dict[str, Any] | None = None,
         to_thread: bool = True
-    ) -> ReturnTypeT:
+    ) -> Awaitable[ReturnTypeT]:
         pos_args, kwargs = self.collect_args(args, data)
         if self._is_async:
             return self._callable(*pos_args, **kwargs)
