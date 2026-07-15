@@ -1,6 +1,5 @@
 __all__ = [
     'MiddlewareManager',
-    'wrap_with_middlewares',
     'MiddlewareRegistrar',
 ]
 
@@ -12,39 +11,6 @@ from enum import Enum
 
 
 WrappedT = TypeVar('WrappedT', bound='Callable[..., Any]')
-
-
-def wrap_with_middlewares(
-    callable_to_wrap: Callable[..., Any] | CallableWrapper[Any],
-    middlewares: Sequence[Callable[..., Any] | MiddlewareCallable[Any]],
-    wrapper_factory: Callable[[WrappedT, WrappedT | None], WrappedT]
-) -> WrappedT:
-    current_call = wrapper_factory(callable_to_wrap, None)
-    for middleware in reversed(middlewares):
-        current_call = wrapper_factory(middleware, current_call)
-    return current_call
-
-
-def wrap_with_di_middlewares(
-    callable_to_wrap: Callable[..., Any] | CallableWrapper[Any],
-    middlewares: Sequence[Callable[..., Any] | MiddlewareCallable[Any]],
-    pos_args_collector: Callable[[dict[str, Any]], list[Any]] | None = None
-):
-    def wrapper_factory(wrapping_callable, next_call):
-        async def wrapped(di):
-            nonlocal wrapping_callable
-            if not isinstance(wrapping_callable, CallableWrapper):
-                wrapping_callable = CallableWrapper(wrapping_callable)
-
-            data = di | {'di': di}
-            if next_call is not None:
-                data.update({'next_call': next_call})
-
-            args = pos_args_collector(di) if next_call is not None and pos_args_collector is not None else []
-            return await wrapping_callable(args, data)
-        return wrapped
-
-    return wrap_with_middlewares(callable_to_wrap, middlewares, wrapper_factory)
 
 T = TypeVar('T')
 
@@ -109,8 +75,16 @@ class MiddlewareManager(Sequence[MiddlewareCallable[Any]]):
     def __reversed__(self) -> Iterator[MiddlewareCallable]:
         return reversed(self._middlewares)
 
-    wrap_with_middlewares = staticmethod(wrap_with_middlewares)
-    wrap_with_di_middlewares = staticmethod(wrap_with_di_middlewares)
+    @staticmethod
+    def wrap_with_middlewares(
+        callable_to_wrap: Callable[..., Any] | CallableWrapper[Any],
+        middlewares: Sequence[Callable[..., Any] | MiddlewareCallable[Any]],
+        wrapper_factory: Callable[[WrappedT, WrappedT | None], WrappedT]
+    ) -> WrappedT:
+        current_call = wrapper_factory(callable_to_wrap, None)
+        for middleware in reversed(middlewares):
+            current_call = wrapper_factory(middleware, current_call)
+        return current_call
 
 
 class RegistrarParent(Protocol):

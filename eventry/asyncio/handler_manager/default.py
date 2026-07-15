@@ -13,7 +13,7 @@ from eventry.asyncio.filter import Filter
 
 if TYPE_CHECKING:
     from .base import EventFilter
-    from eventry.config import HandlerManagerConfig
+    from eventry._config import HandlerManagerConfig
 
 
 FilterCallable = Callable[..., bool | None | dict[str, Any]]
