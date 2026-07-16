@@ -41,6 +41,7 @@ class TemplateDescriptor:
             raise ValueError('Template must contain \'{index}\'.')
         self._value = value
 
+
 @dataclass(kw_only=True)
 class HandlerManagerConfig:
     isolate_handler_context: bool = True
@@ -54,13 +55,13 @@ class HandlerManagerConfig:
     handler_inner_mdw_args: Sequence[Any] = field(default_factory=list)
     handler_args: Sequence[Any] = field(default_factory=list)
 
-    manager_outer_mdw_arg_key_template: str = TemplateDescriptor('__mgr_outer_mdw_{index}__')
+    manager_outer_mdw_arg_key_template: str = TemplateDescriptor('__mgr_outer_{index}__')
     manager_filter_arg_key_template: str = TemplateDescriptor('__mgr_filter_{index}__')
-    manager_inner_mdw_arg_key_template: str = TemplateDescriptor('__mgr_inner_mdw_{index}__')
-    handler_outer_mdw_arg_key_template: str = TemplateDescriptor('__handler_outer_mdw_{index}__')
+    manager_inner_mdw_arg_key_template: str = TemplateDescriptor('__mgr_inner_{index}__')
+    handler_outer_mdw_arg_key_template: str = TemplateDescriptor('__handler_outer_{index}__')
     handler_filter_arg_key_template: str = TemplateDescriptor('__handler_filter_{index}__')
-    handler_inner_mdw_arg_key_template: str = TemplateDescriptor('__handler_inner_mdw_arg_{index}__')
-    handler_arg_key_template: str = TemplateDescriptor('__eventry_handler_arg_{index}__')
+    handler_inner_mdw_arg_key_template: str = TemplateDescriptor('__handler_inner_{index}__')
+    handler_arg_key_template: str = TemplateDescriptor('__handler_{index}__')
 
     def collect_manager_outer_mdw_args(self, di: dict[str, Any]) -> list[Any]:
         return _collect_args(di, self.manager_outer_mdw_arg_key_template, len(self.manager_outer_mdw_args))
