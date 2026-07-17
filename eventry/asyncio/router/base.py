@@ -3,7 +3,7 @@ from __future__ import annotations
 
 __all__ = ['Router']
 
-
+from dataclasses import asdict
 from typing import TYPE_CHECKING, Any
 from collections.abc import Generator
 from copy import copy
@@ -50,9 +50,11 @@ class Router:
         execution_ctx: ExecutionContext,
         context: dict[str, Any],
     ):
+        router_execution_ctx = RouterExecutionContext(router=self, **asdict(execution_ctx))
         for i in self._handler_managers.values():
             manager_context = copy(context)
-            await i.propagate_event(event, manager_context)
+
+            await i.propagate_event(event, config, router_execution_ctx, manager_context)
             if event.propagation_stopped:
                 return
 
