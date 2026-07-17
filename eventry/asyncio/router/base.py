@@ -5,11 +5,15 @@ __all__ = ['Router']
 
 
 from typing import TYPE_CHECKING, Any
+from collections.abc import Generator
 from copy import copy
+from eventry._execution_context import ExecutionContext, RouterExecutionContext
+from eventry._config import AsyncEventDispatchingConfig as EventDispatchingConfig
 
 if TYPE_CHECKING:
     from eventry.asyncio.handler_manager import HandlerManager
     from eventry.event import Event
+
 
 
 class Router:
@@ -39,18 +43,37 @@ class Router:
         r._parent = None
         return r
 
-    async def propagate_event(self, event: Event, di: dict[str, Any]):
+    async def propagate_event(
+        self,
+        event: Event,
+        config: EventDispatchingConfig,
+        execution_ctx: ExecutionContext,
+        context: dict[str, Any],
+    ):
         for i in self._handler_managers.values():
-            manager_di = copy(di)
-            await i.propagate_event(event, manager_di)
+            manager_context = copy(context)
+            await i.propagate_event(event, manager_context)
             if event.propagation_stopped:
                 return
 
         for r in self._sub_routers.values():
-            subrouter_di = copy(di)
-            await r.propagate_event(event, subrouter_di)
+            subrouter_context = copy(context)
+            await r.propagate_event(event, config, execution_ctx, subrouter_context)
             if event.propagation_stopped:
                 return
+
+    @property
+    def chain_to_root(self) -> Generator[Router, None, None]:
+        r = self
+        while r.parent is not None:
+            yield r
+            r = r.parent
+
+    @property
+    def chain_to_tails(self) -> Generator[Router, None, None]:
+        yield self
+        for r in self._sub_routers.values():
+            yield from r.chain_to_tails
 
     @property
     def name(self) -> str:

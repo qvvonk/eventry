@@ -1,11 +1,10 @@
-from collections.abc import Callable, Awaitable
-from dataclasses import dataclass
+from __future__ import annotations
 
-from .callable_wrappers import Handler
 from .router import Router
 from typing import Any
 from eventry.event import Event
-from eventry.loggers import logger
+from eventry._execution_context import ExecutionContext
+from eventry._config import AsyncEventDispatchingConfig as EventDispatchingConfig
 
 
 class Dispatcher:
@@ -15,9 +14,11 @@ class Dispatcher:
         self,
         router: Router,
         event_context: dict[str, Any] | None = None,
+        config: EventDispatchingConfig | None = None
     ) -> None:
         self.router = router
         self._event_context = event_context or {}
+        self._config = config if config is not None else EventDispatchingConfig()
 
     @property
     def router(self) -> Router | None:
@@ -33,47 +34,28 @@ class Dispatcher:
     def event_context(self) -> dict[str, Any]:
         return self._event_context
 
+    @property
+    def config(self) -> EventDispatchingConfig:
+        return self._config
+
     async def propagate_event(
         self,
         event: Event,
         *,
         router: Router | None = None,
-        additional_context: dict[str, Any] | None = None
+        additional_context: dict[str, Any] | None = None,
+        config: EventDispatchingConfig | None = None
     ) -> None:
         router = router if router is not None else self.router
         if router is None:
             raise ValueError('Router is not set.')
 
+        config = config if config is not None else self.config
         context = self.event_context | event.dependencies_injection | (additional_context or {})
-        await router.propagate_event(event, context)
-
-
-@dataclass
-class HandlerExecutionContext:
-    handler: Handler[Any]
-    event: Event
-    dispatcher: Dispatcher
-    router: Router
-    exception: Exception
-    context: dict[str, Any]
-
-
-async def on_handler_error_callback(execution_context: HandlerExecutionContext) -> None:
-    logger.error(
-        f'An error occurred while executing handler {execution_context.handler.id!r}@<router path> -> <manager_name> '
-        f'for event {execution_context.event.name!r}.',
-        exc_info=execution_context.exception
-    )
-
-
-async def on_handler_success_callback(execution_context: HandlerExecutionContext) -> None:
-    return
-
-
-@dataclass(kw_only=True)
-class EventDispatchingConfig:
-    single_handler: bool = False
-    on_handler_error: Callable[[HandlerExecutionContext], Awaitable[Any]] = on_handler_error_callback
-    on_handler_success: Callable[[HandlerExecutionContext], Awaitable[Any]] = on_handler_success_callback
-    on_manager_error: Callable[[HandlerExecutionContext], Awaitable[Any]] = on_handler_error_callback
-    on_router_error: Callable[[HandlerExecutionContext], Awaitable[Any]] = on_handler_error_callback
+        execution_context = ExecutionContext(
+            event=event,
+            dispatcher=self,
+            context=context,
+            exception=None
+        )
+        await router.propagate_event(event, context, config, execution_ctx)

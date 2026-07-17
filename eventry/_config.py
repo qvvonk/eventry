@@ -1,11 +1,14 @@
 __all__ = [
     'HandlerManagerConfig',
+    'AsyncEventDispatchingConfig',
 ]
 
 
-from collections.abc import Sequence
+from collections.abc import Sequence, Callable, Awaitable
 from dataclasses import dataclass, field
 from typing import Any
+from .loggers import logger
+from ._execution_context import RouterExecutionContext, HandlerExecutionContext, ManagerExecutionContext
 
 
 def _collect_args(di: dict[str, Any], template: str, amount: int | None = None) -> list[Any]:
@@ -110,3 +113,39 @@ class HandlerManagerConfig:
 
     def update_di_with_handler_args(self, di: dict[str, Any]) -> None:
         update_context_with_args(di, self.handler_args, self.handler_arg_key_template)
+
+
+async def on_error_callback(ctx: RouterExecutionContext) -> None:
+    if not isinstance(ctx, RouterExecutionContext):
+        return
+
+
+    router_path = '.'.join(f'{i.name!r}' for i in ctx.router.chain_to_root)
+
+    if isinstance(ctx, HandlerExecutionContext):
+        logger.error(
+            f'An error occurred while executing handler {ctx.handler.id!r} @ {ctx.manager.name!r} @ {router_path}'
+            f'for event {ctx.event.name!r}.',
+            exc_info=ctx.exception
+        )
+    elif isinstance(ctx, ManagerExecutionContext):
+        logger.error(
+            f'An error occurred while executing handlers of manager {ctx.manager.name!r} @ {router_path}.',
+            exc_info=ctx.exception
+        )
+    else:
+        logger.error(
+            f'An error occurred while executing handlers of router {router_path}.',
+            exc_info=ctx.exception
+        )
+
+
+async def on_handler_callback(ctx: HandlerExecutionContext) -> None:
+    return
+
+
+@dataclass(kw_only=True)
+class AsyncEventDispatchingConfig:
+    single_handler: bool = False
+    on_error: Callable[[RouterExecutionContext], Awaitable[Any]] = on_error_callback
+    on_handler: Callable[[HandlerExecutionContext], Awaitable[Any]] = on_handler_callback
