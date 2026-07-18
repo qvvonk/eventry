@@ -341,13 +341,13 @@ class HandlerManager(
         execution_ctx: RouterExecutionContext,
         context: dict[str, Any]
     ):
-        self.config.update_di_with_manager_outer_mdw_args(context)
-        self.config.update_di_with_manager_filter_args(context)
-        self.config.update_di_with_manager_inner_mdw_args(context)
-        self.config.update_di_with_handler_outer_mdw_args(context)
-        self.config.update_di_with_handler_filter_args(context)
-        self.config.update_di_with_handler_inner_mdw_args(context)
-        self.config.update_di_with_handler_args(context)
+        self.config.update_ctx_with_manager_outer_mdw_args(context)
+        self.config.update_ctx_with_manager_filter_args(context)
+        self.config.update_ctx_with_manager_inner_mdw_args(context)
+        self.config.update_ctx_with_handler_outer_mdw_args(context)
+        self.config.update_ctx_with_handler_filter_args(context)
+        self.config.update_ctx_with_handler_inner_mdw_args(context)
+        self.config.update_ctx_with_handler_args(context)
 
         wrapped = MiddlewareManager.wrap_with_middlewares(
             partial(self._execute_handlers_with_mgr_filter, event, config, execution_ctx),

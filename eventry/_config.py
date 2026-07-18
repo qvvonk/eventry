@@ -47,8 +47,6 @@ class TemplateDescriptor:
 
 @dataclass(kw_only=True)
 class HandlerManagerConfig:
-    isolate_handler_context: bool = True
-
     manager_outer_mdw_args: Sequence[Any] = field(default_factory=list)
     manager_filter_args: Sequence[Any] = field(default_factory=list)
     manager_inner_mdw_args: Sequence[Any] = field(default_factory=list)
@@ -66,53 +64,53 @@ class HandlerManagerConfig:
     handler_inner_mdw_arg_key_template: str = TemplateDescriptor('__handler_inner_{index}__')
     handler_arg_key_template: str = TemplateDescriptor('__handler_{index}__')
 
-    def collect_manager_outer_mdw_args(self, di: dict[str, Any]) -> list[Any]:
-        return _collect_args(di, self.manager_outer_mdw_arg_key_template, len(self.manager_outer_mdw_args))
+    def collect_manager_outer_mdw_args(self, ctx: dict[str, Any]) -> list[Any]:
+        return _collect_args(ctx, self.manager_outer_mdw_arg_key_template, len(self.manager_outer_mdw_args))
 
-    def collect_manager_filter_args(self, di: dict[str, Any]) -> list[Any]:
-        return _collect_args(di, self.manager_filter_arg_key_template, len(self.manager_filter_args))
+    def collect_manager_filter_args(self, ctx: dict[str, Any]) -> list[Any]:
+        return _collect_args(ctx, self.manager_filter_arg_key_template, len(self.manager_filter_args))
 
-    def collect_manager_inner_mdw_args(self, di: dict[str, Any]) -> list[Any]:
-        return _collect_args(di, self.manager_inner_mdw_arg_key_template, len(self.manager_inner_mdw_args))
+    def collect_manager_inner_mdw_args(self, ctx: dict[str, Any]) -> list[Any]:
+        return _collect_args(ctx, self.manager_inner_mdw_arg_key_template, len(self.manager_inner_mdw_args))
 
-    def collect_handler_outer_mdw_args(self, di: dict[str, Any]) -> list[Any]:
-        return _collect_args(di, self.handler_outer_mdw_arg_key_template, len(self.handler_outer_mdw_args))
+    def collect_handler_outer_mdw_args(self, ctx: dict[str, Any]) -> list[Any]:
+        return _collect_args(ctx, self.handler_outer_mdw_arg_key_template, len(self.handler_outer_mdw_args))
 
-    def collect_handler_filter_args(self, di: dict[str, Any]) -> list[Any]:
-        return _collect_args(di, self.handler_filter_arg_key_template, len(self.handler_filter_args))
+    def collect_handler_filter_args(self, ctx: dict[str, Any]) -> list[Any]:
+        return _collect_args(ctx, self.handler_filter_arg_key_template, len(self.handler_filter_args))
 
-    def collect_handler_inner_mdw_args(self, di: dict[str, Any]) -> list[Any]:
-        return _collect_args(di, self.handler_inner_mdw_arg_key_template, len(self.handler_inner_mdw_args))
+    def collect_handler_inner_mdw_args(self, ctx: dict[str, Any]) -> list[Any]:
+        return _collect_args(ctx, self.handler_inner_mdw_arg_key_template, len(self.handler_inner_mdw_args))
 
-    def collect_handler_args(self, di: dict[str, Any]) -> list[Any]:
-        return _collect_args(di, self.handler_arg_key_template, len(self.handler_args))
+    def collect_handler_args(self, ctx: dict[str, Any]) -> list[Any]:
+        return _collect_args(ctx, self.handler_arg_key_template, len(self.handler_args))
 
-    def update_di_with_manager_outer_mdw_args(self, di: dict[str, Any]) -> None:
-        update_context_with_args(di, self.manager_outer_mdw_args,
+    def update_ctx_with_manager_outer_mdw_args(self, ctx: dict[str, Any]) -> None:
+        update_context_with_args(ctx, self.manager_outer_mdw_args,
                                  self.manager_outer_mdw_arg_key_template)
 
-    def update_di_with_manager_filter_args(self, di: dict[str, Any]) -> None:
-        update_context_with_args(di, self.manager_filter_args,
+    def update_ctx_with_manager_filter_args(self, ctx: dict[str, Any]) -> None:
+        update_context_with_args(ctx, self.manager_filter_args,
                                  self.manager_filter_arg_key_template)
 
-    def update_di_with_manager_inner_mdw_args(self, di: dict[str, Any]) -> None:
-        update_context_with_args(di, self.manager_inner_mdw_args,
+    def update_ctx_with_manager_inner_mdw_args(self, ctx: dict[str, Any]) -> None:
+        update_context_with_args(ctx, self.manager_inner_mdw_args,
                                  self.manager_inner_mdw_arg_key_template)
 
-    def update_di_with_handler_outer_mdw_args(self, di: dict[str, Any]) -> None:
-        update_context_with_args(di, self.handler_outer_mdw_args,
+    def update_ctx_with_handler_outer_mdw_args(self, ctx: dict[str, Any]) -> None:
+        update_context_with_args(ctx, self.handler_outer_mdw_args,
                                  self.handler_outer_mdw_arg_key_template)
 
-    def update_di_with_handler_filter_args(self, di: dict[str, Any]) -> None:
-        update_context_with_args(di, self.handler_filter_args,
+    def update_ctx_with_handler_filter_args(self, ctx: dict[str, Any]) -> None:
+        update_context_with_args(ctx, self.handler_filter_args,
                                  self.handler_filter_arg_key_template)
 
-    def update_di_with_handler_inner_mdw_args(self, di: dict[str, Any]) -> None:
-        update_context_with_args(di, self.handler_inner_mdw_args,
+    def update_ctx_with_handler_inner_mdw_args(self, ctx: dict[str, Any]) -> None:
+        update_context_with_args(ctx, self.handler_inner_mdw_args,
                                  self.handler_inner_mdw_arg_key_template)
 
-    def update_di_with_handler_args(self, di: dict[str, Any]) -> None:
-        update_context_with_args(di, self.handler_args, self.handler_arg_key_template)
+    def update_ctx_with_handler_args(self, ctx: dict[str, Any]) -> None:
+        update_context_with_args(ctx, self.handler_args, self.handler_arg_key_template)
 
 
 async def on_error_callback(ctx: RouterExecutionContext) -> None:
