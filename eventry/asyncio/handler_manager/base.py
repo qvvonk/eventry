@@ -8,11 +8,9 @@ __all__ = [
 
 import asyncio
 import inspect
-from dataclasses import asdict
 from functools import partial
 from types import MappingProxyType
 from collections.abc import Callable, Generator, Sequence, Awaitable
-from copy import copy
 from typing import TYPE_CHECKING, Any, TypeVar, Literal, Generic
 
 from eventry.asyncio.filter import Filter, FilterFromFunction, convert_filters, dummy_filter
@@ -121,7 +119,7 @@ class HandlerManager(
 
         if manager_type not in ManagerMdwTypes:
             raise ValueError(
-                f'Handler manager does not support {manager_type!r} middleware manager.'
+                f'Handler manager does not support {manager_type!r} type of middleware manager.'
             )
 
         if manager is not None:
@@ -351,6 +349,9 @@ class HandlerManager(
         execution_ctx: RouterExecutionContext,
         context: dict[str, Any]
     ):
+        if not self.event_filter(event):
+            return None
+
         self.config.update_ctx_with_manager_outer_mdw_args(context)
         self.config.update_ctx_with_manager_filter_args(context)
         self.config.update_ctx_with_manager_inner_mdw_args(context)
