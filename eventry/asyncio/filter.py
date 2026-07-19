@@ -21,7 +21,7 @@ from collections.abc import Callable, Iterable, Sequence, Awaitable
 from .callable_wrappers import CallableWrapper
 
 
-CallableFilter: TypeAlias = Callable[..., bool | Awaitable[bool]]
+CallableFilter: TypeAlias = Callable[..., bool | dict[str, Any] | Awaitable[bool | dict[str, Any]]]
 
 
 class Filter:
@@ -77,11 +77,11 @@ class Filter:
 
         return NotFilter(self)
 
-    async def execute(self, args: Sequence[Any], data: dict[str, Any]) -> bool | dict[str, Any]:
+    async def execute(self, args: Sequence[Any], data: dict[str, Any]) -> bool:
         result = await self._call_wrapper(args, data)
         if isinstance(result, dict):
             data.update(result)
-        return result
+        return bool(result)
 
 
 class LogicalFilter(Filter, ABC): ...
