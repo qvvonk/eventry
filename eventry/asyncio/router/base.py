@@ -3,17 +3,17 @@ from __future__ import annotations
 
 __all__ = ['Router']
 
-from dataclasses import asdict
 from typing import TYPE_CHECKING, Any
-from collections.abc import Generator
 from copy import copy
-from eventry._execution_context import ExecutionContext, RouterExecutionContext
+from collections.abc import Generator
+
 from eventry._config import AsyncEventDispatchingConfig as EventDispatchingConfig
+from eventry._execution_context import ExecutionContext, RouterExecutionContext
+
 
 if TYPE_CHECKING:
-    from eventry.asyncio.handler_manager import HandlerManager
     from eventry.event import Event
-
+    from eventry.asyncio.handler_manager import HandlerManager
 
 
 class Router:
@@ -50,7 +50,9 @@ class Router:
         execution_ctx: ExecutionContext,
         context: dict[str, Any],
     ):
-        router_execution_ctx = RouterExecutionContext(router=self, **execution_ctx.shallow_asdict())
+        router_execution_ctx = RouterExecutionContext(
+            router=self, **execution_ctx.shallow_asdict()
+        )
         for i in self._handler_managers.values():
             manager_context = copy(context)
 

@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+
 __all__ = [
     'CallableWrapper',
     'FromData',
@@ -7,17 +9,17 @@ __all__ = [
 ]
 
 import asyncio
-from typing import Generic, TypeVar, TYPE_CHECKING, Any
-from collections.abc import Callable, Awaitable, Sequence, Mapping
+import inspect
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from types import MethodType, FunctionType
 from functools import partial
-import inspect
+from collections.abc import Mapping, Callable, Sequence, Awaitable
 
 
 if TYPE_CHECKING:
+    from eventry.event import Event
     from eventry.asyncio.filter import Filter
     from eventry.asyncio.handler_manager.base import EventFilter
-    from eventry.event import Event
 
 
 ReturnTypeT = TypeVar('ReturnTypeT')
@@ -53,7 +55,6 @@ class CallableWrapper(Generic[ReturnTypeT]):
         else:
             raise TypeError(f'Unable to find __call__ method in {type(__obj).__name__}.')
 
-
         self._callable = _callable
         self._has_self = hasattr(_callable, '__self__')
         _callable = _callable if isinstance(self._callable, FunctionType) else _callable.__func__
@@ -68,12 +69,16 @@ class CallableWrapper(Generic[ReturnTypeT]):
 
         self._nondef_args_c = self._args_c - len(_callable.__defaults__ or ())
         self._nondef_kwonly_c = self._kwonly_c - len(_callable.__kwdefaults__ or {})
-        self._names = _code.co_varnames[self._has_self : self._args_c + self._kwonly_c + self._has_self]
+        self._names = _code.co_varnames[
+            self._has_self : self._args_c + self._kwonly_c + self._has_self
+        ]
         self._defaults = _callable.__defaults__ or ()
         self._kwargs_defaults = _callable.__kwdefaults__ or {}
         self._is_async = bool(_code.co_flags & 0x80)
 
-    def collect_args(self, args: Sequence[Any] = (), kwargs: Mapping[str, Any] | None = None) -> tuple[list[Any], dict[str, Any]]:
+    def collect_args(
+        self, args: Sequence[Any] = (), kwargs: Mapping[str, Any] | None = None
+    ) -> tuple[list[Any], dict[str, Any]]:
         args = self._partial_args + list(args)
         kwargs = self._partial_kwargs | dict(kwargs or {})
 
@@ -83,7 +88,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
                 f'Callable {self._callable.__qualname__!r} has no varargs '
                 f'and accepts at most {self._args_c} positional arguments, '
                 f'but {len(args)} were given.\n'
-                f'Passed args: {args}.'
+                f'Passed args: {args}.',
             )
 
         r_args = [i if type(i) is not FromData else kwargs[i] for i in args] if args else []
@@ -98,7 +103,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
                         f'accepts {self._nondef_args_c} non-default arguments, '
                         f'but only {len(args)} positional args were given.\n'
                         f'Considering this, tried to find value for non-default argument '
-                        f'{arg_name_index} ({name!r}) in given kwargs dict, but no value was found.'
+                        f'{arg_name_index} ({name!r}) in given kwargs dict, but no value was found.',
                     )
                 r_args.append(kwargs[name])
                 bound_args_c += 1
@@ -125,7 +130,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
 
                 raise ValueError(
                     f'No value was found in given kwargs dict for non-default '
-                    f'kw-only argument {name!r}.'
+                    f'kw-only argument {name!r}.',
                 )
 
         if self._has_varkw:
@@ -147,7 +152,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
         self,
         args: Sequence[Any] = (),
         data: dict[str, Any] | None = None,
-        to_thread: bool = True
+        to_thread: bool = True,
     ) -> Awaitable[ReturnTypeT]:
         pos_args, kwargs = self.collect_args(args, data)
         if self._is_async:
@@ -160,7 +165,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
         self,
         _call: Callable[..., R],
         args: Sequence[Any],
-        kwargs: Mapping[str, Any]
+        kwargs: Mapping[str, Any],
     ) -> R:
         return _call(*args, **kwargs)
 
@@ -188,6 +193,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
         inner_middlewares: Sequence[MiddlewareCallable[Any] | Callable[..., Any]] | None = None,
     ):
         from eventry.asyncio.filter import dummy_filter
+
         outer_middlewares = outer_middlewares or []
         inner_middlewares = inner_middlewares or []
 
@@ -197,14 +203,12 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
         self._filter = filter if filter is not None else dummy_filter()
         self._event_filter = event_filter
         self._outer_middlewares = [
-            i if isinstance(i, MiddlewareCallable)
-            else MiddlewareCallable(i)
+            i if isinstance(i, MiddlewareCallable) else MiddlewareCallable(i)
             for i in outer_middlewares
         ]
 
         self._inner_middlewares = [
-            i if isinstance(i, MiddlewareCallable)
-            else MiddlewareCallable(i)
+            i if isinstance(i, MiddlewareCallable) else MiddlewareCallable(i)
             for i in inner_middlewares
         ]
 
@@ -235,7 +239,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
     def check_event(self, event: Event) -> bool:
         if self.event_filter is None:
             return True
-        elif isinstance(self.event_filter, str):
+        if isinstance(self.event_filter, str):
             return self.event_filter == event.name
 
         return self.event_filter(event)

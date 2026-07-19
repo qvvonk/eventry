@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from .router import Router
 from typing import Any
+
 from eventry.event import Event
-from eventry._execution_context import ExecutionContext
 from eventry._config import AsyncEventDispatchingConfig as EventDispatchingConfig
+from eventry._execution_context import ExecutionContext
+
+from .router import Router
 
 
 class Dispatcher:
@@ -14,7 +16,7 @@ class Dispatcher:
         self,
         router: Router,
         event_context: dict[str, Any] | None = None,
-        config: EventDispatchingConfig | None = None
+        config: EventDispatchingConfig | None = None,
     ) -> None:
         self.router = router
         self._event_context = event_context or {}
@@ -44,7 +46,7 @@ class Dispatcher:
         *,
         router: Router | None = None,
         additional_context: dict[str, Any] | None = None,
-        config: EventDispatchingConfig | None = None
+        config: EventDispatchingConfig | None = None,
     ) -> None:
         router = router if router is not None else self.router
         if router is None:

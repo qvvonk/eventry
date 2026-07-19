@@ -3,9 +3,9 @@ from __future__ import annotations
 
 __all__ = ['Event', 'ExtendedEvent']
 
-from collections.abc import Iterator
-from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
+from types import MappingProxyType
+from collections.abc import Iterator
 
 
 class EventBase:
@@ -18,13 +18,13 @@ class EventBase:
         if not getattr(cls, '__event_name__', None):
             if name is None:
                 raise TypeError(
-                    f'{cls.__name__} must be defined with keyword argument \'event_name\'.'
+                    f"{cls.__name__} must be defined with keyword argument 'event_name'.",
                 )
 
             if not isinstance(name, str):
                 raise ValueError(
                     f'Event name for class {cls.__name__} must be a string, '
-                    f'got {type(name).__name__}.'
+                    f'got {type(name).__name__}.',
                 )
 
         if name is not None:
@@ -113,5 +113,3 @@ class ExtendedEvent(Event, event_name='event'):
     @property
     def data(self) -> MappingProxyType[Any, Any]:
         return MappingProxyType(self._data)
-
-

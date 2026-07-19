@@ -3,23 +3,33 @@ from __future__ import annotations
 
 __all__ = [
     'HandlerManager',
-    'HandlerManagerConfig'
+    'HandlerManagerConfig',
 ]
 
 import asyncio
 import inspect
-from functools import partial
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
 from types import MappingProxyType
-from collections.abc import Callable, Generator, Sequence, Awaitable
-from typing import TYPE_CHECKING, Any, TypeVar, Literal, Generic
+from functools import partial
+from collections.abc import Callable, Sequence, Awaitable, Generator
 
-from eventry.asyncio.filter import Filter, FilterFromFunction, convert_filters, dummy_filter
-from eventry.asyncio.callable_wrappers import Handler, CallableWrapper
-from eventry._config import HandlerManagerConfig
-from eventry.asyncio.middleware_manager import MiddlewareManager, MiddlewareManagerType, MiddlewareRegistrar
-from eventry._config import AsyncEventDispatchingConfig as EventDispatchingConfig
-from eventry._execution_context import RouterExecutionContext, ManagerExecutionContext, HandlerExecutionContext
+from eventry._config import (
+    HandlerManagerConfig,
+    AsyncEventDispatchingConfig as EventDispatchingConfig,
+)
 from eventry.loggers import logger
+from eventry.asyncio.filter import Filter, FilterFromFunction, dummy_filter, convert_filters
+from eventry._execution_context import (
+    RouterExecutionContext,
+    HandlerExecutionContext,
+    ManagerExecutionContext,
+)
+from eventry.asyncio.callable_wrappers import Handler, CallableWrapper
+from eventry.asyncio.middleware_manager import (
+    MiddlewareManager,
+    MiddlewareRegistrar,
+    MiddlewareManagerType,
+)
 
 
 if TYPE_CHECKING:
@@ -40,7 +50,7 @@ MgrMdwsType = Literal[
     'manager.outer',
     'manager.inner',
     'handler.outer',
-    'handler.inner'
+    'handler.inner',
 ]
 
 ManagerMdwTypes = [
@@ -69,9 +79,10 @@ class HandlerManager(
         HandlerFilterT,
         HandlerInnerMdwT,
         HandlerT,
-    ]
+    ],
 ):
-    def __init__(self,
+    def __init__(
+        self,
         name: str,
         event_filter: EventFilter | None = None,
         config: HandlerManagerConfig | None = None,
@@ -89,7 +100,8 @@ class HandlerManager(
         self._filter: Filter = dummy_filter()
 
         self.middleware: MiddlewareRegistrar[MgrMdwsType] = MiddlewareRegistrar(
-            self, ManagerMdwTypes
+            self,
+            ManagerMdwTypes,
         )
 
     def set_filter(self, filter: ManagerFilterT) -> None:
@@ -105,11 +117,13 @@ class HandlerManager(
             return None
         return self._middleware_managers.get(mdw_type)
 
-    def set_middleware_manager(self, manager_type: MgrMdwsType, manager: MiddlewareManager | None) -> None:
+    def set_middleware_manager(
+        self, manager_type: MgrMdwsType, manager: MiddlewareManager | None
+    ) -> None:
         if manager is not None and not isinstance(manager, MiddlewareManager):
             raise TypeError(
                 f'Middleware manager must be an instance of MiddlewareManager, '
-                f'not {type(manager)!r}.'
+                f'not {type(manager)!r}.',
             )
 
         try:
@@ -119,7 +133,7 @@ class HandlerManager(
 
         if manager_type not in ManagerMdwTypes:
             raise ValueError(
-                f'Handler manager does not support {manager_type!r} type of middleware manager.'
+                f'Handler manager does not support {manager_type!r} type of middleware manager.',
             )
 
         if manager is not None:
@@ -250,7 +264,9 @@ class HandlerManager(
             make_mdw_wrapper_factory(self.config.collect_handler_inner_mdw_args),
         )(context)
 
-    async def _execute_handler_with_filter_inner(self, handler: Handler[Any], context: dict[str, Any]):
+    async def _execute_handler_with_filter_inner(
+        self, handler: Handler[Any], context: dict[str, Any]
+    ):
         r = await handler.filter.execute(self.config.collect_handler_filter_args(context), context)
         if not r and not isinstance(r, dict):
             return r
@@ -262,14 +278,17 @@ class HandlerManager(
         handler: Handler[Any],
         config: EventDispatchingConfig,
         execution_ctx: ManagerExecutionContext,
-        context: dict[str, Any]
+        context: dict[str, Any],
     ):
-        h_execution_ctx = HandlerExecutionContext(handler=handler, **execution_ctx.shallow_asdict())
+        h_execution_ctx = HandlerExecutionContext(
+            handler=handler, **execution_ctx.shallow_asdict()
+        )
         try:
             handler_result = await MiddlewareManager.wrap_with_middlewares(
                 partial(self._execute_handler_with_filter_inner, handler),
-                list(self.get_middleware_manager('handler.outer') or []) + handler.outer_middlewares,
-                make_mdw_wrapper_factory(self.config.collect_handler_outer_mdw_args)
+                list(self.get_middleware_manager('handler.outer') or [])
+                + handler.outer_middlewares,
+                make_mdw_wrapper_factory(self.config.collect_handler_outer_mdw_args),
             )(context)
         except Exception as handler_error:
             try:
@@ -277,14 +296,13 @@ class HandlerManager(
             except Exception as callback_error:
                 if callback_error is handler_error:
                     raise callback_error
-                else:
-                    logger.error(
-                        f'An error occurred while executing error callback of handler '
-                        f'{handler.id!r} @ {h_execution_ctx.manager.name!r} @ '
-                        f'{h_execution_ctx.router.full_name} '
-                        f'for event {h_execution_ctx.event.name!r}.',
-                        exc_info=handler_error
-                    )
+                logger.error(
+                    f'An error occurred while executing error callback of handler '
+                    f'{handler.id!r} @ {h_execution_ctx.manager.name!r} @ '
+                    f'{h_execution_ctx.router.full_name} '
+                    f'for event {h_execution_ctx.event.name!r}.',
+                    exc_info=handler_error,
+                )
             return
 
         try:
@@ -295,7 +313,7 @@ class HandlerManager(
                 f'{handler.id!r} @ {h_execution_ctx.manager.name!r} @ '
                 f'{h_execution_ctx.router.full_name} '
                 f'for event {h_execution_ctx.event.name!r}.',
-                exc_info=e
+                exc_info=e,
             )
 
     async def _execute_handlers_inner(
@@ -309,7 +327,7 @@ class HandlerManager(
             handler_context = context | {'handler': i}
             if not i.as_task:
                 asyncio.create_task(
-                    self._execute_handler_with_filter(i, config, execution_ctx, handler_context)
+                    self._execute_handler_with_filter(i, config, execution_ctx, handler_context),
                 )
             else:
                 await self._execute_handler_with_filter(i, config, execution_ctx, handler_context)
@@ -321,12 +339,12 @@ class HandlerManager(
         event: Event,
         config: EventDispatchingConfig,
         execution_ctx: ManagerExecutionContext,
-        context: dict[str, Any]
+        context: dict[str, Any],
     ):
         return await MiddlewareManager.wrap_with_middlewares(
             partial(self._execute_handlers_inner, event, config, execution_ctx),
             self.get_middleware_manager('manager.inner') or [],
-            make_mdw_wrapper_factory(self.config.collect_manager_inner_mdw_args)
+            make_mdw_wrapper_factory(self.config.collect_manager_inner_mdw_args),
         )(context)
 
     async def _execute_handlers_with_mgr_filter(
@@ -334,7 +352,7 @@ class HandlerManager(
         event: Event,
         config: EventDispatchingConfig,
         execution_ctx: ManagerExecutionContext,
-        context: dict[str, Any]
+        context: dict[str, Any],
     ):
         r = await self.filter.execute(self.config.collect_manager_filter_args(context), context)
         if r is False or r is None:
@@ -347,7 +365,7 @@ class HandlerManager(
         event: Event,
         config: EventDispatchingConfig,
         execution_ctx: RouterExecutionContext,
-        context: dict[str, Any]
+        context: dict[str, Any],
     ):
         if not self.event_filter(event):
             return None
@@ -366,7 +384,7 @@ class HandlerManager(
             return await MiddlewareManager.wrap_with_middlewares(
                 partial(self._execute_handlers_with_mgr_filter, event, config, manager_ctx),
                 self.get_middleware_manager('manager.outer') or [],
-                make_mdw_wrapper_factory(self.config.collect_manager_outer_mdw_args)
+                make_mdw_wrapper_factory(self.config.collect_manager_outer_mdw_args),
             )(context)
         except Exception as manager_error:
             try:
@@ -374,9 +392,7 @@ class HandlerManager(
             except Exception as callback_error:
                 if callback_error is manager_error:
                     raise callback_error
-                else:
-                    logger.error('Error in manager callback', exc_info=callback_error) # todo
-
+                logger.error('Error in manager callback', exc_info=callback_error)  # todo
 
 
 def gen_default_handler_id(handler: Any):
@@ -386,9 +402,11 @@ def gen_default_handler_id(handler: Any):
 
 
 _CALLABLE = Callable[[dict[str, Any]], Awaitable[Any]]
+
+
 def make_mdw_wrapper_factory(
     args_call: Callable[[dict[str, Any]], list[Any]] | None = None,
-    next_call_arg_name: str = 'next_call'
+    next_call_arg_name: str = 'next_call',
 ) -> Callable[[_CALLABLE, _CALLABLE | None], _CALLABLE]:
     def wrapper_factory(to_wrap: _CALLABLE, prev_wrapped: _CALLABLE | None) -> _CALLABLE:
         async def wrapped(context: dict[str, Any]) -> Any:
@@ -400,4 +418,5 @@ def make_mdw_wrapper_factory(
             return await call(args_call(context) if args_call is not None else [], context)
 
         return wrapped
+
     return wrapper_factory

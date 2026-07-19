@@ -9,14 +9,15 @@ __all__ = [
 ]
 
 
+from typing import TYPE_CHECKING, Any
 from dataclasses import dataclass
 
-from typing import TYPE_CHECKING, Any
+
 if TYPE_CHECKING:
     from eventry.event import Event
+    from eventry.asyncio.router import Router
     from eventry.asyncio.dispatcher import Dispatcher
     from eventry.asyncio.handler_manager import HandlerManager
-    from eventry.asyncio.router import Router
     from eventry.asyncio.callable_wrappers import Handler
 
 
@@ -39,7 +40,7 @@ class RouterExecutionContext(ExecutionContext):
 
 
 @dataclass(kw_only=True)
-class ManagerExecutionContext(RouterExecutionContext,):
+class ManagerExecutionContext(RouterExecutionContext):
     manager: HandlerManager
 
 

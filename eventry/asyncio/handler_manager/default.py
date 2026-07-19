@@ -5,15 +5,19 @@ __all__ = ['DefaultHandlerManager']
 
 
 from typing import TYPE_CHECKING, Any
-from collections.abc import Callable
-from .base import HandlerManager
-from eventry.asyncio.middleware_manager import MiddlewareManager
 from functools import partial
+from collections.abc import Callable
+
 from eventry.asyncio.filter import Filter
+from eventry.asyncio.middleware_manager import MiddlewareManager
+
+from .base import HandlerManager
+
 
 if TYPE_CHECKING:
-    from .base import EventFilter
     from eventry._config import HandlerManagerConfig
+
+    from .base import EventFilter
 
 
 FilterCallable = Callable[..., bool | None | dict[str, Any]]
@@ -38,7 +42,7 @@ class DefaultHandlerManager(
         HandlerFilterT,
         HandlerInnerMdwT,
         HandlerT,
-    ]
+    ],
 ):
     def __init__(
         self,
@@ -49,7 +53,7 @@ class DefaultHandlerManager(
         super().__init__(
             name=name,
             event_filter=event_filter,
-            config=config
+            config=config,
         )
 
         self.set_middleware_manager('manager.outer', MiddlewareManager())

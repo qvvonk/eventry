@@ -1,14 +1,22 @@
+from __future__ import annotations
+
+
 __all__ = [
     'HandlerManagerConfig',
     'AsyncEventDispatchingConfig',
 ]
 
 
-from collections.abc import Sequence, Callable, Awaitable
-from dataclasses import dataclass, field
 from typing import Any
+from dataclasses import field, dataclass
+from collections.abc import Callable, Sequence, Awaitable
+
 from .loggers import logger
-from ._execution_context import RouterExecutionContext, HandlerExecutionContext, ManagerExecutionContext
+from ._execution_context import (
+    RouterExecutionContext,
+    HandlerExecutionContext,
+    ManagerExecutionContext,
+)
 
 
 def _collect_args(di: dict[str, Any], template: str, amount: int | None = None) -> list[Any]:
@@ -41,7 +49,7 @@ class TemplateDescriptor:
         if not isinstance(value, str):
             raise TypeError('Template must be a string.')
         if '{index}' not in value:
-            raise ValueError('Template must contain \'{index}\'.')
+            raise ValueError("Template must contain '{index}'.")
         self._value = value
 
 
@@ -65,49 +73,67 @@ class HandlerManagerConfig:
     handler_arg_key_template: str = TemplateDescriptor('__handler_{index}__')
 
     def collect_manager_outer_mdw_args(self, ctx: dict[str, Any]) -> list[Any]:
-        return _collect_args(ctx, self.manager_outer_mdw_arg_key_template, len(self.manager_outer_mdw_args))
+        return _collect_args(
+            ctx, self.manager_outer_mdw_arg_key_template, len(self.manager_outer_mdw_args)
+        )
 
     def collect_manager_filter_args(self, ctx: dict[str, Any]) -> list[Any]:
-        return _collect_args(ctx, self.manager_filter_arg_key_template, len(self.manager_filter_args))
+        return _collect_args(
+            ctx, self.manager_filter_arg_key_template, len(self.manager_filter_args)
+        )
 
     def collect_manager_inner_mdw_args(self, ctx: dict[str, Any]) -> list[Any]:
-        return _collect_args(ctx, self.manager_inner_mdw_arg_key_template, len(self.manager_inner_mdw_args))
+        return _collect_args(
+            ctx, self.manager_inner_mdw_arg_key_template, len(self.manager_inner_mdw_args)
+        )
 
     def collect_handler_outer_mdw_args(self, ctx: dict[str, Any]) -> list[Any]:
-        return _collect_args(ctx, self.handler_outer_mdw_arg_key_template, len(self.handler_outer_mdw_args))
+        return _collect_args(
+            ctx, self.handler_outer_mdw_arg_key_template, len(self.handler_outer_mdw_args)
+        )
 
     def collect_handler_filter_args(self, ctx: dict[str, Any]) -> list[Any]:
-        return _collect_args(ctx, self.handler_filter_arg_key_template, len(self.handler_filter_args))
+        return _collect_args(
+            ctx, self.handler_filter_arg_key_template, len(self.handler_filter_args)
+        )
 
     def collect_handler_inner_mdw_args(self, ctx: dict[str, Any]) -> list[Any]:
-        return _collect_args(ctx, self.handler_inner_mdw_arg_key_template, len(self.handler_inner_mdw_args))
+        return _collect_args(
+            ctx, self.handler_inner_mdw_arg_key_template, len(self.handler_inner_mdw_args)
+        )
 
     def collect_handler_args(self, ctx: dict[str, Any]) -> list[Any]:
         return _collect_args(ctx, self.handler_arg_key_template, len(self.handler_args))
 
     def update_ctx_with_manager_outer_mdw_args(self, ctx: dict[str, Any]) -> None:
-        update_context_with_args(ctx, self.manager_outer_mdw_args,
-                                 self.manager_outer_mdw_arg_key_template)
+        update_context_with_args(
+            ctx, self.manager_outer_mdw_args, self.manager_outer_mdw_arg_key_template
+        )
 
     def update_ctx_with_manager_filter_args(self, ctx: dict[str, Any]) -> None:
-        update_context_with_args(ctx, self.manager_filter_args,
-                                 self.manager_filter_arg_key_template)
+        update_context_with_args(
+            ctx, self.manager_filter_args, self.manager_filter_arg_key_template
+        )
 
     def update_ctx_with_manager_inner_mdw_args(self, ctx: dict[str, Any]) -> None:
-        update_context_with_args(ctx, self.manager_inner_mdw_args,
-                                 self.manager_inner_mdw_arg_key_template)
+        update_context_with_args(
+            ctx, self.manager_inner_mdw_args, self.manager_inner_mdw_arg_key_template
+        )
 
     def update_ctx_with_handler_outer_mdw_args(self, ctx: dict[str, Any]) -> None:
-        update_context_with_args(ctx, self.handler_outer_mdw_args,
-                                 self.handler_outer_mdw_arg_key_template)
+        update_context_with_args(
+            ctx, self.handler_outer_mdw_args, self.handler_outer_mdw_arg_key_template
+        )
 
     def update_ctx_with_handler_filter_args(self, ctx: dict[str, Any]) -> None:
-        update_context_with_args(ctx, self.handler_filter_args,
-                                 self.handler_filter_arg_key_template)
+        update_context_with_args(
+            ctx, self.handler_filter_args, self.handler_filter_arg_key_template
+        )
 
     def update_ctx_with_handler_inner_mdw_args(self, ctx: dict[str, Any]) -> None:
-        update_context_with_args(ctx, self.handler_inner_mdw_args,
-                                 self.handler_inner_mdw_arg_key_template)
+        update_context_with_args(
+            ctx, self.handler_inner_mdw_args, self.handler_inner_mdw_arg_key_template
+        )
 
     def update_ctx_with_handler_args(self, ctx: dict[str, Any]) -> None:
         update_context_with_args(ctx, self.handler_args, self.handler_arg_key_template)
@@ -121,17 +147,17 @@ async def on_error_callback(ctx: RouterExecutionContext, exc: Exception) -> None
         logger.error(
             f'An error occurred while executing handler {ctx.handler.id!r} @ {ctx.manager.name!r} @ {ctx.router.full_name}'
             f'for event {ctx.event.name!r}.',
-            exc_info=exc
+            exc_info=exc,
         )
     elif isinstance(ctx, ManagerExecutionContext):
         logger.error(
             f'An error occurred while executing handlers of manager {ctx.manager.name!r} @ {ctx.router.full_name}.',
-            exc_info=exc
+            exc_info=exc,
         )
     else:
         logger.error(
             f'An error occurred while executing handlers of router {ctx.router.full_name}.',
-            exc_info=exc
+            exc_info=exc,
         )
 
 

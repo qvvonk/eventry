@@ -1,13 +1,17 @@
+from __future__ import annotations
+
+
 __all__ = [
     'MiddlewareManager',
     'MiddlewareRegistrar',
 ]
 
 
-from .callable_wrappers import MiddlewareCallable, CallableWrapper
-from collections.abc import Sequence, Iterator, Callable
-from typing import Any, TypeVar, overload, Protocol, Generic, Literal
+from typing import Any, Generic, TypeVar, Protocol, overload
 from enum import Enum
+from collections.abc import Callable, Iterator, Sequence
+
+from .callable_wrappers import CallableWrapper, MiddlewareCallable
 
 
 WrappedT = TypeVar('WrappedT', bound='Callable[..., Any]')
@@ -79,7 +83,7 @@ class MiddlewareManager(Sequence[MiddlewareCallable[Any]]):
     def wrap_with_middlewares(
         callable_to_wrap: Callable[..., Any] | CallableWrapper[Any],
         middlewares: Sequence[Callable[..., Any] | MiddlewareCallable[Any]],
-        wrapper_factory: Callable[[WrappedT, WrappedT | None], WrappedT]
+        wrapper_factory: Callable[[WrappedT, WrappedT | None], WrappedT],
     ) -> WrappedT:
         current_call = wrapper_factory(callable_to_wrap, None)
         for middleware in reversed(middlewares):
@@ -99,7 +103,7 @@ class MiddlewareRegistrar(Generic[A]):
     def __init__(
         self,
         parent: RegistrarParent,
-        allowed_mdw_types: list[MiddlewareManagerType]
+        allowed_mdw_types: list[MiddlewareManagerType],
     ) -> None:
         self._parent = parent
         self._allowed_mdw_types = allowed_mdw_types
@@ -118,4 +122,5 @@ class MiddlewareRegistrar(Generic[A]):
         def register_middleware(middleware: B) -> B:
             manager.register_middleware(middleware)
             return middleware
+
         return register_middleware

@@ -14,11 +14,9 @@ __all__ = [
 ]
 
 
-from abc import ABC
-from collections.abc import Sequence
-
 from typing import Any, TypeAlias
-from collections.abc import Callable, Iterable, Awaitable
+from abc import ABC
+from collections.abc import Callable, Iterable, Sequence, Awaitable
 
 from .callable_wrappers import CallableWrapper
 
