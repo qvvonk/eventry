@@ -91,6 +91,19 @@ class CallableWrapper(Generic[ReturnTypeT]):
                 f'Passed args: {args}.',
             )
 
+        r_args = []
+        for index, arg in enumerate(args):
+            if type(arg) is not FromData:
+                r_args.append(arg)
+                continue
+            if arg not in kwargs:
+                raise KeyError(
+                    f'Positional argument {index}, '
+                    f'that was passed to callable {self._callable.__qualname__!r}, '
+                    f'requires value {arg!r} with key from kwargs, but it was not found.'
+                )
+            r_args.append(kwargs[arg])
+
         r_args = [i if type(i) is not FromData else kwargs[i] for i in args] if args else []
 
         bound_args_c = len(r_args) if len(r_args) <= self._args_c else self._args_c

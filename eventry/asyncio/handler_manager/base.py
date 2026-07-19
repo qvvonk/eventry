@@ -164,7 +164,7 @@ class HandlerManager(
             while handler_id in self._handlers:
                 handler_id += '_'
 
-        handler_obj = Handler(
+        return Handler(
             handler,
             handler_id=handler_id,
             event_filter=event_filter,
@@ -173,7 +173,6 @@ class HandlerManager(
             inner_middlewares=inner_middlewares,
             outer_middlewares=outer_middlewares,
         )
-        return handler_obj
 
     def _register_handler(self, handler: Handler[Any]) -> None:
         """
@@ -265,7 +264,7 @@ class HandlerManager(
         )(context)
 
     async def _execute_handler_with_filter_inner(
-        self, handler: Handler[Any], context: dict[str, Any]
+        self, handler: Handler[Any], context: dict[str, Any],
     ):
         r = await handler.filter.execute(self.config.collect_handler_filter_args(context), context)
         if not r and not isinstance(r, dict):
@@ -281,13 +280,12 @@ class HandlerManager(
         context: dict[str, Any],
     ):
         h_execution_ctx = HandlerExecutionContext(
-            handler=handler, **execution_ctx.shallow_asdict()
+            handler=handler, **execution_ctx.shallow_asdict(),
         )
         try:
             handler_result = await MiddlewareManager.wrap_with_middlewares(
                 partial(self._execute_handler_with_filter_inner, handler),
-                list(self.get_middleware_manager('handler.outer') or [])
-                + handler.outer_middlewares,
+                list(self.get_middleware_manager('handler.outer') or []) + handler.outer_middlewares,
                 make_mdw_wrapper_factory(self.config.collect_handler_outer_mdw_args),
             )(context)
         except Exception as handler_error:
@@ -325,7 +323,7 @@ class HandlerManager(
     ):
         for i in self.get_matching_handlers(event):
             handler_context = context | {'handler': i}
-            if not i.as_task:
+            if i.as_task:
                 asyncio.create_task(
                     self._execute_handler_with_filter(i, config, execution_ctx, handler_context),
                 )
@@ -367,7 +365,7 @@ class HandlerManager(
         execution_ctx: RouterExecutionContext,
         context: dict[str, Any],
     ):
-        if not self.event_filter(event):
+        if not self.check_event(event):
             return None
 
         self.config.update_ctx_with_manager_outer_mdw_args(context)
