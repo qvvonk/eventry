@@ -56,6 +56,5 @@ class Dispatcher:
             event=event,
             dispatcher=self,
             context=context,
-            exception=None
         )
         await router.propagate_event(event, config, execution_context, context)

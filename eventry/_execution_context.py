@@ -25,7 +25,12 @@ class ExecutionContext:
     event: Event
     dispatcher: 'Dispatcher'
     context: dict[str, Any]
-    exception: Exception | None = None
+
+    def shallow_asdict(self) -> dict[str, Any]:
+        return {
+            f.name: self.__dict__[f.name]
+            for f in type(self).__dict__['__dataclass_fields__'].values()
+        }
 
 
 @dataclass(kw_only=True)

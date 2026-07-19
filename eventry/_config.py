@@ -113,37 +113,34 @@ class HandlerManagerConfig:
         update_context_with_args(ctx, self.handler_args, self.handler_arg_key_template)
 
 
-async def on_error_callback(ctx: RouterExecutionContext) -> None:
+async def on_error_callback(ctx: RouterExecutionContext, exc: Exception) -> None:
     if not isinstance(ctx, RouterExecutionContext):
         return
 
-
-    router_path = '.'.join(f'{i.name!r}' for i in ctx.router.chain_to_root)
-
     if isinstance(ctx, HandlerExecutionContext):
         logger.error(
-            f'An error occurred while executing handler {ctx.handler.id!r} @ {ctx.manager.name!r} @ {router_path}'
+            f'An error occurred while executing handler {ctx.handler.id!r} @ {ctx.manager.name!r} @ {ctx.router.full_name}'
             f'for event {ctx.event.name!r}.',
-            exc_info=ctx.exception
+            exc_info=exc
         )
     elif isinstance(ctx, ManagerExecutionContext):
         logger.error(
-            f'An error occurred while executing handlers of manager {ctx.manager.name!r} @ {router_path}.',
-            exc_info=ctx.exception
+            f'An error occurred while executing handlers of manager {ctx.manager.name!r} @ {ctx.router.full_name}.',
+            exc_info=exc
         )
     else:
         logger.error(
-            f'An error occurred while executing handlers of router {router_path}.',
-            exc_info=ctx.exception
+            f'An error occurred while executing handlers of router {ctx.router.full_name}.',
+            exc_info=exc
         )
 
 
-async def on_handler_callback(ctx: HandlerExecutionContext) -> None:
+async def on_handler_callback(ctx: HandlerExecutionContext, result: Any) -> None:
     return
 
 
 @dataclass(kw_only=True)
 class AsyncEventDispatchingConfig:
     single_handler: bool = False
-    on_error: Callable[[RouterExecutionContext], Awaitable[Any]] = on_error_callback
-    on_handler: Callable[[HandlerExecutionContext], Awaitable[Any]] = on_handler_callback
+    on_error: Callable[[RouterExecutionContext, Exception], Awaitable[Any]] = on_error_callback
+    on_handler: Callable[[HandlerExecutionContext, Any], Awaitable[Any]] = on_handler_callback

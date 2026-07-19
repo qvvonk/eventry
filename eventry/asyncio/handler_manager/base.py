@@ -6,6 +6,7 @@ __all__ = [
     'HandlerManagerConfig'
 ]
 
+import asyncio
 import inspect
 from dataclasses import asdict
 from functools import partial
@@ -244,22 +245,14 @@ class HandlerManager(
     def filter(self) -> Filter:
         return self._filter
 
-    async def _execute_handler_inner(self, handler: Handler[Any], context: dict[str, Any]):
-        return await handler(self.config.collect_handler_args(context), context)
-
     async def _execute_handler(self, handler: Handler[Any], context: dict[str, Any]) -> Any:
-        wrapped = MiddlewareManager.wrap_with_middlewares(
-            partial(self._execute_handler_inner, handler),
+        return await MiddlewareManager.wrap_with_middlewares(
+            partial(handler, self.config.collect_handler_args(context)),
             list(self.get_middleware_manager('handler.inner') or []) + handler.inner_middlewares,
             make_mdw_wrapper_factory(self.config.collect_handler_inner_mdw_args),
-        )
-        return await wrapped(context)
+        )(context)
 
-    async def _execute_handler_with_filter_inner(
-        self,
-        handler: Handler[Any],
-        context: dict[str, Any]
-    ):
+    async def _execute_handler_with_filter_inner(self, handler: Handler[Any], context: dict[str, Any]):
         r = await handler.filter.execute(self.config.collect_handler_filter_args(context), context)
         if not r and not isinstance(r, dict):
             return r
@@ -273,26 +266,39 @@ class HandlerManager(
         execution_ctx: ManagerExecutionContext,
         context: dict[str, Any]
     ):
-        wrapped = MiddlewareManager.wrap_with_middlewares(
-            partial(self._execute_handler_with_filter_inner, handler),
-            list(self.get_middleware_manager('handler.outer') or []) + handler.outer_middlewares,
-            make_mdw_wrapper_factory(self.config.collect_handler_outer_mdw_args)
-        )
-
+        h_execution_ctx = HandlerExecutionContext(handler=handler, **execution_ctx.shallow_asdict())
         try:
-            return await wrapped(context)
+            handler_result = await MiddlewareManager.wrap_with_middlewares(
+                partial(self._execute_handler_with_filter_inner, handler),
+                list(self.get_middleware_manager('handler.outer') or []) + handler.outer_middlewares,
+                make_mdw_wrapper_factory(self.config.collect_handler_outer_mdw_args)
+            )(context)
         except Exception as handler_error:
-            h_execution_ctx = HandlerExecutionContext(
-                handler=handler,
-                **asdict(execution_ctx) | {'exception': handler_error}
-            )
             try:
-                await config.on_error(h_execution_ctx)
+                await config.on_error(h_execution_ctx, handler_error)
             except Exception as callback_error:
                 if callback_error is handler_error:
                     raise callback_error
                 else:
-                    logger.error(f'An error in handler callback', exc_info=callback_error)
+                    logger.error(
+                        f'An error occurred while executing error callback of handler '
+                        f'{handler.id!r} @ {h_execution_ctx.manager.name!r} @ '
+                        f'{h_execution_ctx.router.full_name} '
+                        f'for event {h_execution_ctx.event.name!r}.',
+                        exc_info=handler_error
+                    )
+            return
+
+        try:
+            await config.on_handler(h_execution_ctx, handler_result)
+        except Exception as e:
+            logger.error(
+                f'An error occurred while executing callback of handler '
+                f'{handler.id!r} @ {h_execution_ctx.manager.name!r} @ '
+                f'{h_execution_ctx.router.full_name} '
+                f'for event {h_execution_ctx.event.name!r}.',
+                exc_info=e
+            )
 
     async def _execute_handlers_inner(
         self,
@@ -302,8 +308,13 @@ class HandlerManager(
         context: dict[str, Any],
     ):
         for i in self.get_matching_handlers(event):
-            handler_context = copy(context) if self.config.isolate_handler_context else context
-            await self._execute_handler_with_filter(i, config, execution_ctx, handler_context)
+            handler_context = context | {'handler': i}
+            if not i.as_task:
+                asyncio.create_task(
+                    self._execute_handler_with_filter(i, config, execution_ctx, handler_context)
+                )
+            else:
+                await self._execute_handler_with_filter(i, config, execution_ctx, handler_context)
             if event.propagation_stopped:
                 return
 
@@ -314,12 +325,11 @@ class HandlerManager(
         execution_ctx: ManagerExecutionContext,
         context: dict[str, Any]
     ):
-        wrapped = MiddlewareManager.wrap_with_middlewares(
+        return await MiddlewareManager.wrap_with_middlewares(
             partial(self._execute_handlers_inner, event, config, execution_ctx),
             self.get_middleware_manager('manager.inner') or [],
             make_mdw_wrapper_factory(self.config.collect_manager_inner_mdw_args)
-        )
-        return await wrapped(context)
+        )(context)
 
     async def _execute_handlers_with_mgr_filter(
         self,
@@ -349,20 +359,17 @@ class HandlerManager(
         self.config.update_ctx_with_handler_inner_mdw_args(context)
         self.config.update_ctx_with_handler_args(context)
 
-        wrapped = MiddlewareManager.wrap_with_middlewares(
-            partial(self._execute_handlers_with_mgr_filter, event, config, execution_ctx),
-            self.get_middleware_manager('manager.outer') or [],
-            make_mdw_wrapper_factory(self.config.collect_manager_outer_mdw_args)
-        )
-
-        manager_ctx = ManagerExecutionContext(manager=self, **asdict(execution_ctx))
+        manager_ctx = ManagerExecutionContext(manager=self, **execution_ctx.shallow_asdict())
 
         try:
-            return await wrapped(context)
+            return await MiddlewareManager.wrap_with_middlewares(
+                partial(self._execute_handlers_with_mgr_filter, event, config, manager_ctx),
+                self.get_middleware_manager('manager.outer') or [],
+                make_mdw_wrapper_factory(self.config.collect_manager_outer_mdw_args)
+            )(context)
         except Exception as manager_error:
             try:
-                error_ctx = ManagerExecutionContext(**asdict(manager_ctx) | {'exception': manager_error})
-                await config.on_error(error_ctx)
+                await config.on_error(manager_ctx, manager_error)
             except Exception as callback_error:
                 if callback_error is manager_error:
                     raise callback_error

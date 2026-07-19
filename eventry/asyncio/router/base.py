@@ -50,7 +50,7 @@ class Router:
         execution_ctx: ExecutionContext,
         context: dict[str, Any],
     ):
-        router_execution_ctx = RouterExecutionContext(router=self, **asdict(execution_ctx))
+        router_execution_ctx = RouterExecutionContext(router=self, **execution_ctx.shallow_asdict())
         for i in self._handler_managers.values():
             manager_context = copy(context)
 
@@ -64,22 +64,24 @@ class Router:
             if event.propagation_stopped:
                 return
 
-    @property
     def chain_to_root(self) -> Generator[Router, None, None]:
         r = self
-        while r.parent is not None:
+        while r is not None:
             yield r
             r = r.parent
 
-    @property
     def chain_to_tails(self) -> Generator[Router, None, None]:
         yield self
         for r in self._sub_routers.values():
-            yield from r.chain_to_tails
+            yield from r.chain_to_tails()
 
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def full_name(self) -> str:
+        return '.'.join(f'{r.name!r}' for r in self.chain_to_root())
 
     @property
     def parent(self) -> Router | None:
