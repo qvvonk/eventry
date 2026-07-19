@@ -48,12 +48,20 @@ class Dispatcher:
         additional_context: dict[str, Any] | None = None,
         config: EventDispatchingConfig | None = None,
     ) -> None:
+        if not isinstance(event, Event):
+            raise TypeError(f'Event must be an instance of Event, not {type(event)!r}.')
+
         router = router if router is not None else self.router
         if router is None:
             raise ValueError('Router is not set.')
 
         config = config if config is not None else self.config
-        context = self.event_context | event.dependencies_injection | (additional_context or {})
+        context = {
+            **self.event_context,
+            **event.dependencies_injection,
+            **(additional_context or {}),
+            'event': event, # todo: name from dispatcher config
+        }
         execution_context = ExecutionContext(
             event=event,
             dispatcher=self,
