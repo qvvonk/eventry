@@ -199,7 +199,6 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
         /,
         *,
         handler_id: str,
-        event_filter: EventFilter | None,
         filter: Filter | None = None,
         as_task: bool = False,
         outer_middlewares: Sequence[MiddlewareCallable[Any] | Callable[..., Any]] | None = None,
@@ -214,7 +213,6 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
         self._handler_id = handler_id
         self._as_task = as_task
         self._filter = filter if filter is not None else dummy_filter()
-        self._event_filter = event_filter
         self._outer_middlewares = [
             i if isinstance(i, MiddlewareCallable) else MiddlewareCallable(i)
             for i in outer_middlewares
@@ -238,21 +236,9 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
         return self._handler_id
 
     @property
-    def event_filter(self) -> EventFilter | None:
-        return self._event_filter
-
-    @property
     def outer_middlewares(self) -> list[MiddlewareCallable[Any]]:
         return self._outer_middlewares
 
     @property
     def inner_middlewares(self) -> list[MiddlewareCallable[Any]]:
         return self._inner_middlewares
-
-    def check_event(self, event: Event) -> bool:
-        if self.event_filter is None:
-            return True
-        if isinstance(self.event_filter, str):
-            return self.event_filter == event.name
-
-        return self.event_filter(event)

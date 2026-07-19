@@ -152,7 +152,6 @@ class HandlerManager(
     def _create_handler_obj(
         self,
         handler: Any,  # todo
-        event_filter: EventFilter | None = None,
         handler_id: str | None = None,
         filter: Any = None,
         as_task: bool = False,
@@ -167,7 +166,6 @@ class HandlerManager(
         return Handler(
             handler,
             handler_id=handler_id,
-            event_filter=event_filter,
             filter=convert_filters([filter])[0] if filter is not None else None,
             as_task=as_task,
             inner_middlewares=inner_middlewares,
@@ -190,28 +188,11 @@ class HandlerManager(
             raise ValueError(f'Handler with ID {handler.id} already exists in this manager.')
         self._handlers[handler.id] = handler
 
-    def get_matching_handlers(self, event: Event) -> Generator[Handler[Any], None]:
-        """
-        Iterates through all registered handlers and yields those whose filters
-        match the given event.
-
-        :param event: The incoming event to check against handler filters.
-
-        :return: An async generator yielding handlers that should handle the event.
-        """
-        for handler in self._handlers.values():
-            if self.event_filter is not None:
-                yield handler
-            else:
-                if handler.check_event(event):
-                    yield handler
-
     def __call__(
         self,
         filter: HandlerFilterT | None = None,
         /,
         *,
-        event_filter: EventFilter | None = None,
         handler_id: str | None = None,
         as_task: bool = False,
         inner_middlewares: Sequence[HandlerInnerMdwT] | None = None,
@@ -220,7 +201,6 @@ class HandlerManager(
         def inner(handler: HandlerT) -> HandlerT:
             handler_obj = self._create_handler_obj(
                 handler=handler,
-                event_filter=event_filter,
                 handler_id=handler_id,
                 filter=filter,
                 as_task=as_task,
@@ -321,7 +301,7 @@ class HandlerManager(
         execution_ctx: ManagerExecutionContext,
         context: dict[str, Any],
     ):
-        for i in self.get_matching_handlers(event):
+        for i in self.handlers.values():
             handler_context = context | {'handler': i}
             if i.as_task:
                 asyncio.create_task(
