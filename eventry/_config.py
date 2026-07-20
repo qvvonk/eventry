@@ -2,6 +2,7 @@ from __future__ import annotations
 
 
 __all__ = [
+    'RouterConfig',
     'HandlerManagerConfig',
     'AsyncEventDispatchingConfig',
 ]
@@ -56,6 +57,37 @@ class TemplateDescriptor:
         if '{index}' not in value:
             raise ValueError("Template must contain '{index}'.")
         setattr(instance, self._name, value)
+
+
+@dataclass(kw_only=True)
+class RouterConfig:
+    router_key: str | None = 'router'
+
+    outer_mdw_args: Sequence[Any] = field(default_factory=list)
+    filter_args: Sequence[Any] = field(default_factory=list)
+    inner_mdw_args: Sequence[Any] = field(default_factory=list)
+
+    outer_mdw_arg_key_template: TemplateDescriptor = TemplateDescriptor('__router_outer_{index}__')
+    filter_arg_key_template: TemplateDescriptor = TemplateDescriptor('__router_filter_{index}__')
+    inner_arg_key_template: TemplateDescriptor = TemplateDescriptor('__router_inner_{index}__')
+
+    def collect_outer_mdw_args(self, ctx: dict[str, Any]) -> list[Any]:
+        return _collect_args(ctx, self.outer_mdw_arg_key_template, len(self.outer_mdw_args))
+
+    def collect_filter_args(self, ctx: dict[str, Any]) -> list[Any]:
+        return _collect_args(ctx, self.filter_arg_key_template, len(self.filter_args))
+
+    def collect_inner_mdw_args(self, ctx: dict[str, Any]) -> list[Any]:
+        return _collect_args(ctx, self.inner_arg_key_template, len(self.inner_mdw_args))
+
+    def update_ctx_with_outer_mdw_args(self, ctx: dict[str, Any]) -> None:
+        update_context_with_args(ctx, self.outer_mdw_args, self.outer_mdw_arg_key_template)
+
+    def update_ctx_with_filter_args(self, ctx: dict[str, Any]) -> None:
+        update_context_with_args(ctx, self.filter_args, self.filter_arg_key_template)
+
+    def update_ctx_with_inner_mdw_args(self, ctx: dict[str, Any]) -> None:
+        update_context_with_args(ctx, self.inner_mdw_args, self.inner_arg_key_template)
 
 
 @dataclass(kw_only=True)

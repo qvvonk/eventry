@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 from copy import copy
 from collections.abc import Generator
 
-from eventry._config import AsyncEventDispatchingConfig as EventDispatchingConfig
+from eventry._config import AsyncEventDispatchingConfig as EventDispatchingConfig, RouterConfig
 from eventry._execution_context import ExecutionContext, RouterExecutionContext
 
 
@@ -20,11 +20,13 @@ class Router:
     def __init__(
         self,
         name: str = '',
+        config: RouterConfig | None = None,
     ) -> None:
         self._name = name or self.__class__.__name__
         self._sub_routers: dict[str, Router] = {}
         self._handler_managers: dict[str, HandlerManager] = {}
         self._parent: Router | None = None
+        self._config = config if config is not None else RouterConfig()
 
     def attach_router(self, router: Router) -> None:
         if router is self:
@@ -55,6 +57,8 @@ class Router:
         )
         for i in self._handler_managers.values():
             manager_context = copy(context)
+            if self.config.router_key is not None:
+                manager_context[self.config.router_key] = self
 
             await i.propagate_event(event, config, router_execution_ctx, manager_context)
             if event.propagation_stopped:
@@ -88,3 +92,7 @@ class Router:
     @property
     def parent(self) -> Router | None:
         return self._parent
+
+    @property
+    def config(self) -> RouterConfig:
+        return self._config
