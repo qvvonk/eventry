@@ -9,7 +9,7 @@ __all__ = [
 
 from typing import Any, Generic, TypeVar, Protocol, overload
 from enum import Enum
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence, Awaitable
 
 from .callable_wrappers import CallableWrapper, MiddlewareCallable
 
@@ -124,3 +124,24 @@ class MiddlewareRegistrar(Generic[A]):
             return middleware
 
         return register_middleware
+
+
+_CALLABLE = Callable[[dict[str, Any]], Awaitable[Any]]
+
+
+def _make_mdw_wrapper_factory(
+    args_call: Callable[[dict[str, Any]], list[Any]] | None = None,
+    next_call_arg_name: str = 'next_call',
+) -> Callable[[_CALLABLE, _CALLABLE | None], _CALLABLE]:
+    def wrapper_factory(to_wrap: _CALLABLE, prev_wrapped: _CALLABLE | None) -> _CALLABLE:
+        async def wrapped(context: dict[str, Any]) -> Any:
+            if prev_wrapped is None:
+                return await to_wrap(context)
+
+            context.update({next_call_arg_name: prev_wrapped})
+            call = to_wrap if isinstance(to_wrap, CallableWrapper) else CallableWrapper(to_wrap)
+            return await call(args_call(context) if args_call is not None else [], context)
+
+        return wrapped
+
+    return wrapper_factory

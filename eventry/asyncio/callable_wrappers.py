@@ -17,9 +17,7 @@ from collections.abc import Mapping, Callable, Sequence, Awaitable
 
 
 if TYPE_CHECKING:
-    from eventry.event import Event
     from eventry.asyncio.filter import Filter
-    from eventry.asyncio.handler_manager.base import EventFilter
 
 
 ReturnTypeT = TypeVar('ReturnTypeT')
@@ -77,7 +75,9 @@ class CallableWrapper(Generic[ReturnTypeT]):
         self._is_async = bool(_code.co_flags & 0x80)
 
     def collect_args(
-        self, args: Sequence[Any] = (), kwargs: Mapping[str, Any] | None = None
+        self,
+        args: Sequence[Any] = (),
+        kwargs: Mapping[str, Any] | None = None,
     ) -> tuple[list[Any], dict[str, Any]]:
         args = self._partial_args + list(args)
         kwargs = self._partial_kwargs | dict(kwargs or {})
@@ -100,7 +100,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
                 raise KeyError(
                     f'Positional argument {index}, '
                     f'that was passed to callable {self._callable.__qualname__!r}, '
-                    f'requires value {arg!r} with key from kwargs, but it was not found.'
+                    f'requires value {arg!r} with key from kwargs, but it was not found.',
                 )
             r_args.append(kwargs[arg])
 

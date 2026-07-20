@@ -60,7 +60,7 @@ class Dispatcher:
             **self.event_context,
             **event.context_injection(),
             **(additional_context or {}),
-            'event': event, # todo: name from dispatcher config
+            'event': event,  # todo: name from dispatcher config
         }
         execution_context = ExecutionContext(
             event=event,

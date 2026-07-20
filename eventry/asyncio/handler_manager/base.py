@@ -11,7 +11,7 @@ import inspect
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
 from types import MappingProxyType
 from functools import partial
-from collections.abc import Callable, Sequence, Awaitable, Generator
+from collections.abc import Callable, Sequence
 
 from eventry._config import (
     HandlerManagerConfig,
@@ -24,11 +24,12 @@ from eventry._execution_context import (
     HandlerExecutionContext,
     ManagerExecutionContext,
 )
-from eventry.asyncio.callable_wrappers import Handler, CallableWrapper
+from eventry.asyncio.callable_wrappers import Handler
 from eventry.asyncio.middleware_manager import (
     MiddlewareManager,
     MiddlewareRegistrar,
     MiddlewareManagerType,
+    _make_mdw_wrapper_factory,
 )
 
 
@@ -118,7 +119,9 @@ class HandlerManager(
         return self._middleware_managers.get(mdw_type)
 
     def set_middleware_manager(
-        self, manager_type: MgrMdwsType, manager: MiddlewareManager | None
+        self,
+        manager_type: MgrMdwsType,
+        manager: MiddlewareManager | None,
     ) -> None:
         if manager is not None and not isinstance(manager, MiddlewareManager):
             raise TypeError(
@@ -240,11 +243,13 @@ class HandlerManager(
         return await MiddlewareManager.wrap_with_middlewares(
             partial(handler, self.config.collect_handler_args(context)),
             list(self.get_middleware_manager('handler.inner') or []) + handler.inner_middlewares,
-            make_mdw_wrapper_factory(self.config.collect_handler_inner_mdw_args),
+            _make_mdw_wrapper_factory(self.config.collect_handler_inner_mdw_args),
         )(context)
 
     async def _execute_handler_with_filter_inner(
-        self, handler: Handler[Any], context: dict[str, Any],
+        self,
+        handler: Handler[Any],
+        context: dict[str, Any],
     ):
         r = await handler.filter.execute(self.config.collect_handler_filter_args(context), context)
         if not r and not isinstance(r, dict):
@@ -260,13 +265,15 @@ class HandlerManager(
         context: dict[str, Any],
     ):
         h_execution_ctx = HandlerExecutionContext(
-            handler=handler, **execution_ctx.shallow_asdict(),
+            handler=handler,
+            **execution_ctx.shallow_asdict(),
         )
         try:
             handler_result = await MiddlewareManager.wrap_with_middlewares(
                 partial(self._execute_handler_with_filter_inner, handler),
-                list(self.get_middleware_manager('handler.outer') or []) + handler.outer_middlewares,
-                make_mdw_wrapper_factory(self.config.collect_handler_outer_mdw_args),
+                list(self.get_middleware_manager('handler.outer') or [])
+                + handler.outer_middlewares,
+                _make_mdw_wrapper_factory(self.config.collect_handler_outer_mdw_args),
             )(context)
         except Exception as handler_error:
             try:
@@ -322,7 +329,7 @@ class HandlerManager(
         return await MiddlewareManager.wrap_with_middlewares(
             partial(self._execute_handlers_inner, event, config, execution_ctx),
             self.get_middleware_manager('manager.inner') or [],
-            make_mdw_wrapper_factory(self.config.collect_manager_inner_mdw_args),
+            _make_mdw_wrapper_factory(self.config.collect_manager_inner_mdw_args),
         )(context)
 
     async def _execute_handlers_with_mgr_filter(
@@ -362,7 +369,7 @@ class HandlerManager(
             return await MiddlewareManager.wrap_with_middlewares(
                 partial(self._execute_handlers_with_mgr_filter, event, config, manager_ctx),
                 self.get_middleware_manager('manager.outer') or [],
-                make_mdw_wrapper_factory(self.config.collect_manager_outer_mdw_args),
+                _make_mdw_wrapper_factory(self.config.collect_manager_outer_mdw_args),
             )(context)
         except Exception as manager_error:
             try:
@@ -377,24 +384,3 @@ def gen_default_handler_id(handler: Any):
     if inspect.isfunction(handler) or inspect.ismethod(handler) or inspect.isclass(handler):
         return f'{handler.__qualname__}'
     return f'{handler.__class__.__qualname__}'
-
-
-_CALLABLE = Callable[[dict[str, Any]], Awaitable[Any]]
-
-
-def make_mdw_wrapper_factory(
-    args_call: Callable[[dict[str, Any]], list[Any]] | None = None,
-    next_call_arg_name: str = 'next_call',
-) -> Callable[[_CALLABLE, _CALLABLE | None], _CALLABLE]:
-    def wrapper_factory(to_wrap: _CALLABLE, prev_wrapped: _CALLABLE | None) -> _CALLABLE:
-        async def wrapped(context: dict[str, Any]) -> Any:
-            if prev_wrapped is None:
-                return await to_wrap(context)
-
-            context.update({next_call_arg_name: prev_wrapped})
-            call = to_wrap if isinstance(to_wrap, CallableWrapper) else CallableWrapper(to_wrap)
-            return await call(args_call(context) if args_call is not None else [], context)
-
-        return wrapped
-
-    return wrapper_factory

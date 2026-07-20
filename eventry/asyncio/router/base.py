@@ -3,12 +3,20 @@ from __future__ import annotations
 
 __all__ = ['Router']
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
 from copy import copy
+from functools import partial
 from collections.abc import Generator
 
-from eventry._config import AsyncEventDispatchingConfig as EventDispatchingConfig, RouterConfig
+from eventry._config import RouterConfig, AsyncEventDispatchingConfig as EventDispatchingConfig
+from eventry.asyncio.filter import Filter, FilterFromFunction, dummy_filter
 from eventry._execution_context import ExecutionContext, RouterExecutionContext
+from eventry.asyncio.middleware_manager import (
+    MiddlewareManager,
+    MiddlewareRegistrar,
+    MiddlewareManagerType,
+    _make_mdw_wrapper_factory,
+)
 
 
 if TYPE_CHECKING:
@@ -16,7 +24,19 @@ if TYPE_CHECKING:
     from eventry.asyncio.handler_manager import HandlerManager
 
 
-class Router:
+FilterT = TypeVar('FilterT')
+
+
+RouterMdwTypes = [MiddlewareManagerType.ROUTER_INNER, MiddlewareManagerType.ROUTER_OUTER]
+RouterMdwsType = Literal[
+    'router.outer',
+    'router.inner',
+    MiddlewareManagerType.ROUTER_INNER,
+    MiddlewareManagerType.ROUTER_OUTER,
+]
+
+
+class Router(Generic[FilterT]):
     def __init__(
         self,
         name: str = '',
@@ -27,6 +47,48 @@ class Router:
         self._handler_managers: dict[str, HandlerManager] = {}
         self._parent: Router | None = None
         self._config = config if config is not None else RouterConfig()
+        self._filter: Filter = dummy_filter()
+        self._middleware_managers: dict[MiddlewareManagerType, MiddlewareManager] = {}
+        self.middleware = MiddlewareRegistrar(self, RouterMdwTypes)
+
+    def set_filter(self, filter: FilterT) -> None:
+        self._filter = filter if isinstance(filter, Filter) else FilterFromFunction(filter)
+
+    def remove_filter(self) -> None:
+        self._filter = dummy_filter()
+
+    def get_middleware_manager(self, manager_type: RouterMdwsType) -> MiddlewareManager | None:
+        try:
+            mdw_type = MiddlewareManagerType(manager_type)
+        except ValueError:
+            return None
+        return self._middleware_managers.get(mdw_type)
+
+    def set_middleware_manager(
+        self,
+        manager_type: RouterMdwsType,
+        manager: MiddlewareManager | None,
+    ) -> None:
+        if manager is not None and not isinstance(manager, MiddlewareManager):
+            raise TypeError(
+                f'Middleware manager must be an instance of MiddlewareManager, '
+                f'not {type(manager)!r}.',
+            )
+
+        try:
+            manager_type = MiddlewareManagerType(manager_type)
+        except ValueError:
+            raise ValueError(f'Invalid middleware manager type: {manager_type!r}.') from None
+
+        if manager_type not in RouterMdwTypes:
+            raise ValueError(
+                f'Router does not support {manager_type!r} type of middleware manager.',
+            )
+
+        if manager is not None:
+            self._middleware_managers[manager_type] = manager
+        else:
+            self._middleware_managers.pop(manager_type, None)
 
     def attach_router(self, router: Router) -> None:
         if router is self:
@@ -45,6 +107,52 @@ class Router:
         r._parent = None
         return r
 
+    async def _propagate_event(
+        self,
+        event: Event,
+        config: EventDispatchingConfig,
+        execution_ctx: RouterExecutionContext,
+        context: dict[str, Any],
+    ):
+        for i in self._handler_managers.values():
+            manager_context = copy(context)
+
+            await i.propagate_event(event, config, execution_ctx, manager_context)
+            if event.propagation_stopped:
+                return
+
+        for r in self._sub_routers.values():
+            subrouter_context = copy(context)
+            await r._propagate_event(event, config, execution_ctx, subrouter_context)
+            if event.propagation_stopped:
+                return
+
+    async def _propagate_event_with_filter_inner(
+        self,
+        event: Event,
+        config: EventDispatchingConfig,
+        execution_ctx: RouterExecutionContext,
+        context: dict[str, Any],
+    ):
+        r = await self.filter.execute(self.config.collect_filter_args(context), context)
+        if not r and not isinstance(r, dict):
+            return r
+
+        return await self._propagate_event(event, config, execution_ctx, context)
+
+    async def _propagate_event_with_filter(
+        self,
+        event: Event,
+        config: EventDispatchingConfig,
+        execution_ctx: RouterExecutionContext,
+        context: dict[str, Any],
+    ):
+        return await MiddlewareManager.wrap_with_middlewares(
+            partial(self._propagate_event_with_filter_inner, event, config, execution_ctx),
+            self.get_middleware_manager('router.inner') or [],
+            _make_mdw_wrapper_factory(self.config.collect_inner_mdw_args),
+        )(context)
+
     async def propagate_event(
         self,
         event: Event,
@@ -52,23 +160,18 @@ class Router:
         execution_ctx: ExecutionContext,
         context: dict[str, Any],
     ):
-        router_execution_ctx = RouterExecutionContext(
-            router=self, **execution_ctx.shallow_asdict()
-        )
-        for i in self._handler_managers.values():
-            manager_context = copy(context)
-            if self.config.router_key is not None:
-                manager_context[self.config.router_key] = self
+        execution_ctx = RouterExecutionContext(**execution_ctx.shallow_asdict() | {'router': self})
+        context[self.config.router_key] = self
 
-            await i.propagate_event(event, config, router_execution_ctx, manager_context)
-            if event.propagation_stopped:
-                return
+        self.config.update_ctx_with_outer_mdw_args(context)
+        self.config.update_ctx_with_filter_args(context)
+        self.config.update_ctx_with_inner_mdw_args(context)
 
-        for r in self._sub_routers.values():
-            subrouter_context = copy(context)
-            await r.propagate_event(event, config, execution_ctx, subrouter_context)
-            if event.propagation_stopped:
-                return
+        return await MiddlewareManager.wrap_with_middlewares(
+            partial(self._propagate_event_with_filter, event, config, execution_ctx),
+            self.get_middleware_manager('router.outer') or [],
+            _make_mdw_wrapper_factory(self.config.collect_outer_mdw_args),
+        )(context)
 
     def chain_to_root(self) -> Generator[Router, None, None]:
         r = self
@@ -96,3 +199,7 @@ class Router:
     @property
     def config(self) -> RouterConfig:
         return self._config
+
+    @property
+    def filter(self) -> Filter:
+        return self._filter
