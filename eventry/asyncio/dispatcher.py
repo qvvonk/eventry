@@ -58,7 +58,7 @@ class Dispatcher:
         config = config if config is not None else self.config
         context = {
             **self.event_context,
-            **event.dependencies_injection,
+            **event.context_injection(),
             **(additional_context or {}),
             'event': event, # todo: name from dispatcher config
         }

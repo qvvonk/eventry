@@ -54,8 +54,7 @@ class Event(EventBase, event_name='event'):
         """
         self._propagation_stopped = True
 
-    @property
-    def dependencies_injection(self) -> dict[str, Any]:
+    def context_injection(self) -> dict[str, Any]:
         return {}
 
     @property
