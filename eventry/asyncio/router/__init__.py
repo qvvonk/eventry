@@ -1,6 +1,8 @@
 __all__ = [
     'Router',
-    'RouterConfig'
+    'RouterConfig',
+    'DefaultRouter'
 ]
 
 from .base import Router, RouterConfig
+from .default import DefaultRouter

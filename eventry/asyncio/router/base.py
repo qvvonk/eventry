@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-__all__ = ['Router']
+__all__ = ['Router', 'RouterConfig']
 
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from copy import copy
