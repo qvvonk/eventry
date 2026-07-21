@@ -27,9 +27,24 @@ T = TypeVar('T')
 RT = TypeVar('RT')
 
 
-class FromKwargs(str): ...
+class FromKwargs(str):
+    def __repr__(self) -> str:
+        text = super().__repr__()
+        return f'{self.__class__.__name__}({text})'
 
-class Kwargs: ...
+    def __str__(self) -> str:
+        return super().__str__()
+
+
+class Kwargs:
+    def __repr__(self) -> str:
+        return self.__class__.__name__
+
+    def __str__(self):
+        return 'Kwargs'
+
+
+Kwargs = Kwargs()
 
 
 class CallableWrapper(Generic[ReturnTypeT]):
@@ -96,7 +111,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
 
         r_args = []
         for index, arg in enumerate(args):
-            if type(arg) is Kwargs:
+            if arg is Kwargs:
                 r_args.append(kwargs if kwargs is not None else {})
             elif type(arg) is not FromKwargs:
                 r_args.append(arg)
@@ -106,7 +121,8 @@ class CallableWrapper(Generic[ReturnTypeT]):
                     f'that was passed to callable {self._callable.__qualname__!r}, '
                     f'requires value {arg!r} with key from kwargs, but it was not found.',
                 )
-            r_args.append(kwargs[arg])
+            else:
+                r_args.append(kwargs[arg])
 
         bound_args_c = len(r_args) if len(r_args) <= self._args_c else self._args_c
         if bound_args_c < self._nondef_args_c:

@@ -116,7 +116,7 @@ class Router(Generic[FilterT]):
         execution_ctx: ExecutionContext,
         context: dict[str, Any],
     ):
-        execution_ctx = RouterExecutionContext(**execution_ctx.shallow_asdict() | {'router': self})
+        execution_ctx = RouterExecutionContext(**(execution_ctx.shallow_asdict() | {'router': self}))
         context[self.config.router_key] = self
 
         self.config.update_ctx_with_outer_mdw_args(context)

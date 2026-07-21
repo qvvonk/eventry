@@ -28,6 +28,9 @@ classifiers = [
 Repository = "https://github.com/qvvonk/eventry"
 Issues = "https://github.com/qvvonk/eventry/issues"
 
+[tool.pyrefly.errors]
+redundant-cast = "warn"
+
 
 [project.optional-dependencies]
 dev = [
@@ -95,3 +98,11 @@ lines-between-types = 0
 lines-after-imports = 2
 split-on-trailing-comma = true
 combine-as-imports = true
+
+[tool.pyrefly]
+project-excludes = [
+    "**/docs*",
+    "**/.venv*",
+]
+python-version = "3.10.0"
+preset = "legacy"
