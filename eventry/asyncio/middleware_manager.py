@@ -2,24 +2,21 @@ from __future__ import annotations
 
 
 __all__ = [
+    'MiddlewareStorage',
     'MiddlewareManager',
-    'MiddlewareRegistrar',
+    'MiddlewareType',
+    'MdwsType'
 ]
 
 
-from typing import Any, Generic, TypeVar, Protocol, overload
+from typing import Any, Generic, TypeVar, Protocol, overload, Literal
 from enum import Enum
 from collections.abc import Callable, Iterator, Sequence, Awaitable
 
 from .callable_wrappers import CallableWrapper, MiddlewareCallable
 
 
-WrappedT = TypeVar('WrappedT', bound='Callable[..., Any]')
-
-T = TypeVar('T')
-
-
-class MiddlewareManagerType(Enum):
+class MiddlewareType(Enum):
     ROUTER_OUTER = 'router.outer'
     ROUTER_INNER = 'router.inner'
     MANAGER_OUTER = 'manager.outer'
@@ -28,7 +25,28 @@ class MiddlewareManagerType(Enum):
     HANDLER_INNER = 'handler.inner'
 
 
-class MiddlewareManager(Sequence[MiddlewareCallable[Any]]):
+MdwsType = Literal[
+    'router.outer',
+    'router.inner',
+    'manager.outer',
+    'manager.inner',
+    'handler.outer',
+    'handler.inner',
+    MiddlewareType.ROUTER_OUTER,
+    MiddlewareType.ROUTER_INNER,
+    MiddlewareType.MANAGER_OUTER,
+    MiddlewareType.MANAGER_INNER,
+    MiddlewareType.HANDLER_OUTER,
+    MiddlewareType.HANDLER_INNER,
+]
+
+
+WrappedT = TypeVar('WrappedT', bound='Callable[..., Any]')
+
+T = TypeVar('T')
+
+
+class MiddlewareStorage(Sequence[MiddlewareCallable[Any]]):
     def __init__(self) -> None:
         self._middlewares: list[MiddlewareCallable[Any]] = []
 
@@ -91,39 +109,45 @@ class MiddlewareManager(Sequence[MiddlewareCallable[Any]]):
         return current_call
 
 
-class RegistrarParent(Protocol):
-    _middleware_managers: dict[MiddlewareManagerType, MiddlewareManager]
+class MiddlewareManager:
+    def __init__(self, allowed_types: Sequence[MdwsType]) -> None:
+        self._allowed_types = set(MiddlewareType(i) for i in allowed_types)
+        self._storages: dict[MiddlewareType, MiddlewareStorage] = {}
 
-
-A = TypeVar('A')
-B = TypeVar('B')
-
-
-class MiddlewareRegistrar(Generic[A]):
-    def __init__(
-        self,
-        parent: RegistrarParent,
-        allowed_mdw_types: list[MiddlewareManagerType],
-    ) -> None:
-        self._parent = parent
-        self._allowed_mdw_types = allowed_mdw_types
-
-    def __call__(self, scope: A) -> Callable[[B], B]:
+    def get_middlewares_storage(self, type: MdwsType) -> MiddlewareStorage | None:
         try:
-            scope = MiddlewareManagerType(scope)
+            mdw_type = MiddlewareType(type)
         except ValueError:
-            raise ValueError(f'Invalid middleware scope: {scope}')
+            return None
+        return self._storages.get(mdw_type)
 
-        if scope not in self._parent._middleware_managers:
-            raise ValueError(f'Middleware manager for {scope} is not registered.')
+    def set_middlewares_storage(self, type: MdwsType, storage: MiddlewareStorage | None) -> None:
+        if storage is not None and not isinstance(storage, MiddlewareStorage):
+            raise TypeError(
+                f'Middlewares storage must be an instance of `MiddlewareStorage`, '
+                f'not {storage.__class__.__name__!r}.',
+            )
 
-        manager = self._parent._middleware_managers[scope]
+        try:
+            type = MiddlewareType(type)
+        except ValueError:
+            raise ValueError(f'Invalid middleware manager type: {type!r}.') from None
 
-        def register_middleware(middleware: B) -> B:
-            manager.register_middleware(middleware)
-            return middleware
+        if type not in self._allowed_types:
+            raise ValueError(
+                f'This middleware manager does not accept middleware storages of type {type!r}.',
+            )
 
-        return register_middleware
+        if storage is not None:
+            self._storages[type] = storage
+        else:
+            self._storages.pop(type, None)
+
+    def __call__(self, *, scope: MdwsType) -> Callable[[T], T]:
+        storage = self.get_middlewares_storage(scope)
+        if storage is None:
+            raise ValueError(f'This manager does not contain middleware storage for {scope!r} scope.') from None
+        return storage.__call__()
 
 
 _CALLABLE = Callable[[dict[str, Any]], Awaitable[Any]]

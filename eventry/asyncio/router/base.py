@@ -12,9 +12,8 @@ from eventry._config import RouterConfig, AsyncEventDispatchingConfig as EventDi
 from eventry.asyncio.filter import Filter, FilterFromFunction, dummy_filter
 from eventry._execution_context import ExecutionContext, RouterExecutionContext
 from eventry.asyncio.middleware_manager import (
+    MiddlewareStorage,
     MiddlewareManager,
-    MiddlewareRegistrar,
-    MiddlewareManagerType,
     _make_mdw_wrapper_factory,
 )
 
@@ -25,15 +24,6 @@ if TYPE_CHECKING:
 
 
 FilterT = TypeVar('FilterT')
-
-
-RouterMdwTypes = [MiddlewareManagerType.ROUTER_INNER, MiddlewareManagerType.ROUTER_OUTER]
-RouterMdwsType = Literal[
-    'router.outer',
-    'router.inner',
-    MiddlewareManagerType.ROUTER_INNER,
-    MiddlewareManagerType.ROUTER_OUTER,
-]
 
 
 class Router(Generic[FilterT]):
@@ -48,47 +38,13 @@ class Router(Generic[FilterT]):
         self._parent: Router | None = None
         self._config = config if config is not None else RouterConfig()
         self._filter: Filter = dummy_filter()
-        self._middleware_managers: dict[MiddlewareManagerType, MiddlewareManager] = {}
-        self.middleware = MiddlewareRegistrar(self, RouterMdwTypes)
+        self.middleware = MiddlewareManager(['router.outer', 'router.inner'])
 
     def set_filter(self, filter: FilterT) -> None:
         self._filter = filter if isinstance(filter, Filter) else FilterFromFunction(filter)
 
     def remove_filter(self) -> None:
         self._filter = dummy_filter()
-
-    def get_middleware_manager(self, manager_type: RouterMdwsType) -> MiddlewareManager | None:
-        try:
-            mdw_type = MiddlewareManagerType(manager_type)
-        except ValueError:
-            return None
-        return self._middleware_managers.get(mdw_type)
-
-    def set_middleware_manager(
-        self,
-        manager_type: RouterMdwsType,
-        manager: MiddlewareManager | None,
-    ) -> None:
-        if manager is not None and not isinstance(manager, MiddlewareManager):
-            raise TypeError(
-                f'Middleware manager must be an instance of MiddlewareManager, '
-                f'not {type(manager)!r}.',
-            )
-
-        try:
-            manager_type = MiddlewareManagerType(manager_type)
-        except ValueError:
-            raise ValueError(f'Invalid middleware manager type: {manager_type!r}.') from None
-
-        if manager_type not in RouterMdwTypes:
-            raise ValueError(
-                f'Router does not support {manager_type!r} type of middleware manager.',
-            )
-
-        if manager is not None:
-            self._middleware_managers[manager_type] = manager
-        else:
-            self._middleware_managers.pop(manager_type, None)
 
     def attach_router(self, router: Router) -> None:
         if router is self:
@@ -147,9 +103,9 @@ class Router(Generic[FilterT]):
         execution_ctx: RouterExecutionContext,
         context: dict[str, Any],
     ):
-        return await MiddlewareManager.wrap_with_middlewares(
+        return await MiddlewareStorage.wrap_with_middlewares(
             partial(self._propagate_event_with_filter_inner, event, config, execution_ctx),
-            self.get_middleware_manager('router.inner') or [],
+            self.middleware.get_middlewares_storage('router.inner') or [],
             _make_mdw_wrapper_factory(self.config.collect_inner_mdw_args),
         )(context)
 
@@ -167,9 +123,9 @@ class Router(Generic[FilterT]):
         self.config.update_ctx_with_filter_args(context)
         self.config.update_ctx_with_inner_mdw_args(context)
 
-        return await MiddlewareManager.wrap_with_middlewares(
+        return await MiddlewareStorage.wrap_with_middlewares(
             partial(self._propagate_event_with_filter, event, config, execution_ctx),
-            self.get_middleware_manager('router.outer') or [],
+            self.middleware.get_middlewares_storage('router.outer') or [],
             _make_mdw_wrapper_factory(self.config.collect_outer_mdw_args),
         )(context)
 

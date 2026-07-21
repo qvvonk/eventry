@@ -9,7 +9,7 @@ from functools import partial
 from collections.abc import Callable
 
 from eventry.asyncio.filter import Filter
-from eventry.asyncio.middleware_manager import MiddlewareManager
+from eventry.asyncio.middleware_manager import MiddlewareStorage
 
 from .base import HandlerManager
 
@@ -56,10 +56,10 @@ class DefaultHandlerManager(
             config=config,
         )
 
-        self.set_middleware_manager('manager.outer', MiddlewareManager())
-        self.set_middleware_manager('manager.inner', MiddlewareManager())
-        self.set_middleware_manager('handler.outer', MiddlewareManager())
-        self.set_middleware_manager('handler.inner', MiddlewareManager())
+        self.middleware.set_middlewares_storage('manager.outer', MiddlewareStorage())
+        self.middleware.set_middlewares_storage('manager.inner', MiddlewareStorage())
+        self.middleware.set_middlewares_storage('handler.outer', MiddlewareStorage())
+        self.middleware.set_middlewares_storage('handler.inner', MiddlewareStorage())
 
     # Use partial to keep the decorator syntax consistent:
     # all decorators are called with parentheses.
