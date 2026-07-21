@@ -23,6 +23,9 @@ from ._execution_context import (
 )
 
 
+_NEXT_CALL_KEY = 'next_call'
+
+
 def _collect_args(di: dict[str, Any], template: str, amount: int | None = None) -> list[Any]:
     if amount is None:
         result = []
@@ -74,6 +77,9 @@ class RouterConfig:
     filter_arg_key_template: _TemplateD = _TemplateD('__router_filter_{index}__')
     inner_arg_key_template: _TemplateD = _TemplateD('__router_inner_{index}__')
 
+    outer_mdw_next_call_key = _NEXT_CALL_KEY
+    inner_mdw_next_call_key = _NEXT_CALL_KEY
+
     def collect_outer_mdw_args(self, ctx: dict[str, Any]) -> list[Any]:
         return _collect_args(ctx, self.outer_mdw_arg_key_template, len(self.outer_mdw_args))
 
@@ -95,6 +101,9 @@ class RouterConfig:
 
 @dataclass(kw_only=True)
 class HandlerManagerConfig:
+    manager_key: str = 'manager'
+    handler_key: str = 'handler'
+
     manager_outer_mdw_args: Sequence[Any] = ()
     manager_filter_args: Sequence[Any] = ()
     manager_inner_mdw_args: Sequence[Any] = ()
@@ -111,6 +120,11 @@ class HandlerManagerConfig:
     handler_filter_arg_key_template: _TemplateD = _TemplateD('__handler_filter_{index}__')
     handler_inner_mdw_arg_key_template: _TemplateD = _TemplateD('__handler_inner_{index}__')
     handler_arg_key_template: _TemplateD = _TemplateD('__handler_{index}__')
+
+    manager_outer_mdw_next_call_key = _NEXT_CALL_KEY
+    manager_inner_mdw_next_call_key = _NEXT_CALL_KEY
+    handler_outer_mdw_next_call_key = _NEXT_CALL_KEY
+    handler_inner_mdw_next_call_key = _NEXT_CALL_KEY
 
     def collect_manager_outer_mdw_args(self, ctx: dict[str, Any]) -> list[Any]:
         return _collect_args(

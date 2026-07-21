@@ -71,7 +71,7 @@ class Router(Generic[FilterT]):
         context: dict[str, Any],
     ):
         for i in self._handler_managers.values():
-            manager_context = copy(context)
+            manager_context = context | {i.config.manager_key: i}
 
             await i.propagate_event(event, config, execution_ctx, manager_context)
             if event.propagation_stopped:
