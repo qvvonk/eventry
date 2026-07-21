@@ -5,13 +5,15 @@ __all__ = [
     'RouterConfig',
     'HandlerManagerConfig',
     'AsyncEventDispatchingConfig',
+    'FromKwargs',
+    'Kwargs'
 ]
 
 
 from typing import Any
-from dataclasses import field, dataclass
+from dataclasses import dataclass
 from collections.abc import Callable, Sequence, Awaitable
-from eventry.asyncio.callable_wrappers import FromKwargs, Kwargs
+from eventry.asyncio.callable_wrappers import FromKwargs as FromKwargs, Kwargs as Kwargs
 
 from .loggers import logger
 from ._execution_context import (
@@ -40,7 +42,7 @@ def update_context_with_args(di: dict[str, Any], args: Sequence[Any], template: 
         di[template.format(index=index)] = arg
 
 
-class TemplateDescriptor:
+class _TemplateD:
     def __init__(self, default: str) -> None:
         self._default = default
 
@@ -68,9 +70,9 @@ class RouterConfig:
     filter_args: Sequence[Any] = ()
     inner_mdw_args: Sequence[Any] = ()
 
-    outer_mdw_arg_key_template: TemplateDescriptor = TemplateDescriptor('__router_outer_{index}__')
-    filter_arg_key_template: TemplateDescriptor = TemplateDescriptor('__router_filter_{index}__')
-    inner_arg_key_template: TemplateDescriptor = TemplateDescriptor('__router_inner_{index}__')
+    outer_mdw_arg_key_template: _TemplateD = _TemplateD('__router_outer_{index}__')
+    filter_arg_key_template: _TemplateD = _TemplateD('__router_filter_{index}__')
+    inner_arg_key_template: _TemplateD = _TemplateD('__router_inner_{index}__')
 
     def collect_outer_mdw_args(self, ctx: dict[str, Any]) -> list[Any]:
         return _collect_args(ctx, self.outer_mdw_arg_key_template, len(self.outer_mdw_args))
@@ -102,25 +104,13 @@ class HandlerManagerConfig:
     handler_inner_mdw_args: Sequence[Any] = ()
     handler_args: Sequence[Any] = ()
 
-    manager_outer_mdw_arg_key_template: TemplateDescriptor = TemplateDescriptor(
-        '__mgr_outer_{index}__'
-    )
-    manager_filter_arg_key_template: TemplateDescriptor = TemplateDescriptor(
-        '__mgr_filter_{index}__'
-    )
-    manager_inner_mdw_arg_key_template: TemplateDescriptor = TemplateDescriptor(
-        '__mgr_inner_{index}__'
-    )
-    handler_outer_mdw_arg_key_template: TemplateDescriptor = TemplateDescriptor(
-        '__handler_outer_{index}__'
-    )
-    handler_filter_arg_key_template: TemplateDescriptor = TemplateDescriptor(
-        '__handler_filter_{index}__'
-    )
-    handler_inner_mdw_arg_key_template: TemplateDescriptor = TemplateDescriptor(
-        '__handler_inner_{index}__'
-    )
-    handler_arg_key_template: TemplateDescriptor = TemplateDescriptor('__handler_{index}__')
+    manager_outer_mdw_arg_key_template: _TemplateD = _TemplateD('__mgr_outer_{index}__')
+    manager_filter_arg_key_template: _TemplateD = _TemplateD('__mgr_filter_{index}__')
+    manager_inner_mdw_arg_key_template: _TemplateD = _TemplateD('__mgr_inner_{index}__')
+    handler_outer_mdw_arg_key_template: _TemplateD = _TemplateD('__handler_outer_{index}__')
+    handler_filter_arg_key_template: _TemplateD = _TemplateD('__handler_filter_{index}__')
+    handler_inner_mdw_arg_key_template: _TemplateD = _TemplateD('__handler_inner_{index}__')
+    handler_arg_key_template: _TemplateD = _TemplateD('__handler_{index}__')
 
     def collect_manager_outer_mdw_args(self, ctx: dict[str, Any]) -> list[Any]:
         return _collect_args(

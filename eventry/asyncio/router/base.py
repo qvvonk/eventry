@@ -3,7 +3,7 @@ from __future__ import annotations
 
 __all__ = ['Router']
 
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from copy import copy
 from functools import partial
 from collections.abc import Generator

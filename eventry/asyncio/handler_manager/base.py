@@ -28,7 +28,6 @@ from eventry.asyncio.callable_wrappers import Handler
 from eventry.asyncio.middleware_manager import (
     MiddlewareStorage,
     MiddlewareManager,
-    MiddlewareType,
     _make_mdw_wrapper_factory,
 )
 

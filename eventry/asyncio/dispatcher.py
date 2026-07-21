@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+
+__all__ = [
+    'Dispatcher',
+    'EventDispatchingConfig'
+]
+
+
 from typing import Any
 
 from eventry.event import Event

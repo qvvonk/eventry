@@ -1,3 +1,6 @@
-from __future__ import annotations
+__all__ = [
+    'Router',
+    'RouterConfig'
+]
 
-from .base import Router as Router
+from .base import Router, RouterConfig
