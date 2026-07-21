@@ -11,6 +11,7 @@ __all__ = [
 from typing import Any
 from dataclasses import field, dataclass
 from collections.abc import Callable, Sequence, Awaitable
+from eventry.asyncio.callable_wrappers import FromKwargs, Kwargs
 
 from .loggers import logger
 from ._execution_context import (

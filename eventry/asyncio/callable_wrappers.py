@@ -3,7 +3,8 @@ from __future__ import annotations
 
 __all__ = [
     'CallableWrapper',
-    'FromData',
+    'FromKwargs',
+    'Kwargs',
     'Handler',
     'MiddlewareCallable',
 ]
@@ -26,7 +27,9 @@ T = TypeVar('T')
 RT = TypeVar('RT')
 
 
-class FromData(str): ...
+class FromKwargs(str): ...
+
+class Kwargs: ...
 
 
 class CallableWrapper(Generic[ReturnTypeT]):
@@ -93,18 +96,17 @@ class CallableWrapper(Generic[ReturnTypeT]):
 
         r_args = []
         for index, arg in enumerate(args):
-            if type(arg) is not FromData:
+            if type(arg) is Kwargs:
+                r_args.append(kwargs if kwargs is not None else {})
+            elif type(arg) is not FromKwargs:
                 r_args.append(arg)
-                continue
-            if arg not in kwargs:
+            elif arg not in kwargs:
                 raise KeyError(
                     f'Positional argument {index}, '
                     f'that was passed to callable {self._callable.__qualname__!r}, '
                     f'requires value {arg!r} with key from kwargs, but it was not found.',
                 )
             r_args.append(kwargs[arg])
-
-        r_args = [i if type(i) is not FromData else kwargs[i] for i in args] if args else []
 
         bound_args_c = len(r_args) if len(r_args) <= self._args_c else self._args_c
         if bound_args_c < self._nondef_args_c:
