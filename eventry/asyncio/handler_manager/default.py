@@ -4,11 +4,8 @@ from __future__ import annotations
 __all__ = ['DefaultHandlerManager']
 
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from functools import partial
-from collections.abc import Callable
-
-from eventry.asyncio.filter import Filter
 from eventry.asyncio.middleware_manager import MiddlewareStorage
 
 from .base import HandlerManager
@@ -16,34 +13,10 @@ from .base import HandlerManager
 
 if TYPE_CHECKING:
     from eventry._config import HandlerManagerConfig
-
     from .base import EventFilter
 
 
-FilterCallable = Callable[..., bool | None | dict[str, Any]]
-FilterT = FilterCallable | Filter
-MiddlewareT = Callable[..., Any]
-HandlerT = Callable[..., Any]
-
-ManagerOuterMdwT = MiddlewareT
-ManagerInnerMdwT = MiddlewareT
-HandlerOuterMdwT = MiddlewareT
-HandlerInnerMdwT = MiddlewareT
-ManagerFilterT = FilterT
-HandlerFilterT = FilterT
-
-
-class DefaultHandlerManager(
-    HandlerManager[
-        ManagerOuterMdwT,
-        ManagerFilterT,
-        ManagerInnerMdwT,
-        HandlerOuterMdwT,
-        HandlerFilterT,
-        HandlerInnerMdwT,
-        HandlerT,
-    ],
-):
+class DefaultHandlerManager(HandlerManager):
     def __init__(
         self,
         name: str,

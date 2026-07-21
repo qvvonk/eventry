@@ -8,7 +8,7 @@ __all__ = [
 
 import asyncio
 import inspect
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from types import MappingProxyType
 from functools import partial
 from collections.abc import Callable, Sequence
@@ -43,13 +43,13 @@ if TYPE_CHECKING:
 T = TypeVar('T')
 
 
-ManagerOuterMdwT = TypeVar('ManagerOuterMdwT')
-ManagerFilterT = TypeVar('ManagerFilterT')
-ManagerInnerMdwT = TypeVar('ManagerInnerMdwT')
-HandlerOuterMdwT = TypeVar('HandlerOuterMdwT')
-HandlerFilterT = TypeVar('HandlerFilterT')
-HandlerInnerMdwT = TypeVar('HandlerInnerMdwT')
-HandlerT = TypeVar('HandlerT')
+ManagerOuterMdwT = TypeVar('ManagerOuterMdwT', default=Callable[..., Any])
+ManagerFilterT = TypeVar('ManagerFilterT', default=Callable[..., Any])
+ManagerInnerMdwT = TypeVar('ManagerInnerMdwT', default=Callable[..., Any])
+HandlerOuterMdwT = TypeVar('HandlerOuterMdwT', default=Callable[... ,Any])
+HandlerFilterT = TypeVar('HandlerFilterT', default=Callable[... ,Any])
+HandlerInnerMdwT = TypeVar('HandlerInnerMdwT', default=Callable[... ,Any])
+HandlerT = TypeVar('HandlerT', default=Callable[... ,Any])
 
 
 class HandlerManager(
