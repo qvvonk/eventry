@@ -64,9 +64,9 @@ class TemplateDescriptor:
 class RouterConfig:
     router_key: str = 'router'
 
-    outer_mdw_args: Sequence[Any] = field(default_factory=list)
-    filter_args: Sequence[Any] = field(default_factory=list)
-    inner_mdw_args: Sequence[Any] = field(default_factory=list)
+    outer_mdw_args: Sequence[Any] = ()
+    filter_args: Sequence[Any] = ()
+    inner_mdw_args: Sequence[Any] = ()
 
     outer_mdw_arg_key_template: TemplateDescriptor = TemplateDescriptor('__router_outer_{index}__')
     filter_arg_key_template: TemplateDescriptor = TemplateDescriptor('__router_filter_{index}__')
@@ -93,14 +93,14 @@ class RouterConfig:
 
 @dataclass(kw_only=True)
 class HandlerManagerConfig:
-    manager_outer_mdw_args: Sequence[Any] = field(default_factory=list)
-    manager_filter_args: Sequence[Any] = field(default_factory=list)
-    manager_inner_mdw_args: Sequence[Any] = field(default_factory=list)
+    manager_outer_mdw_args: Sequence[Any] = ()
+    manager_filter_args: Sequence[Any] = ()
+    manager_inner_mdw_args: Sequence[Any] = ()
 
-    handler_outer_mdw_args: Sequence[Any] = field(default_factory=list)
-    handler_filter_args: Sequence[Any] = field(default_factory=list)
-    handler_inner_mdw_args: Sequence[Any] = field(default_factory=list)
-    handler_args: Sequence[Any] = field(default_factory=list)
+    handler_outer_mdw_args: Sequence[Any] = ()
+    handler_filter_args: Sequence[Any] = ()
+    handler_inner_mdw_args: Sequence[Any] = ()
+    handler_args: Sequence[Any] = ()
 
     manager_outer_mdw_arg_key_template: TemplateDescriptor = TemplateDescriptor(
         '__mgr_outer_{index}__'
