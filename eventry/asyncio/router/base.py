@@ -6,7 +6,7 @@ __all__ = ['Router', 'RouterConfig']
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from copy import copy
 from functools import partial
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 
 from eventry._config import RouterConfig, AsyncEventDispatchingConfig as EventDispatchingConfig
 from eventry.asyncio.filter import Filter, FilterFromFunction, dummy_filter
@@ -16,6 +16,7 @@ from eventry.asyncio.middleware_manager import (
     MiddlewareManager,
     _make_mdw_wrapper_factory,
 )
+from types import MappingProxyType
 
 
 if TYPE_CHECKING:
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
 
 
 FilterT = TypeVar('FilterT')
+ManagerT = TypeVar('ManagerT', bound=HandlerManager)
 
 
 class Router(Generic[FilterT]):
@@ -35,6 +37,7 @@ class Router(Generic[FilterT]):
         self._name = name or self.__class__.__name__
         self._sub_routers: dict[str, Router] = {}
         self._handler_managers: dict[str, HandlerManager] = {}
+        self._handler_managers_proxy = MappingProxyType(self._handler_managers)
         self._parent: Router | None = None
         self._config = config if config is not None else RouterConfig()
         self._filter: Filter = dummy_filter()
@@ -55,13 +58,26 @@ class Router(Generic[FilterT]):
 
         self._sub_routers[router.name] = router
         router._parent = self
-        # todo: add checks
+        # todo: add loop checks
 
-    def remove_subrouter(self, router: str | Router) -> Router:
+    def detach_router(self, router: str | Router) -> Router:
         name = router.name if isinstance(router, Router) else router
         r = self._sub_routers.pop(name)
         r._parent = None
         return r
+
+    def add_handler_manager(self, manager: ManagerT) -> ManagerT:
+        if not isinstance(manager, HandlerManager):
+            raise TypeError(f'Handler manager must be an instance of `HandlerManager`, not {type(manager)!r}')
+
+        if manager.name in self._handler_managers:
+            raise ValueError(f'Handler manager with name {manager.name!r} already exists in this router.')
+
+        self._handler_managers[manager.name] = manager
+        return manager
+
+    def remove_handler_manager(self, name: str) -> HandlerManager | None:
+        return self._handler_managers.pop(name)
 
     async def _propagate_event(
         self,
@@ -159,3 +175,7 @@ class Router(Generic[FilterT]):
     @property
     def filter(self) -> Filter:
         return self._filter
+
+    @property
+    def handler_managers(self) -> Mapping[str, HandlerManager]:
+        return self._handler_managers_proxy
