@@ -65,7 +65,7 @@ class _TemplateD:
         setattr(instance, self._name, value)
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class RouterConfig:
     router_key: str = 'router'
 
@@ -99,11 +99,8 @@ class RouterConfig:
         update_context_with_args(ctx, self.inner_mdw_args, self.inner_arg_key_template)
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class HandlerManagerConfig:
-    manager_key: str = 'manager'
-    handler_key: str = 'handler'
-
     manager_outer_mdw_args: Sequence[Any] = ()
     manager_filter_args: Sequence[Any] = ()
     manager_inner_mdw_args: Sequence[Any] = ()
@@ -121,6 +118,8 @@ class HandlerManagerConfig:
     handler_inner_mdw_arg_key_template: _TemplateD = _TemplateD('__handler_inner_{index}__')
     handler_arg_key_template: _TemplateD = _TemplateD('__handler_{index}__')
 
+    manager_key: str = 'manager'
+    handler_key: str = 'handler'
     manager_outer_mdw_next_call_key = _NEXT_CALL_KEY
     manager_inner_mdw_next_call_key = _NEXT_CALL_KEY
     handler_outer_mdw_next_call_key = _NEXT_CALL_KEY
