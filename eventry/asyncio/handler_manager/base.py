@@ -95,29 +95,6 @@ class HandlerManager(
 
         return self.event_filter(event)
 
-    def _create_handler_obj(
-        self,
-        handler: Any,  # todo
-        handler_id: str | None = None,
-        filter: Any = None,
-        as_task: bool = False,
-        inner_middlewares: Sequence[Any] | None = None,
-        outer_middlewares: Sequence[Any] | None = None,
-    ) -> Handler[Any]:
-        if not handler_id:
-            handler_id = gen_default_handler_id(handler)
-            while handler_id in self._handlers:
-                handler_id += '_'
-
-        return Handler(
-            handler,
-            handler_id=handler_id,
-            filter=convert_filters([filter])[0] if filter is not None else None,
-            as_task=as_task,
-            inner_middlewares=inner_middlewares,
-            outer_middlewares=outer_middlewares,
-        )
-
     def _register_handler(self, handler: Handler[Any]) -> None:
         """
         Registers handler to this handler manager.
@@ -145,17 +122,16 @@ class HandlerManager(
         outer_middlewares: Sequence[HandlerOuterMdwT] | None = None,
     ) -> Callable[[HandlerT], HandlerT]:
         def inner(handler: HandlerT) -> HandlerT:
-            handler_obj = self._create_handler_obj(
-                handler=handler,
-                handler_id=handler_id,
-                filter=filter,
+            handler_obj = Handler(
+                handler,
+                handler_id=handler_id or gen_default_handler_id(handler, list(self._handlers.keys())),
+                filter=convert_filters([filter])[0] if filter is not None else None,
                 as_task=as_task,
                 inner_middlewares=inner_middlewares,
                 outer_middlewares=outer_middlewares,
             )
             self._register_handler(handler_obj)
             return handler
-
         return inner
 
     @property
@@ -318,7 +294,18 @@ class HandlerManager(
                 logger.error('Error in manager callback', exc_info=callback_error)  # todo
 
 
-def gen_default_handler_id(handler: Any):
+def gen_default_handler_id(handler: Any, names: Sequence[str] = ()) -> str:
     if inspect.isfunction(handler) or inspect.ismethod(handler) or inspect.isclass(handler):
-        return f'{handler.__qualname__}'
-    return f'{handler.__class__.__qualname__}'
+        r = f'{handler.__qualname__}'
+    else:
+        r = f'{handler.__class__.__qualname__}'
+
+    if r not in names:
+        return r
+
+    index = 1
+    while True:
+        with_index = f'{r}_{index}'
+        if with_index not in names:
+            return with_index
+        index += 1
