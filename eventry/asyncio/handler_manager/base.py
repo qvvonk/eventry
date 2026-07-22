@@ -124,7 +124,7 @@ class HandlerManager(
         def inner(handler: HandlerT) -> HandlerT:
             handler_obj = Handler(
                 handler,
-                handler_id=handler_id or gen_default_handler_id(handler, list(self._handlers.keys())),
+                handler_id=handler_id or gen_handler_id(handler, list(self._handlers.keys())),
                 filter=convert_filters([filter])[0] if filter is not None else None,
                 as_task=as_task,
                 inner_middlewares=inner_middlewares,
@@ -294,18 +294,12 @@ class HandlerManager(
                 logger.error('Error in manager callback', exc_info=callback_error)  # todo
 
 
-def gen_default_handler_id(handler: Any, names: Sequence[str] = ()) -> str:
-    if inspect.isfunction(handler) or inspect.ismethod(handler) or inspect.isclass(handler):
-        r = f'{handler.__qualname__}'
-    else:
-        r = f'{handler.__class__.__qualname__}'
-
+def gen_handler_id(handler: Any, names: Sequence[str] = ()) -> str:
+    r = handler.__qualname__ if inspect.isroutine(handler) else handler.__clas__.__name__
     if r not in names:
         return r
 
     index = 1
-    while True:
-        with_index = f'{r}_{index}'
-        if with_index not in names:
-            return with_index
+    while f'{r}_{index}' in names:
         index += 1
+    return f'{r}_{index}'
