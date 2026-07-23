@@ -21,7 +21,7 @@ class Dispatcher:
 
     def __init__(
         self,
-        router: Router,
+        router: Router | None = None,
         event_context: dict[str, Any] | None = None,
         config: EventDispatchingConfig | None = None,
     ) -> None:
