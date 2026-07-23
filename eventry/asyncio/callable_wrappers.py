@@ -33,7 +33,7 @@ class FromKwargs(str):
         return f'{self.__class__.__name__}({text})'
 
     def __str__(self) -> str:
-        return super().__str__()
+        return self.__repr__()
 
 
 class Kwargs:
@@ -98,6 +98,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
         kwargs: Mapping[str, Any] | None = None,
     ) -> tuple[list[Any], dict[str, Any]]:
         args = self._partial_args + list(args)
+        original_kwargs = kwargs or {}
         kwargs = self._partial_kwargs | dict(kwargs or {})
 
         if len(args) > self._args_c and not self._has_varargs:
@@ -111,9 +112,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
 
         r_args = []
         for index, arg in enumerate(args):
-            if arg is Kwargs:
-                r_args.append(kwargs if kwargs is not None else {})
-            elif type(arg) is not FromKwargs:
+            if type(arg) is not FromKwargs:
                 r_args.append(arg)
             elif arg not in kwargs:
                 raise KeyError(
@@ -177,6 +176,13 @@ class CallableWrapper(Generic[ReturnTypeT]):
                 if name in kwargs:
                     r_kwargs[name] = kwargs[name]
 
+        for index, i in enumerate(r_args):
+            if i is Kwargs:
+                r_args[index] = original_kwargs
+
+        for k, v in r_kwargs.items():
+            if v is Kwargs:
+                r_kwargs[v] = original_kwargs
         return r_args, r_kwargs
 
     def __call__(

@@ -65,7 +65,7 @@ class _TemplateD:
         setattr(instance, self._name, value)
 
 
-@dataclass(kw_only=True, frozen=True)
+@dataclass(kw_only=True)
 class RouterConfig:
     router_key: str = 'router'
 
@@ -99,7 +99,7 @@ class RouterConfig:
         update_context_with_args(ctx, self.inner_mdw_args, self.inner_arg_key_template)
 
 
-@dataclass(kw_only=True, frozen=True)
+@dataclass(kw_only=True)
 class HandlerManagerConfig:
     manager_outer_mdw_args: Sequence[Any] = ()
     manager_filter_args: Sequence[Any] = ()

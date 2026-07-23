@@ -23,9 +23,10 @@ if TYPE_CHECKING:
     from eventry.event import Event
     from eventry.asyncio.handler_manager import HandlerManager
 
+    ManagerT = TypeVar('ManagerT', bound=HandlerManager)
+
 
 FilterT = TypeVar('FilterT')
-ManagerT = TypeVar('ManagerT', bound=HandlerManager)
 
 
 class Router(Generic[FilterT]):
