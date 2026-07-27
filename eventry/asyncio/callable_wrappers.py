@@ -11,7 +11,7 @@ __all__ = [
 
 import asyncio
 import inspect
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, final
 from types import MethodType, FunctionType
 from functools import partial
 from collections.abc import Mapping, Callable, Sequence, Awaitable
@@ -27,6 +27,7 @@ T = TypeVar('T')
 RT = TypeVar('RT')
 
 
+@final
 class FromKwargs(str):
     def __repr__(self) -> str:
         text = super().__repr__()
@@ -36,6 +37,7 @@ class FromKwargs(str):
         return self.__repr__()
 
 
+@final
 class Kwargs:
     def __repr__(self) -> str:
         return self.__class__.__name__
