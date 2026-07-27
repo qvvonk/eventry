@@ -16,16 +16,16 @@ from collections.abc import Callable, Sequence
 from eventry.loggers import logger
 from eventry.asyncio.config import HandlerManagerConfig, EventDispatchingConfig
 from eventry.asyncio.filter import Filter, FilterFromFunction, dummy_filter, convert_filters
+from eventry.asyncio.middleware import (
+    MiddlewareManager,
+    MiddlewareStorage,
+    _make_mdw_wrapper_factory,
+)
 from eventry.asyncio.callable_wrappers import Handler
 from eventry.asyncio.execution_context import (
     RouterExecutionContext,
     HandlerExecutionContext,
     ManagerExecutionContext,
-)
-from eventry.asyncio.middleware import (
-    MiddlewareManager,
-    MiddlewareStorage,
-    _make_mdw_wrapper_factory,
 )
 
 

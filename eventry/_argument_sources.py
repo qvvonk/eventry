@@ -1,12 +1,5 @@
 from __future__ import annotations
 
-
-__all__ = [
-    'FromKwargs',
-    'Kwargs',
-]
-
-
 from typing import final
 
 

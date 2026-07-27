@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-
-__all__ = ['Event', 'ExtendedEvent']
-
 from typing import TYPE_CHECKING, Any
 from types import MappingProxyType
 from collections.abc import Iterator

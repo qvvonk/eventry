@@ -28,7 +28,7 @@ __all__ = [
     'default_handler_callback',
     'MiddlewareManager',
     'MiddlewareStorage',
-    'MiddlewareType'
+    'MiddlewareType',
 ]
 
 
@@ -56,6 +56,7 @@ from .filter import (
 )
 from .router import Router, DefaultRouter
 from .dispatcher import Dispatcher
+from .middleware import MiddlewareType, MiddlewareManager, MiddlewareStorage
 from .handler_manager import HandlerManager, DefaultHandlerManager
 from .execution_context import (
     ExecutionContext,
@@ -63,4 +64,3 @@ from .execution_context import (
     HandlerExecutionContext,
     ManagerExecutionContext,
 )
-from .middleware import MiddlewareStorage, MiddlewareManager, MiddlewareType
