@@ -17,11 +17,11 @@ from eventry.asyncio.middleware_manager import (
     _make_mdw_wrapper_factory,
 )
 from types import MappingProxyType
+from eventry.asyncio.handler_manager.base import HandlerManager
 
 
 if TYPE_CHECKING:
     from eventry.event import Event
-    from eventry.asyncio.handler_manager import HandlerManager
 
     ManagerT = TypeVar('ManagerT', bound=HandlerManager)
 
@@ -30,11 +30,7 @@ FilterT = TypeVar('FilterT')
 
 
 class Router(Generic[FilterT]):
-    def __init__(
-        self,
-        name: str = '',
-        config: RouterConfig | None = None,
-    ) -> None:
+    def __init__(self, name: str = '', config: RouterConfig | None = None) -> None:
         self._name = name or self.__class__.__name__
         self._sub_routers: dict[str, Router] = {}
         self._handler_managers: dict[str, HandlerManager] = {}
@@ -50,19 +46,28 @@ class Router(Generic[FilterT]):
     def remove_filter(self) -> None:
         self._filter = dummy_filter()
 
-    def attach_router(self, router: Router) -> None:
-        if router is self:
+    def attach_router(self, r: Router) -> None:
+        if r is self:
             raise ValueError('Cannot attach router to itself.')
 
-        if router.parent is not None:
-            raise ValueError('Router already has a parent.')
+        if r.parent is not None:
+            raise ValueError(f'Router {r.full_name!r} already has a parent.')
 
-        self._sub_routers[router.name] = router
-        router._parent = self
-        # todo: add loop checks
+        if r.name in self._sub_routers:
+            raise ValueError(f'Router {self.full_name} already has a subrouter with name {r.name!r}.')
+
+        for i in self.chain_to_root():
+            if i is r:
+                raise ValueError(f'Cannot attach an ancestor router.')
+
+        self._sub_routers[r.name] = r
+        r._parent = self
 
     def detach_router(self, router: str | Router) -> Router:
         name = router.name if isinstance(router, Router) else router
+        if name not in self._sub_routers:
+            raise KeyError(f'Router {self.full_name} does not has a subrouter with name {name!r}.')
+
         r = self._sub_routers.pop(name)
         r._parent = None
         return r

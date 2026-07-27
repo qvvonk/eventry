@@ -9,7 +9,7 @@ __all__ = [
 ]
 
 
-from typing import Any, Generic, TypeVar, Protocol, overload, Literal
+from typing import Any, TypeVar, overload, Literal
 from enum import Enum
 from collections.abc import Callable, Iterator, Sequence, Awaitable
 
