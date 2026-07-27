@@ -5,7 +5,6 @@ __all__ = [
     'MiddlewareStorage',
     'MiddlewareManager',
     'MiddlewareType',
-    'MdwsType',
 ]
 
 

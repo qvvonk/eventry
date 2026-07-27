@@ -24,6 +24,11 @@ import pytest
             id='handler_manager',
         ),
         pytest.param(
+            ['eventry.asyncio', 'eventry.asyncio.middleware'],
+            ['MiddlewareStorage', 'MiddlewareManager', 'MiddlewareType'],
+            id='middleware',
+        ),
+        pytest.param(
             ['eventry.asyncio.filter', 'eventry.asyncio'],
             [
                 'Filter',

@@ -16,7 +16,7 @@ from eventry.asyncio.config import RouterConfig, EventDispatchingConfig
 from eventry.asyncio.filter import Filter, FilterFromFunction, dummy_filter
 from eventry.asyncio.exceptions import router as rexc
 from eventry.asyncio.execution_context import ExecutionContext, RouterExecutionContext
-from eventry.asyncio.middleware_manager import (
+from eventry.asyncio.middleware import (
     MiddlewareManager,
     MiddlewareStorage,
     _make_mdw_wrapper_factory,

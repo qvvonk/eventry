@@ -22,7 +22,7 @@ from eventry.asyncio.execution_context import (
     HandlerExecutionContext,
     ManagerExecutionContext,
 )
-from eventry.asyncio.middleware_manager import (
+from eventry.asyncio.middleware import (
     MiddlewareManager,
     MiddlewareStorage,
     _make_mdw_wrapper_factory,
