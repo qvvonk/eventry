@@ -81,6 +81,8 @@ class Filter:
         result = await self._call_wrapper(args, data)
         if isinstance(result, dict):
             data.update(result)
+            return True
+
         return bool(result)
 
 
