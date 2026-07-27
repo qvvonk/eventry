@@ -6,9 +6,10 @@ __all__ = ['DefaultHandlerManager']
 
 from typing import TYPE_CHECKING
 from functools import partial
+
+from eventry._config import Kwargs, FromKwargs
 from eventry.asyncio.middleware_manager import MiddlewareStorage
 from eventry.asyncio.handler_manager.base import HandlerManager, HandlerManagerConfig
-from eventry._config import Kwargs, FromKwargs
 
 
 if TYPE_CHECKING:
@@ -19,7 +20,7 @@ config = HandlerManagerConfig(
     manager_outer_mdw_args=(FromKwargs('next_call'), Kwargs),
     manager_inner_mdw_args=(FromKwargs('next_call'), Kwargs),
     handler_outer_mdw_args=(FromKwargs('next_call'), Kwargs),
-    handler_inner_mdw_args=(FromKwargs('next_call'), Kwargs)
+    handler_inner_mdw_args=(FromKwargs('next_call'), Kwargs),
 )
 
 

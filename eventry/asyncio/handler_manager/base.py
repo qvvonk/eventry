@@ -26,8 +26,8 @@ from eventry._execution_context import (
 )
 from eventry.asyncio.callable_wrappers import Handler
 from eventry.asyncio.middleware_manager import (
-    MiddlewareStorage,
     MiddlewareManager,
+    MiddlewareStorage,
     _make_mdw_wrapper_factory,
 )
 
@@ -45,10 +45,10 @@ T = TypeVar('T')
 ManagerOuterMdwT = TypeVar('ManagerOuterMdwT', default=Callable[..., Any])
 ManagerFilterT = TypeVar('ManagerFilterT', default=Callable[..., Any])
 ManagerInnerMdwT = TypeVar('ManagerInnerMdwT', default=Callable[..., Any])
-HandlerOuterMdwT = TypeVar('HandlerOuterMdwT', default=Callable[... ,Any])
-HandlerFilterT = TypeVar('HandlerFilterT', default=Callable[... ,Any])
-HandlerInnerMdwT = TypeVar('HandlerInnerMdwT', default=Callable[... ,Any])
-HandlerT = TypeVar('HandlerT', default=Callable[... ,Any])
+HandlerOuterMdwT = TypeVar('HandlerOuterMdwT', default=Callable[..., Any])
+HandlerFilterT = TypeVar('HandlerFilterT', default=Callable[..., Any])
+HandlerInnerMdwT = TypeVar('HandlerInnerMdwT', default=Callable[..., Any])
+HandlerT = TypeVar('HandlerT', default=Callable[..., Any])
 
 
 class HandlerManager(
@@ -78,7 +78,9 @@ class HandlerManager(
         self._name = name
         self._config = config or HandlerManagerConfig()
         self._filter: Filter = dummy_filter()
-        self.middleware = MiddlewareManager(['manager.outer', 'manager.inner', 'handler.outer', 'handler.inner'])
+        self.middleware = MiddlewareManager(
+            ['manager.outer', 'manager.inner', 'handler.outer', 'handler.inner']
+        )
 
     def set_filter(self, filter: ManagerFilterT) -> None:
         self._filter = filter if isinstance(filter, Filter) else FilterFromFunction(filter)
@@ -89,7 +91,7 @@ class HandlerManager(
     def check_event(self, event: Event) -> bool:
         if self.event_filter is None:
             return True
-        
+
         if isinstance(self.event_filter, str):
             return self.event_filter == event.name
 
@@ -132,6 +134,7 @@ class HandlerManager(
             )
             self._register_handler(handler_obj)
             return handler
+
         return inner
 
     @property
@@ -161,8 +164,12 @@ class HandlerManager(
     async def _execute_handler(self, handler: Handler[Any], context: dict[str, Any]) -> Any:
         return await MiddlewareStorage.wrap_with_middlewares(
             partial(handler, self.config.collect_handler_args(context)),
-            list(self.middleware.get_middlewares_storage('handler.inner') or []) + handler.inner_middlewares,
-            _make_mdw_wrapper_factory(self.config.collect_handler_inner_mdw_args, self.config.handler_inner_mdw_next_call_key),
+            list(self.middleware.get_middlewares_storage('handler.inner') or [])
+            + handler.inner_middlewares,
+            _make_mdw_wrapper_factory(
+                self.config.collect_handler_inner_mdw_args,
+                self.config.handler_inner_mdw_next_call_key,
+            ),
         )(context)
 
     async def _execute_handler_with_filter_inner(
@@ -189,7 +196,10 @@ class HandlerManager(
                 partial(self._execute_handler_with_filter_inner, handler),
                 list(self.middleware.get_middlewares_storage('handler.outer') or [])
                 + handler.outer_middlewares,
-                _make_mdw_wrapper_factory(self.config.collect_handler_outer_mdw_args, self.config.handler_outer_mdw_next_call_key),
+                _make_mdw_wrapper_factory(
+                    self.config.collect_handler_outer_mdw_args,
+                    self.config.handler_outer_mdw_next_call_key,
+                ),
             )(context)
         except Exception as handler_error:
             try:
@@ -227,10 +237,14 @@ class HandlerManager(
         for i in self.handlers.values():
             if i.as_task:
                 asyncio.create_task(
-                    self._execute_handler_with_filter(i, config, execution_ctx, context | {self.config.handler_key: i}),
+                    self._execute_handler_with_filter(
+                        i, config, execution_ctx, context | {self.config.handler_key: i}
+                    ),
                 )
             else:
-                await self._execute_handler_with_filter(i, config, execution_ctx, context | {self.config.handler_key: i})
+                await self._execute_handler_with_filter(
+                    i, config, execution_ctx, context | {self.config.handler_key: i}
+                )
             if event.propagation_stopped:
                 return
 
@@ -244,7 +258,10 @@ class HandlerManager(
         return await MiddlewareStorage.wrap_with_middlewares(
             partial(self._execute_handlers_inner, event, config, execution_ctx),
             self.middleware.get_middlewares_storage('manager.inner') or [],
-            _make_mdw_wrapper_factory(self.config.collect_manager_inner_mdw_args, self.config.manager_inner_mdw_next_call_key),
+            _make_mdw_wrapper_factory(
+                self.config.collect_manager_inner_mdw_args,
+                self.config.manager_inner_mdw_next_call_key,
+            ),
         )(context)
 
     async def _execute_handlers_with_mgr_filter(
@@ -283,7 +300,10 @@ class HandlerManager(
             return await MiddlewareStorage.wrap_with_middlewares(
                 partial(self._execute_handlers_with_mgr_filter, event, config, manager_ctx),
                 self.middleware.get_middlewares_storage('manager.outer') or [],
-                _make_mdw_wrapper_factory(self.config.collect_manager_outer_mdw_args, self.config.manager_outer_mdw_next_call_key),
+                _make_mdw_wrapper_factory(
+                    self.config.collect_manager_outer_mdw_args,
+                    self.config.manager_outer_mdw_next_call_key,
+                ),
             )(context)
         except Exception as manager_error:
             try:

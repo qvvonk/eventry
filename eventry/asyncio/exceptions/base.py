@@ -1,7 +1,9 @@
+from __future__ import annotations
+
+
 __all__ = [
-    'EventryException'
+    'EventryException',
 ]
 
 
-class EventryException(Exception):
-    ...
+class EventryException(Exception): ...

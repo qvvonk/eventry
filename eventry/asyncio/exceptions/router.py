@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .base import EventryException
 
 
@@ -10,22 +12,17 @@ __all__ = [
 ]
 
 
-class RouterError(EventryException):
-    ...
+class RouterError(EventryException): ...
 
 
 # --- Router attachment exceptions ---
-class RouterAttachmentError(RouterError):
-    ...
+class RouterAttachmentError(RouterError): ...
 
 
-class RouterAlreadyAttachedError(RouterAttachmentError, ValueError):
-    ...
+class RouterAlreadyAttachedError(RouterAttachmentError, ValueError): ...
 
 
-class DuplicateSubrouterNameError(RouterAttachmentError, ValueError):
-    ...
+class DuplicateSubrouterNameError(RouterAttachmentError, ValueError): ...
 
 
-class RouterLoopError(RouterAttachmentError, ValueError):
-    ...
+class RouterLoopError(RouterAttachmentError, ValueError): ...

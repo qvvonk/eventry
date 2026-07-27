@@ -5,11 +5,11 @@ __all__ = [
     'MiddlewareStorage',
     'MiddlewareManager',
     'MiddlewareType',
-    'MdwsType'
+    'MdwsType',
 ]
 
 
-from typing import Any, TypeVar, overload, Literal
+from typing import Any, Literal, TypeVar, overload
 from enum import Enum
 from collections.abc import Callable, Iterator, Sequence, Awaitable
 
@@ -146,7 +146,9 @@ class MiddlewareManager:
     def __call__(self, *, scope: MdwsType) -> Callable[[T], T]:
         storage = self.get_middlewares_storage(scope)
         if storage is None:
-            raise ValueError(f'This manager does not contain middleware storage for {scope!r} scope.') from None
+            raise ValueError(
+                f'This manager does not contain middleware storage for {scope!r} scope.'
+            ) from None
         return storage.__call__()
 
 

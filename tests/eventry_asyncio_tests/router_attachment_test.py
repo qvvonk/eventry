@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import pytest
+
 from eventry.asyncio import Router
 from eventry.asyncio.exceptions import router as rexc
 

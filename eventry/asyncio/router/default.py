@@ -1,15 +1,19 @@
+from __future__ import annotations
+
+
 __all__ = [
-    'DefaultRouter'
+    'DefaultRouter',
 ]
 
-from .base import Router, RouterConfig
 from eventry._config import Kwargs, FromKwargs
 from eventry.asyncio.handler_manager import DefaultHandlerManager
+
+from .base import Router, RouterConfig
 
 
 config = RouterConfig(
     outer_mdw_args=(FromKwargs('next_call'), Kwargs),
-    inner_mdw_args=(FromKwargs('next_call'), Kwargs)
+    inner_mdw_args=(FromKwargs('next_call'), Kwargs),
 )
 
 

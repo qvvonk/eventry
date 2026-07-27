@@ -3,22 +3,22 @@ from __future__ import annotations
 
 __all__ = ['Router', 'RouterConfig']
 
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, Self
+from typing import TYPE_CHECKING, Any, Self, Generic, TypeVar
 from copy import copy
+from types import MappingProxyType
 from functools import partial
-from collections.abc import Generator, Mapping
+from collections.abc import Mapping, Generator
 
 from eventry._config import RouterConfig, AsyncEventDispatchingConfig as EventDispatchingConfig
 from eventry.asyncio.filter import Filter, FilterFromFunction, dummy_filter
 from eventry._execution_context import ExecutionContext, RouterExecutionContext
+from eventry.asyncio.exceptions import router as rexc
 from eventry.asyncio.middleware_manager import (
-    MiddlewareStorage,
     MiddlewareManager,
+    MiddlewareStorage,
     _make_mdw_wrapper_factory,
 )
-from types import MappingProxyType
 from eventry.asyncio.handler_manager.base import HandlerManager
-from eventry.asyncio.exceptions import router as rexc
 
 
 if TYPE_CHECKING:
@@ -60,17 +60,17 @@ class Router(Generic[FilterT]):
 
         if router.parent is not None:
             raise rexc.RouterAlreadyAttachedError(
-                f'Router {router.full_name!r} already has a parent.'
+                f'Router {router.full_name!r} already has a parent.',
             )
 
         if router.name in self._sub_routers:
             raise rexc.DuplicateSubrouterNameError(
-                f'Router {self.full_name} already has a subrouter with name {router.name!r}.'
+                f'Router {self.full_name} already has a subrouter with name {router.name!r}.',
             )
 
         for i in self.chain_to_root():
             if i is router:
-                raise rexc.RouterLoopError(f'Cannot attach an ancestor router.')
+                raise rexc.RouterLoopError('Cannot attach an ancestor router.')
 
         self._sub_routers[router.name] = router
         router._parent = self
@@ -81,7 +81,7 @@ class Router(Generic[FilterT]):
 
         if router_name not in self._sub_routers:
             raise KeyError(
-                f'Router {self.full_name} does not has a subrouter with name {router_name!r}.'
+                f'Router {self.full_name} does not has a subrouter with name {router_name!r}.',
             )
 
         r = self._sub_routers.pop(router_name)
@@ -95,10 +95,14 @@ class Router(Generic[FilterT]):
 
     def add_handler_manager(self, manager: ManagerT) -> ManagerT:
         if not isinstance(manager, HandlerManager):
-            raise TypeError(f'Handler manager must be an instance of `HandlerManager`, not {type(manager)!r}')
+            raise TypeError(
+                f'Handler manager must be an instance of `HandlerManager`, not {type(manager)!r}'
+            )
 
         if manager.name in self._handler_managers:
-            raise ValueError(f'Handler manager with name {manager.name!r} already exists in this router.')
+            raise ValueError(
+                f'Handler manager with name {manager.name!r} already exists in this router.'
+            )
 
         self._handler_managers[manager.name] = manager
         return manager
@@ -159,7 +163,9 @@ class Router(Generic[FilterT]):
         execution_ctx: ExecutionContext,
         context: dict[str, Any],
     ):
-        execution_ctx = RouterExecutionContext(**(execution_ctx.shallow_asdict() | {'router': self}))
+        execution_ctx = RouterExecutionContext(
+            **(execution_ctx.shallow_asdict() | {'router': self})
+        )
         context[self.config.router_key] = self
 
         self.config.update_ctx_with_outer_mdw_args(context)

@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 __all__ = [
     'HandlerManager',
     'DefaultHandlerManager',
@@ -7,8 +10,20 @@ __all__ = [
     'RouterConfig',
     'Dispatcher',
     'EventDispatchingConfig',
+    'Filter',
+    'FilterFromFunction',
+    'LogicalFilter',
+    'AndFilter',
+    'OrFilter',
+    'NotFilter',
+    'any_of',
+    'all_of',
+    'not_',
+    'convert_filters'
 ]
 
-from .handler_manager import HandlerManager, DefaultHandlerManager, HandlerManagerConfig
-from .router import Router, DefaultRouter, RouterConfig
+
+from .router import Router, RouterConfig, DefaultRouter
 from .dispatcher import Dispatcher, EventDispatchingConfig
+from .handler_manager import HandlerManager, HandlerManagerConfig, DefaultHandlerManager
+from .filter import Filter, FilterFromFunction, LogicalFilter, AndFilter, OrFilter, NotFilter, any_of, all_of, not_, convert_filters

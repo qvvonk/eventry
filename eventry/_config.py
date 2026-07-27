@@ -6,14 +6,15 @@ __all__ = [
     'HandlerManagerConfig',
     'AsyncEventDispatchingConfig',
     'FromKwargs',
-    'Kwargs'
+    'Kwargs',
 ]
 
 
 from typing import Any
 from dataclasses import dataclass
 from collections.abc import Callable, Sequence, Awaitable
-from eventry.asyncio.callable_wrappers import FromKwargs as FromKwargs, Kwargs as Kwargs
+
+from eventry.asyncio.callable_wrappers import Kwargs as Kwargs, FromKwargs as FromKwargs
 
 from .loggers import logger
 from ._execution_context import (

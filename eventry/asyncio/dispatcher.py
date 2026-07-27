@@ -3,14 +3,14 @@ from __future__ import annotations
 
 __all__ = [
     'Dispatcher',
-    'EventDispatchingConfig'
+    'EventDispatchingConfig',
 ]
 
 
 from typing import Any
 
 from eventry.event import Event
-from eventry._config import AsyncEventDispatchingConfig as EventDispatchingConfig, Kwargs
+from eventry._config import Kwargs, AsyncEventDispatchingConfig as EventDispatchingConfig
 from eventry._execution_context import ExecutionContext
 
 from .router import Router
@@ -56,7 +56,9 @@ class Dispatcher:
         config: EventDispatchingConfig | None = None,
     ) -> None:
         if not isinstance(event, Event):
-            raise TypeError(f'Event must be an instance of Event, not {event.__class__.__name__!r}.')
+            raise TypeError(
+                f'Event must be an instance of Event, not {event.__class__.__name__!r}.'
+            )
 
         router = router if router is not None else self.router
         if router is None:
@@ -68,7 +70,7 @@ class Dispatcher:
             **event.context_injection(),
             **(additional_context or {}),
             'event': event,  # todo: name from dispatcher config
-            'context': Kwargs  # todo: name from dispatcher
+            'context': Kwargs,  # todo: name from dispatcher
         }
         execution_context = ExecutionContext(
             event=event,

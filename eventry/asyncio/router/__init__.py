@@ -1,7 +1,10 @@
+from __future__ import annotations
+
+
 __all__ = [
     'Router',
     'RouterConfig',
-    'DefaultRouter'
+    'DefaultRouter',
 ]
 
 from .base import Router, RouterConfig
