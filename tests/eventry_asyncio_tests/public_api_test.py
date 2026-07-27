@@ -38,6 +38,19 @@ import pytest
             id='filter',
         ),
         pytest.param(
+            ['eventry.asyncio', 'eventry.asyncio.config'],
+            [
+                'Kwargs',
+                'FromKwargs',
+                'EventDispatchingConfig',
+                'RouterConfig',
+                'HandlerManagerConfig',
+                'default_error_callback',
+                'default_handler_callback',
+            ],
+            id='config',
+        ),
+        pytest.param(
             ['eventry.asyncio.exceptions'],
             [
                 'EventryError',

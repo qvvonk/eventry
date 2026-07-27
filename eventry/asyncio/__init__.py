@@ -22,11 +22,23 @@ __all__ = [
     'convert_filters',
     'Event',
     'ExtendedEvent',
+    'Kwargs',
+    'FromKwargs',
+    'default_error_callback',
+    'default_handler_callback',
 ]
 
 
 from .event import Event, ExtendedEvent
-from .config import RouterConfig, HandlerManagerConfig, EventDispatchingConfig
+from .config import (
+    Kwargs,
+    FromKwargs,
+    RouterConfig,
+    HandlerManagerConfig,
+    EventDispatchingConfig,
+    default_error_callback,
+    default_handler_callback,
+)
 from .filter import (
     Filter,
     OrFilter,
