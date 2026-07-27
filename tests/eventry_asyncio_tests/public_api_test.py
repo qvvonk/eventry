@@ -29,7 +29,7 @@ import pytest
             id='middleware',
         ),
         pytest.param(
-            ['eventry.asyncio.filter', 'eventry.asyncio'],
+            ['eventry.asyncio', 'eventry.asyncio.filter'],
             [
                 'Filter',
                 'AndFilter',
