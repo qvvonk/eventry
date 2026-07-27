@@ -96,12 +96,12 @@ class Router(Generic[FilterT]):
     def add_handler_manager(self, manager: ManagerT) -> ManagerT:
         if not isinstance(manager, HandlerManager):
             raise TypeError(
-                f'Handler manager must be an instance of `HandlerManager`, not {type(manager)!r}'
+                f'Handler manager must be an instance of `HandlerManager`, not {type(manager)!r}',
             )
 
         if manager.name in self._handler_managers:
             raise ValueError(
-                f'Handler manager with name {manager.name!r} already exists in this router.'
+                f'Handler manager with name {manager.name!r} already exists in this router.',
             )
 
         self._handler_managers[manager.name] = manager
@@ -164,7 +164,7 @@ class Router(Generic[FilterT]):
         context: dict[str, Any],
     ):
         execution_ctx = RouterExecutionContext(
-            **(execution_ctx.shallow_asdict() | {'router': self})
+            **(execution_ctx.shallow_asdict() | {'router': self}),
         )
         context[self.config.router_key] = self
 

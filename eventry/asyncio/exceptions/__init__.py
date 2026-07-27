@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .base import EventryException as EventryException
+from .base import EventryError as EventryException
 from .router import (
     RouterError as RouterError,
     RouterLoopError as RouterLoopError,

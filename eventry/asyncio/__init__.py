@@ -19,11 +19,22 @@ __all__ = [
     'any_of',
     'all_of',
     'not_',
-    'convert_filters'
+    'convert_filters',
 ]
 
 
+from .filter import (
+    Filter,
+    OrFilter,
+    AndFilter,
+    NotFilter,
+    LogicalFilter,
+    FilterFromFunction,
+    not_,
+    all_of,
+    any_of,
+    convert_filters,
+)
 from .router import Router, RouterConfig, DefaultRouter
 from .dispatcher import Dispatcher, EventDispatchingConfig
 from .handler_manager import HandlerManager, HandlerManagerConfig, DefaultHandlerManager
-from .filter import Filter, FilterFromFunction, LogicalFilter, AndFilter, OrFilter, NotFilter, any_of, all_of, not_, convert_filters

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .base import EventryException
+from .base import EventryError
 
 
 __all__ = [
@@ -12,7 +12,7 @@ __all__ = [
 ]
 
 
-class RouterError(EventryException): ...
+class RouterError(EventryError): ...
 
 
 # --- Router attachment exceptions ---

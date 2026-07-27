@@ -111,7 +111,7 @@ class MiddlewareStorage(Sequence[MiddlewareCallable[Any]]):
 
 class MiddlewareManager:
     def __init__(self, allowed_types: Sequence[MdwsType]) -> None:
-        self._allowed_types = set(MiddlewareType(i) for i in allowed_types)
+        self._allowed_types = {MiddlewareType(i) for i in allowed_types}
         self._storages: dict[MiddlewareType, MiddlewareStorage] = {}
 
     def get_middlewares_storage(self, type: MdwsType) -> MiddlewareStorage | None:
@@ -147,7 +147,7 @@ class MiddlewareManager:
         storage = self.get_middlewares_storage(scope)
         if storage is None:
             raise ValueError(
-                f'This manager does not contain middleware storage for {scope!r} scope.'
+                f'This manager does not contain middleware storage for {scope!r} scope.',
             ) from None
         return storage.__call__()
 

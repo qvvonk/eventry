@@ -79,7 +79,7 @@ class HandlerManager(
         self._config = config or HandlerManagerConfig()
         self._filter: Filter = dummy_filter()
         self.middleware = MiddlewareManager(
-            ['manager.outer', 'manager.inner', 'handler.outer', 'handler.inner']
+            ['manager.outer', 'manager.inner', 'handler.outer', 'handler.inner'],
         )
 
     def set_filter(self, filter: ManagerFilterT) -> None:
@@ -238,12 +238,12 @@ class HandlerManager(
             if i.as_task:
                 asyncio.create_task(
                     self._execute_handler_with_filter(
-                        i, config, execution_ctx, context | {self.config.handler_key: i}
+                        i, config, execution_ctx, context | {self.config.handler_key: i},
                     ),
                 )
             else:
                 await self._execute_handler_with_filter(
-                    i, config, execution_ctx, context | {self.config.handler_key: i}
+                    i, config, execution_ctx, context | {self.config.handler_key: i},
                 )
             if event.propagation_stopped:
                 return

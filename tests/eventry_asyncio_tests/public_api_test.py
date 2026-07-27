@@ -1,5 +1,8 @@
-import pytest
+from __future__ import annotations
+
 import importlib
+
+import pytest
 
 
 @pytest.mark.parametrize(
@@ -9,19 +12,19 @@ import importlib
             'eventry.asyncio',
             'eventry.asyncio.router',
             ['Router', 'DefaultRouter', 'RouterConfig'],
-            id='router'
+            id='router',
         ),
         pytest.param(
             'eventry.asyncio',
             'eventry.asyncio.dispatcher',
             ['Dispatcher', 'EventDispatchingConfig'],
-            id='dispatcher'
+            id='dispatcher',
         ),
         pytest.param(
             'eventry.asyncio',
             'eventry.asyncio.handler_manager',
             ['HandlerManager', 'DefaultHandlerManager', 'HandlerManagerConfig'],
-            id='handler_manager'
+            id='handler_manager',
         ),
         pytest.param(
             'eventry.asyncio.filter',
@@ -34,16 +37,16 @@ import importlib
                 'FilterFromFunction',
                 'any_of',
                 'all_of',
-                'not_'
+                'not_',
             ],
-            id='filter'
-        )
-    ]
+            id='filter',
+        ),
+    ],
 )
 def test_public_imports(
     public_module,
     implementation_module,
-    names
+    names,
 ):
     public = importlib.import_module(public_module)
     implementation = importlib.import_module(implementation_module)
