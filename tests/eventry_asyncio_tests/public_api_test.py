@@ -56,6 +56,16 @@ import pytest
             id='config',
         ),
         pytest.param(
+            ['eventry.asyncio', 'eventry.asyncio.config', 'eventry.asyncio.execution_context'],
+            (
+                'ExecutionContext',
+                'RouterExecutionContext',
+                'ManagerExecutionContext',
+                'HandlerExecutionContext',
+            ),
+            id='execution_context',
+        ),
+        pytest.param(
             ['eventry.asyncio', 'eventry.asyncio.event'],
             ['Event', 'ExtendedEvent'],
             id='event',

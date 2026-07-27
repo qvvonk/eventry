@@ -9,6 +9,10 @@ __all__ = [
     'default_handler_callback',
     'Kwargs',
     'FromKwargs',
+    'ExecutionContext',
+    'RouterExecutionContext',
+    'HandlerExecutionContext',
+    'ManagerExecutionContext',
 ]
 
 from typing import Any
@@ -19,6 +23,7 @@ from eventry._config import RouterConfig, HandlerManagerConfig
 from eventry.loggers import logger
 from eventry._argument_sources import Kwargs, FromKwargs
 from eventry.asyncio.execution_context import (
+    ExecutionContext,
     RouterExecutionContext,
     HandlerExecutionContext,
     ManagerExecutionContext,
