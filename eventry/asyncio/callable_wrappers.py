@@ -182,7 +182,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
 
         for k, v in r_kwargs.items():
             if v is Kwargs:
-                r_kwargs[v] = original_kwargs
+                r_kwargs[k] = original_kwargs
         return r_args, r_kwargs
 
     def __call__(
