@@ -30,7 +30,6 @@ from eventry.asyncio.middleware_manager import (
     MiddlewareManager,
     _make_mdw_wrapper_factory,
 )
-from copy import copy
 
 
 if TYPE_CHECKING:
@@ -90,6 +89,7 @@ class HandlerManager(
     def check_event(self, event: Event) -> bool:
         if self.event_filter is None:
             return True
+        
         if isinstance(self.event_filter, str):
             return self.event_filter == event.name
 

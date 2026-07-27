@@ -3,7 +3,7 @@ from __future__ import annotations
 
 __all__ = ['Router', 'RouterConfig']
 
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, Self
 from copy import copy
 from functools import partial
 from collections.abc import Generator, Mapping
@@ -18,6 +18,7 @@ from eventry.asyncio.middleware_manager import (
 )
 from types import MappingProxyType
 from eventry.asyncio.handler_manager.base import HandlerManager
+from eventry.asyncio.exceptions import router as rexc
 
 
 if TYPE_CHECKING:
@@ -31,8 +32,15 @@ FilterT = TypeVar('FilterT')
 
 class Router(Generic[FilterT]):
     def __init__(self, name: str = '', config: RouterConfig | None = None) -> None:
+        if not isinstance(name, str):
+            raise TypeError(f'Router name must be a string, not {type(config)!r}.')
+
+        if config is not None and not isinstance(config, RouterConfig):
+            raise TypeError(f'Config must be an instance of `RouterConfig`, not {type(config)!r}.')
+
         self._name = name or self.__class__.__name__
         self._sub_routers: dict[str, Router] = {}
+        self._sub_routers_proxy = MappingProxyType(self._sub_routers)
         self._handler_managers: dict[str, HandlerManager] = {}
         self._handler_managers_proxy = MappingProxyType(self._handler_managers)
         self._parent: Router | None = None
@@ -46,31 +54,44 @@ class Router(Generic[FilterT]):
     def remove_filter(self) -> None:
         self._filter = dummy_filter()
 
-    def attach_router(self, r: Router) -> None:
-        if r is self:
-            raise ValueError('Cannot attach router to itself.')
+    def attach_router(self, router: Router) -> None:
+        if router is self:
+            raise rexc.RouterLoopError('Cannot attach router to itself.')
 
-        if r.parent is not None:
-            raise ValueError(f'Router {r.full_name!r} already has a parent.')
+        if router.parent is not None:
+            raise rexc.RouterAlreadyAttachedError(
+                f'Router {router.full_name!r} already has a parent.'
+            )
 
-        if r.name in self._sub_routers:
-            raise ValueError(f'Router {self.full_name} already has a subrouter with name {r.name!r}.')
+        if router.name in self._sub_routers:
+            raise rexc.DuplicateSubrouterNameError(
+                f'Router {self.full_name} already has a subrouter with name {router.name!r}.'
+            )
 
         for i in self.chain_to_root():
-            if i is r:
-                raise ValueError(f'Cannot attach an ancestor router.')
+            if i is router:
+                raise rexc.RouterLoopError(f'Cannot attach an ancestor router.')
 
-        self._sub_routers[r.name] = r
-        r._parent = self
+        self._sub_routers[router.name] = router
+        router._parent = self
 
-    def detach_router(self, router: str | Router) -> Router:
-        name = router.name if isinstance(router, Router) else router
-        if name not in self._sub_routers:
-            raise KeyError(f'Router {self.full_name} does not has a subrouter with name {name!r}.')
+    def detach_router(self, router_name: str) -> Router:
+        if not isinstance(router_name, str):
+            raise TypeError('Router name must be a string.')
 
-        r = self._sub_routers.pop(name)
+        if router_name not in self._sub_routers:
+            raise KeyError(
+                f'Router {self.full_name} does not has a subrouter with name {router_name!r}.'
+            )
+
+        r = self._sub_routers.pop(router_name)
         r._parent = None
         return r
+
+    def detach(self) -> Self:
+        if self.parent is not None:
+            self.parent.detach_router(self.name)
+        return self
 
     def add_handler_manager(self, manager: ManagerT) -> ManagerT:
         if not isinstance(manager, HandlerManager):
@@ -171,6 +192,10 @@ class Router(Generic[FilterT]):
         return '.'.join(f'{r.name!r}' for r in self.chain_to_root())
 
     @property
+    def path(self) -> tuple[str, ...]:
+        return tuple(reversed([i.name for i in self.chain_to_root()]))
+
+    @property
     def parent(self) -> Router | None:
         return self._parent
 
@@ -185,3 +210,7 @@ class Router(Generic[FilterT]):
     @property
     def handler_managers(self) -> Mapping[str, HandlerManager]:
         return self._handler_managers_proxy
+
+    @property
+    def sub_routers(self) -> Mapping[str, Router]:
+        return self._sub_routers_proxy

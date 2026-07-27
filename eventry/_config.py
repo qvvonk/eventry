@@ -238,7 +238,7 @@ async def on_error_callback(ctx: RouterExecutionContext, exc: Exception) -> None
         )
 
 
-async def on_handler_callback(ctx: HandlerExecutionContext, result: Any) -> None:
+async def on_handler_callback(*_: Any) -> None:
     return
 
 

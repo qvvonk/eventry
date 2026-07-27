@@ -7,10 +7,8 @@ __all__ = ['DefaultHandlerManager']
 from typing import TYPE_CHECKING
 from functools import partial
 from eventry.asyncio.middleware_manager import MiddlewareStorage
-from eventry.asyncio.handler_manager import HandlerManager, HandlerManagerConfig
+from eventry.asyncio.handler_manager.base import HandlerManager, HandlerManagerConfig
 from eventry._config import Kwargs, FromKwargs
-
-from .base import HandlerManager
 
 
 if TYPE_CHECKING:

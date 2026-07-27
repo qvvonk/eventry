@@ -56,7 +56,7 @@ class Dispatcher:
         config: EventDispatchingConfig | None = None,
     ) -> None:
         if not isinstance(event, Event):
-            raise TypeError(f'Event must be an instance of Event, not {type(event)!r}.')
+            raise TypeError(f'Event must be an instance of Event, not {event.__class__.__name__!r}.')
 
         router = router if router is not None else self.router
         if router is None:
