@@ -1,10 +1,21 @@
 from __future__ import annotations
 
-from .base import EventryError as EventryException
+
+__all__ = [
+    'EventryError',
+    'RouterError',
+    'RouterLoopError',
+    'RouterAttachmentError',
+    'RouterAlreadyAttachedError',
+    'DuplicateSubrouterNameError',
+]
+
+
+from .base import EventryError
 from .router import (
-    RouterError as RouterError,
-    RouterLoopError as RouterLoopError,
-    RouterAttachmentError as RouterAttachmentError,
-    RouterAlreadyAttachedError as RouterAlreadyAttachedError,
-    DuplicateSubrouterNameError as DuplicateSubrouterNameError,
+    RouterError,
+    RouterLoopError,
+    RouterAttachmentError,
+    RouterAlreadyAttachedError ,
+    DuplicateSubrouterNameError,
 )

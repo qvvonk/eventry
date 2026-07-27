@@ -41,6 +41,19 @@ import pytest
             ],
             id='filter',
         ),
+        pytest.param(
+            'eventry.asyncio.exceptions',
+            'eventry.asyncio.exceptions',
+            [
+                'EventryError',
+                'RouterError',
+                'RouterAttachmentError',
+                'RouterAlreadyAttachedError',
+                'DuplicateSubrouterNameError',
+                'RouterLoopError',
+            ],
+            id='exceptions'
+        )
     ],
 )
 def test_public_imports(
