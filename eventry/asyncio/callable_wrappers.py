@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from types import MethodType, FunctionType
 from functools import partial
 from collections.abc import Mapping, Callable, Sequence, Awaitable
+from eventry._argument_sources import FromKwargs, Kwargs
 
 
 if TYPE_CHECKING:

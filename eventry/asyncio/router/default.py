@@ -5,6 +5,7 @@ __all__ = [
     'DefaultRouter',
 ]
 
+from eventry.asyncio.middleware import MiddlewareStorage
 from eventry.asyncio.config import Kwargs, FromKwargs
 from eventry.asyncio.handler_manager import DefaultHandlerManager
 
@@ -23,7 +24,17 @@ class DefaultRouter(Router):
 
         self._manager = DefaultHandlerManager('DefaultHandlerManager', lambda *args: True)
         self._handler_managers['DefaultHandlerManager'] = self._manager
+        self.middleware.set_middlewares_storage('router.outer', MiddlewareStorage())
+        self.middleware.set_middlewares_storage('router.inner', MiddlewareStorage())
 
     @property
     def on_event(self) -> DefaultHandlerManager:
         return self._manager
+
+    @property
+    def outer_middleware(self) -> MiddlewareStorage:
+        return self.middleware.get_middlewares_storage('router.outer')
+
+    @property
+    def inner_middleware(self) -> MiddlewareStorage:
+        return self.middleware.get_middlewares_storage('router.inner')
