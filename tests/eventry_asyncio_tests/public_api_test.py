@@ -24,7 +24,7 @@ import pytest
             id='handler_manager',
         ),
         pytest.param(
-            ['eventry.asyncio.filter'],
+            ['eventry.asyncio.filter', 'eventry.asyncio'],
             [
                 'Filter',
                 'AndFilter',
@@ -49,6 +49,11 @@ import pytest
                 'default_handler_callback',
             ],
             id='config',
+        ),
+        pytest.param(
+            ['eventry.asyncio', 'eventry.asyncio.event'],
+            ['Event', 'ExtendedEvent'],
+            id='event',
         ),
         pytest.param(
             ['eventry.asyncio.exceptions'],
