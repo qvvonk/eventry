@@ -13,18 +13,15 @@ from types import MappingProxyType
 from functools import partial
 from collections.abc import Callable, Sequence
 
-from eventry._config import (
-    HandlerManagerConfig,
-    AsyncEventDispatchingConfig as EventDispatchingConfig,
-)
 from eventry.loggers import logger
+from eventry.asyncio.config import HandlerManagerConfig, EventDispatchingConfig
 from eventry.asyncio.filter import Filter, FilterFromFunction, dummy_filter, convert_filters
-from eventry._execution_context import (
+from eventry.asyncio.callable_wrappers import Handler
+from eventry.asyncio.execution_context import (
     RouterExecutionContext,
     HandlerExecutionContext,
     ManagerExecutionContext,
 )
-from eventry.asyncio.callable_wrappers import Handler
 from eventry.asyncio.middleware_manager import (
     MiddlewareManager,
     MiddlewareStorage,
@@ -33,7 +30,7 @@ from eventry.asyncio.middleware_manager import (
 
 
 if TYPE_CHECKING:
-    from eventry.event import Event
+    from eventry._event import Event
 
     EventFilterCallable = Callable[[Event], bool]
     EventFilter = EventFilterCallable | str
@@ -238,12 +235,18 @@ class HandlerManager(
             if i.as_task:
                 asyncio.create_task(
                     self._execute_handler_with_filter(
-                        i, config, execution_ctx, context | {self.config.handler_key: i},
+                        i,
+                        config,
+                        execution_ctx,
+                        context | {self.config.handler_key: i},
                     ),
                 )
             else:
                 await self._execute_handler_with_filter(
-                    i, config, execution_ctx, context | {self.config.handler_key: i},
+                    i,
+                    config,
+                    execution_ctx,
+                    context | {self.config.handler_key: i},
                 )
             if event.propagation_stopped:
                 return

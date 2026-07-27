@@ -16,6 +16,6 @@ from .router import (
     RouterError,
     RouterLoopError,
     RouterAttachmentError,
-    RouterAlreadyAttachedError ,
+    RouterAlreadyAttachedError,
     DuplicateSubrouterNameError,
 )

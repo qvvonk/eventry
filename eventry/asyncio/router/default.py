@@ -5,7 +5,7 @@ __all__ = [
     'DefaultRouter',
 ]
 
-from eventry._config import Kwargs, FromKwargs
+from eventry.asyncio.config import Kwargs, FromKwargs
 from eventry.asyncio.handler_manager import DefaultHandlerManager
 
 from .base import Router, RouterConfig

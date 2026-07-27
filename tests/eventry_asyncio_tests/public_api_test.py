@@ -6,29 +6,25 @@ import pytest
 
 
 @pytest.mark.parametrize(
-    ('public_module', 'implementation_module', 'names'),
+    ('modules', 'names'),
     [
         pytest.param(
-            'eventry.asyncio',
-            'eventry.asyncio.router',
+            ['eventry.asyncio', 'eventry.asyncio.router'],
             ['Router', 'DefaultRouter', 'RouterConfig'],
             id='router',
         ),
         pytest.param(
-            'eventry.asyncio',
-            'eventry.asyncio.dispatcher',
+            ['eventry.asyncio', 'eventry.asyncio.dispatcher'],
             ['Dispatcher', 'EventDispatchingConfig'],
             id='dispatcher',
         ),
         pytest.param(
-            'eventry.asyncio',
-            'eventry.asyncio.handler_manager',
+            ['eventry.asyncio', 'eventry.asyncio.handler_manager'],
             ['HandlerManager', 'DefaultHandlerManager', 'HandlerManagerConfig'],
             id='handler_manager',
         ),
         pytest.param(
-            'eventry.asyncio.filter',
-            'eventry.asyncio.filter',
+            ['eventry.asyncio.filter'],
             [
                 'Filter',
                 'AndFilter',
@@ -42,8 +38,7 @@ import pytest
             id='filter',
         ),
         pytest.param(
-            'eventry.asyncio.exceptions',
-            'eventry.asyncio.exceptions',
+            ['eventry.asyncio.exceptions'],
             [
                 'EventryError',
                 'RouterError',
@@ -52,21 +47,28 @@ import pytest
                 'DuplicateSubrouterNameError',
                 'RouterLoopError',
             ],
-            id='exceptions'
-        )
+            id='exceptions',
+        ),
     ],
 )
-def test_public_imports(
-    public_module,
-    implementation_module,
-    names,
-):
-    public = importlib.import_module(public_module)
-    implementation = importlib.import_module(implementation_module)
+def test_public_imports(modules, names):
+    module_objs = [importlib.import_module(i) for i in modules]
 
     for name in names:
-        assert getattr(public, name) is getattr(implementation, name), 'Different objects.'
-        assert hasattr(public, '__all__'), 'Public has no `__all__`.'
-        assert hasattr(implementation, '__all__'), 'Implementation has no `__all__`.'
-        assert name in getattr(public, '__all__'), 'Name not in `public.__all__`.'
-        assert name in getattr(implementation, '__all__'), 'Name not in `implementation.__all__`.'
+        objects = []
+
+        for module_name, module in zip(modules, module_objs):
+            assert hasattr(module, name), f'`{module_name}` does not have attribute `{name}`.'
+
+            assert hasattr(module, '__all__'), (
+                f'`{module_name}` does not have attribute `__all__`.'
+            )
+
+            assert name in getattr(module, '__all__'), (
+                f'`{module_name}.__all__` does not contain `{name}`.'
+            )
+
+            objects.append(getattr(module, name))
+
+        for i in objects:
+            assert i is objects[0]

@@ -1,27 +1,8 @@
 from __future__ import annotations
 
-
-__all__ = [
-    'RouterConfig',
-    'HandlerManagerConfig',
-    'AsyncEventDispatchingConfig',
-    'FromKwargs',
-    'Kwargs',
-]
-
-
 from typing import Any
 from dataclasses import dataclass
-from collections.abc import Callable, Sequence, Awaitable
-
-from eventry.asyncio.callable_wrappers import Kwargs as Kwargs, FromKwargs as FromKwargs
-
-from .loggers import logger
-from ._execution_context import (
-    RouterExecutionContext,
-    HandlerExecutionContext,
-    ManagerExecutionContext,
-)
+from collections.abc import Sequence
 
 
 _NEXT_CALL_KEY = 'next_call'
@@ -215,35 +196,3 @@ class HandlerManagerConfig:
 
     def update_ctx_with_handler_args(self, ctx: dict[str, Any]) -> None:
         update_context_with_args(ctx, self.handler_args, self.handler_arg_key_template)
-
-
-async def on_error_callback(ctx: RouterExecutionContext, exc: Exception) -> None:
-    if not isinstance(ctx, RouterExecutionContext):
-        return
-
-    if isinstance(ctx, HandlerExecutionContext):
-        logger.error(
-            f'An error occurred while executing handler {ctx.handler.id!r} @ {ctx.manager.name!r} @ {ctx.router.full_name}'
-            f'for event {ctx.event.name!r}.',
-            exc_info=exc,
-        )
-    elif isinstance(ctx, ManagerExecutionContext):
-        logger.error(
-            f'An error occurred while executing handlers of manager {ctx.manager.name!r} @ {ctx.router.full_name}.',
-            exc_info=exc,
-        )
-    else:
-        logger.error(
-            f'An error occurred while executing handlers of router {ctx.router.full_name}.',
-            exc_info=exc,
-        )
-
-
-async def on_handler_callback(*_: Any) -> None:
-    return
-
-
-@dataclass(kw_only=True)
-class AsyncEventDispatchingConfig:
-    on_error: Callable[[RouterExecutionContext, Exception], Awaitable[Any]] = on_error_callback
-    on_handler: Callable[[HandlerExecutionContext, Any], Awaitable[Any]] = on_handler_callback

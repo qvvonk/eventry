@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 
-__all__ = ['Router', 'RouterConfig']
+__all__ = [
+    'Router',
+    'RouterConfig',
+]
 
 from typing import TYPE_CHECKING, Any, Self, Generic, TypeVar
 from copy import copy
@@ -9,10 +12,10 @@ from types import MappingProxyType
 from functools import partial
 from collections.abc import Mapping, Generator
 
-from eventry._config import RouterConfig, AsyncEventDispatchingConfig as EventDispatchingConfig
+from eventry.asyncio.config import RouterConfig, EventDispatchingConfig
 from eventry.asyncio.filter import Filter, FilterFromFunction, dummy_filter
-from eventry._execution_context import ExecutionContext, RouterExecutionContext
 from eventry.asyncio.exceptions import router as rexc
+from eventry.asyncio.execution_context import ExecutionContext, RouterExecutionContext
 from eventry.asyncio.middleware_manager import (
     MiddlewareManager,
     MiddlewareStorage,
@@ -22,7 +25,7 @@ from eventry.asyncio.handler_manager.base import HandlerManager
 
 
 if TYPE_CHECKING:
-    from eventry.event import Event
+    from eventry._event import Event
 
     ManagerT = TypeVar('ManagerT', bound=HandlerManager)
 

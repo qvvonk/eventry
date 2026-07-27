@@ -20,9 +20,13 @@ __all__ = [
     'all_of',
     'not_',
     'convert_filters',
+    'Event',
+    'ExtendedEvent',
 ]
 
 
+from .event import Event, ExtendedEvent
+from .config import RouterConfig, HandlerManagerConfig, EventDispatchingConfig
 from .filter import (
     Filter,
     OrFilter,
@@ -35,6 +39,12 @@ from .filter import (
     any_of,
     convert_filters,
 )
-from .router import Router, RouterConfig, DefaultRouter
-from .dispatcher import Dispatcher, EventDispatchingConfig
-from .handler_manager import HandlerManager, HandlerManagerConfig, DefaultHandlerManager
+from .router import Router, DefaultRouter
+from .dispatcher import Dispatcher
+from .handler_manager import HandlerManager, DefaultHandlerManager
+from .execution_context import (
+    ExecutionContext,
+    RouterExecutionContext,
+    HandlerExecutionContext,
+    ManagerExecutionContext,
+)

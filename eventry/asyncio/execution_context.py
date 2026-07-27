@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 
 if TYPE_CHECKING:
-    from eventry.event import Event
+    from eventry.asyncio.event import Event
     from eventry.asyncio.router import Router
     from eventry.asyncio.dispatcher import Dispatcher
     from eventry.asyncio.handler_manager import HandlerManager
