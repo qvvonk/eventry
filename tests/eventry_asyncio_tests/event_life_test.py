@@ -1,62 +1,75 @@
 from __future__ import annotations
 
+from typing import Any
+from collections.abc import Callable, Awaitable
+
 import pytest
 
 from eventry.asyncio import Dispatcher, DefaultRouter, ExtendedEvent
 
 
 router = DefaultRouter(name='test_router')
+DATA = dict[str, Any]
+NEXT = Callable[[DATA], Awaitable[Any]]
 
 
 @router.outer_middleware()
-async def router_outer_middleware(next_call, data, event: ExtendedEvent):
+async def router_outer_middleware(next_call: NEXT, data: DATA, event: ExtendedEvent) -> None:
     event['workflow'] = ['router.outer']
     await next_call(data)
     event['workflow'].append('router.outer.end')
 
 
 @router.inner_middleware()
-async def router_inner_middleware(next_call, data, event: ExtendedEvent):
+async def router_inner_middleware(next_call: NEXT, data: DATA, event: ExtendedEvent) -> None:
     event['workflow'].append('router.inner')
     await next_call(data)
     event['workflow'].append('router.inner.end')
 
 
 @router.on_event.manager_outer_middleware()
-async def manager_outer_middleware(next_call, data, event: ExtendedEvent):
+async def manager_outer_middleware(next_call: NEXT, data: DATA, event: ExtendedEvent) -> None:
     event['workflow'].append('manager.outer')
     await next_call(data)
     event['workflow'].append('manager.outer.end')
 
 
 @router.on_event.manager_inner_middleware()
-async def manager_inner_middleware(next_call, data, event: ExtendedEvent):
+async def manager_inner_middleware(next_call: NEXT, data: DATA, event: ExtendedEvent) -> None:
     event['workflow'].append('manager.inner')
     await next_call(data)
     event['workflow'].append('manager.inner.end')
 
 
 @router.on_event.handler_outer_middleware()
-async def handler_outer_middleware(next_call, data, event: ExtendedEvent):
+async def handler_outer_middleware(next_call: NEXT, data: DATA, event: ExtendedEvent) -> None:
     event['workflow'].append('handler.outer')
     await next_call(data)
     event['workflow'].append('handler.outer.end')
 
 
 @router.on_event.handler_inner_middleware()
-async def handler_inner_middleware(next_call, data, event: ExtendedEvent):
+async def handler_inner_middleware(next_call: NEXT, data: DATA, event: ExtendedEvent) -> None:
     event['workflow'].append('handler.inner')
     await next_call(data)
     event['workflow'].append('handler.inner.end')
 
 
-async def handler_specific_outer_middleware(next_call, data, event: ExtendedEvent):
+async def handler_specific_outer_middleware(
+    next_call: NEXT,
+    data: DATA,
+    event: ExtendedEvent,
+) -> None:
     event['workflow'].append('handler_specific.outer')
     await next_call(data)
     event['workflow'].append('handler_specific.outer.end')
 
 
-async def handler_specific_inner_middleware(next_call, data, event: ExtendedEvent):
+async def handler_specific_inner_middleware(
+    next_call: NEXT,
+    data: DATA,
+    event: ExtendedEvent,
+) -> None:
     event['workflow'].append('handler_specific.inner')
     await next_call(data)
     event['workflow'].append('handler_specific.inner.end')
@@ -66,12 +79,12 @@ async def handler_specific_inner_middleware(next_call, data, event: ExtendedEven
     outer_middlewares=[handler_specific_outer_middleware],
     inner_middlewares=[handler_specific_inner_middleware],
 )
-async def handler(event: ExtendedEvent):
+async def handler(event: ExtendedEvent) -> None:
     event['workflow'].append('handler')
 
 
 @pytest.mark.asyncio
-async def test_event_workflow():
+async def test_event_workflow() -> None:
     event = ExtendedEvent()
     dp = Dispatcher(router)
     await dp.propagate_event(event)

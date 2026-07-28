@@ -1,14 +1,14 @@
 repos:
   - repo: local
     hooks:
-      - id: ruff check
-        language: unsupported
-        name: Ruff Check
-        files: '.+\.py$'
-        entry: ruff check --fix
-
       - id: ruff format
         language: unsupported
         name: Ruff Format
         files: '.+\.py$'
         entry: ruff format
+
+      - id: ruff check
+        language: unsupported
+        name: Ruff Check
+        files: '.+\.py$'
+        entry: ruff check --fix

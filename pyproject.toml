@@ -48,6 +48,7 @@ pretty = true
 exclude = [
     "docs",
     ".venv",
+    "tests"
 ]
 
 [tool.ruff]

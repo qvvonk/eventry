@@ -46,11 +46,11 @@ class TestFilters:
             (f.all_of(false_filter, false_filter), False),
         ],
     )
-    async def test_filters(self, filter, result):
+    async def test_filters(self, filter: f.Filter, result: bool) -> None:
         r = await filter.execute((), {})
         assert r == result
 
-    async def test_filter_context_injection(self):
+    async def test_filter_context_injection(self) -> None:
         def some_filter():
             return {'injected': True}
 
@@ -60,7 +60,7 @@ class TestFilters:
         await filter.execute((), context)
         assert context['injected'] is True
 
-    async def test_filter_convertion(self):
+    async def test_filter_convertion(self) -> None:
         filters = [lambda: True, lambda: False]
         results = [True, False]
 

@@ -57,12 +57,12 @@ import pytest
         ),
         pytest.param(
             ['eventry.asyncio', 'eventry.asyncio.config', 'eventry.asyncio.execution_context'],
-            (
+            [
                 'ExecutionContext',
                 'RouterExecutionContext',
                 'ManagerExecutionContext',
                 'HandlerExecutionContext',
-            ),
+            ],
             id='execution_context',
         ),
         pytest.param(
@@ -84,7 +84,7 @@ import pytest
         ),
     ],
 )
-def test_public_imports(modules, names):
+def test_public_imports(modules: list[str], names: list[str]) -> None:
     module_objs = [importlib.import_module(i) for i in modules]
 
     for name in names:

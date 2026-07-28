@@ -16,11 +16,11 @@ from eventry.asyncio.execution_context import ExecutionContext
 
 
 class Dispatcher:
-    _router: Router | None = None
+    _router: Router[Any] | None = None
 
     def __init__(
         self,
-        router: Router | None = None,
+        router: Router[Any] | None = None,
         event_context: dict[str, Any] | None = None,
         config: EventDispatchingConfig | None = None,
     ) -> None:
@@ -29,11 +29,11 @@ class Dispatcher:
         self._config = config if config is not None else EventDispatchingConfig()
 
     @property
-    def router(self) -> Router | None:
+    def router(self) -> Router[Any] | None:
         return self._router
 
     @router.setter
-    def router(self, router: Router | None) -> None:
+    def router(self, router: Router[Any] | None) -> None:
         if router is not None and not isinstance(router, Router):
             raise TypeError(f'Router must be an instance of Router, not {type(router)!r}.')
         self._router = router
@@ -50,7 +50,7 @@ class Dispatcher:
         self,
         event: Event,
         *,
-        router: Router | None = None,
+        router: Router[Any] | None = None,
         additional_context: dict[str, Any] | None = None,
         config: EventDispatchingConfig | None = None,
     ) -> None:
