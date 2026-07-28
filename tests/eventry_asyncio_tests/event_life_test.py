@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import pytest
 
-from eventry.asyncio import ExtendedEvent, Dispatcher, DefaultRouter
+from eventry.asyncio import Dispatcher, DefaultRouter, ExtendedEvent
 
 
 router = DefaultRouter(name='test_router')
@@ -97,5 +99,5 @@ async def test_event_workflow():
         'manager.outer.end',
         #
         'router.inner.end',
-        'router.outer.end'
+        'router.outer.end',
     ]

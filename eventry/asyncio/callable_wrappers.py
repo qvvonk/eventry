@@ -13,7 +13,8 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from types import MethodType, FunctionType
 from functools import partial
 from collections.abc import Mapping, Callable, Sequence, Awaitable
-from eventry._argument_sources import FromKwargs, Kwargs
+
+from eventry._argument_sources import Kwargs, FromKwargs
 
 
 if TYPE_CHECKING:
@@ -112,7 +113,8 @@ class CallableWrapper(Generic[ReturnTypeT]):
                         f'accepts {self._nondef_args_c} non-default arguments, '
                         f'but only {len(args)} positional args were given.\n'
                         f'Considering this, tried to find value for non-default argument '
-                        f'{arg_name_index} ({name!r}) in given kwargs dict, but no value was found.',
+                        f'{arg_name_index} ({name!r}) in given kwargs dict, '
+                        f'but no value was found.',
                     )
                 r_args.append(kwargs[name])
                 bound_args_c += 1
