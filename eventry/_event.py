@@ -1,31 +1,30 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from types import MappingProxyType
 from collections.abc import Iterator
 
 
+_MISSING = object()
+
+
 class EventBase:
-    if TYPE_CHECKING:
-        __event_name__: str
+    __event_name__: str
 
-    def __init_subclass__(cls, **kwargs: Any) -> None:
-        name = kwargs.pop('event_name', None)
+    def __init_subclass__(cls, *, event_name: str | object = _MISSING, **kwargs: Any) -> None:
+        if event_name is _MISSING:
+            event_name = getattr(cls, '__event_name__', _MISSING)
 
-        if not getattr(cls, '__event_name__', None):
-            if name is None:
-                raise TypeError(
-                    f"{cls.__name__} must be defined with keyword argument 'event_name'.",
-                )
+        if event_name is _MISSING:
+            raise TypeError(f"{cls.__name__} must be defined with keyword argument 'event_name'.")
 
-            if not isinstance(name, str):
-                raise ValueError(
-                    f'Event name for class {cls.__name__} must be a string, '
-                    f'got {type(name).__name__}.',
-                )
+        if not isinstance(event_name, str):
+            raise TypeError(f"'event_name' must be a string, not {type(event_name).__name__!r}.")
 
-        if name is not None:
-            cls.__event_name__ = name
+        if not event_name:
+            raise ValueError("'event_name' must not be empty.")
+
+        cls.__event_name__ = event_name
         super().__init_subclass__(**kwargs)
 
     @property
@@ -64,7 +63,7 @@ class Event(EventBase, event_name='event'):
         return self._propagation_stopped
 
 
-class ExtendedEvent(Event, event_name='event'):
+class ExtendedEvent(Event):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """
         Extended event class with flags and data features.
