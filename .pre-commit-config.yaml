@@ -26,3 +26,11 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-push]
+
+      - id: tox
+        language: unsupported
+        name: Tox
+        entry: tox
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
