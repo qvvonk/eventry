@@ -36,16 +36,13 @@ if TYPE_CHECKING:
     EventFilter = EventFilterCallable | str
 
 
-T = TypeVar('T')
-
-
-ManagerOuterMdwT = TypeVar('ManagerOuterMdwT', default=Callable[..., Any])
-ManagerFilterT = TypeVar('ManagerFilterT', default=Callable[..., Any])
-ManagerInnerMdwT = TypeVar('ManagerInnerMdwT', default=Callable[..., Any])
-HandlerOuterMdwT = TypeVar('HandlerOuterMdwT', default=Callable[..., Any])
-HandlerFilterT = TypeVar('HandlerFilterT', default=Callable[..., Any])
-HandlerInnerMdwT = TypeVar('HandlerInnerMdwT', default=Callable[..., Any])
-HandlerT = TypeVar('HandlerT', default=Callable[..., Any])
+ManagerOuterMdwT = TypeVar('ManagerOuterMdwT', bound=Callable[..., Any])
+ManagerFilterT = TypeVar('ManagerFilterT', bound=Callable[..., Any])
+ManagerInnerMdwT = TypeVar('ManagerInnerMdwT', bound=Callable[..., Any])
+HandlerOuterMdwT = TypeVar('HandlerOuterMdwT', bound=Callable[..., Any])
+HandlerFilterT = TypeVar('HandlerFilterT', bound=Callable[..., Any])
+HandlerInnerMdwT = TypeVar('HandlerInnerMdwT', bound=Callable[..., Any])
+HandlerT = TypeVar('HandlerT', bound=Callable[..., Any])
 
 
 class HandlerManager(
@@ -173,7 +170,7 @@ class HandlerManager(
         self,
         handler: Handler[Any],
         context: dict[str, Any],
-    ):
+    ) -> Any:
         r = await handler.filter.execute(self.config.collect_handler_filter_args(context), context)
         if not r and not isinstance(r, dict):
             return r
@@ -186,7 +183,7 @@ class HandlerManager(
         config: EventDispatchingConfig,
         execution_ctx: ManagerExecutionContext,
         context: dict[str, Any],
-    ):
+    ) -> Any:
         h_exec_ctx = HandlerExecutionContext(handler=handler, **execution_ctx.shallow_asdict())
         try:
             handler_result = await MiddlewareStorage.wrap_with_middlewares(
@@ -230,7 +227,7 @@ class HandlerManager(
         config: EventDispatchingConfig,
         execution_ctx: ManagerExecutionContext,
         context: dict[str, Any],
-    ):
+    ) -> Any:
         for i in self.handlers.values():
             if i.as_task:
                 asyncio.create_task(
@@ -257,7 +254,7 @@ class HandlerManager(
         config: EventDispatchingConfig,
         execution_ctx: ManagerExecutionContext,
         context: dict[str, Any],
-    ):
+    ) -> Any:
         return await MiddlewareStorage.wrap_with_middlewares(
             partial(self._execute_handlers_inner, event, config, execution_ctx),
             self.middleware.get_middlewares_storage('manager.inner') or [],
@@ -273,7 +270,7 @@ class HandlerManager(
         config: EventDispatchingConfig,
         execution_ctx: ManagerExecutionContext,
         context: dict[str, Any],
-    ):
+    ) -> Any:
         r = await self.filter.execute(self.config.collect_manager_filter_args(context), context)
         if r is False or r is None:
             return r
@@ -286,7 +283,7 @@ class HandlerManager(
         config: EventDispatchingConfig,
         execution_ctx: RouterExecutionContext,
         context: dict[str, Any],
-    ):
+    ) -> Any:
         if not self.check_event(event):
             return None
 

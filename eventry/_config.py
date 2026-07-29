@@ -10,7 +10,7 @@ _NEXT_CALL_KEY = 'next_call'
 
 def _collect_args(di: dict[str, Any], template: str, amount: int | None = None) -> list[Any]:
     if amount is None:
-        result = []
+        result: list[str] = []
         index = 0
         while True:
             key = template.format(index)

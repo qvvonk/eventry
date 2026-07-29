@@ -50,8 +50,7 @@ class MiddlewareStorage(Sequence[MiddlewareCallable[Any]]):
         self._middlewares: list[MiddlewareCallable[Any]] = []
 
     def register_middleware(self, middleware: T) -> T:
-        m = MiddlewareCallable(middleware)
-        self._middlewares.append(m)
+        self._middlewares.append(MiddlewareCallable(middleware))
         return middleware
 
     def __call__(self) -> T | Callable[[T], T]:
@@ -74,7 +73,7 @@ class MiddlewareStorage(Sequence[MiddlewareCallable[Any]]):
     def __bool__(self) -> bool:
         return bool(len(self._middlewares))
 
-    def __reversed__(self) -> Iterator[MiddlewareCallable]:
+    def __reversed__(self) -> Iterator[MiddlewareCallable[Any]]:
         return reversed(self._middlewares)
 
     @staticmethod
@@ -94,12 +93,48 @@ class MiddlewareManager:
         self._allowed_types = {MiddlewareType(i) for i in allowed_types}
         self._storages: dict[MiddlewareType, MiddlewareStorage] = {}
 
-    def get_middlewares_storage(self, type: MdwsType) -> MiddlewareStorage | None:
+    @overload
+    def get_middlewares_storage(
+        self,
+        type: MdwsType,
+        raise_: Literal[False] = False,
+    ) -> MiddlewareStorage | None:
+        ...
+
+    @overload
+    def get_middlewares_storage(
+        self,
+        type: MdwsType,
+        raise_: Literal[True],
+    ) -> MiddlewareStorage:
+        ...
+
+    @overload
+    def get_middlewares_storage(
+        self,
+        type: MdwsType,
+        raise_: bool = False,
+    ) -> MiddlewareStorage | None:
+        ...
+
+    def get_middlewares_storage(
+        self,
+        type: MdwsType,
+        raise_: bool = False
+    ) -> MiddlewareStorage | None:
         try:
             mdw_type = MiddlewareType(type)
         except ValueError:
+            if raise_:
+                raise ValueError('Invalid storage type.')
             return None
-        return self._storages.get(mdw_type)
+
+        if not raise_:
+            return self._storages.get(mdw_type)
+        else:
+            if mdw_type not in self._storages:
+                raise KeyError(f'No storage with type {mdw_type}.')
+            return self._storages[mdw_type]
 
     def set_middlewares_storage(self, type: MdwsType, storage: MiddlewareStorage | None) -> None:
         if storage is not None and not isinstance(storage, MiddlewareStorage):

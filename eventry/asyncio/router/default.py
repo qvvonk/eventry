@@ -8,7 +8,7 @@ __all__ = [
 from eventry.asyncio.config import Kwargs, FromKwargs
 from eventry.asyncio.middleware import MiddlewareStorage
 from eventry.asyncio.handler_manager import DefaultHandlerManager
-
+from typing import Any
 from .base import Router, RouterConfig
 
 
@@ -18,7 +18,7 @@ config = RouterConfig(
 )
 
 
-class DefaultRouter(Router):
+class DefaultRouter(Router[Any]):
     def __init__(self, name: str = ''):
         super().__init__(name=name, config=config)
 
@@ -33,8 +33,8 @@ class DefaultRouter(Router):
 
     @property
     def outer_middleware(self) -> MiddlewareStorage:
-        return self.middleware.get_middlewares_storage('router.outer')
+        return self.middleware.get_middlewares_storage('router.outer', raise_=True)
 
     @property
     def inner_middleware(self) -> MiddlewareStorage:
-        return self.middleware.get_middlewares_storage('router.inner')
+        return self.middleware.get_middlewares_storage('router.inner', raise_=True)

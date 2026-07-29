@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     ManagerT = TypeVar('ManagerT', bound=HandlerManager)
 
 
-FilterT = TypeVar('FilterT')
+FilterT = TypeVar('FilterT', bound=Any | Filter)
 
 
 class Router(Generic[FilterT]):
@@ -46,7 +46,7 @@ class Router(Generic[FilterT]):
         self._sub_routers_proxy = MappingProxyType(self._sub_routers)
         self._handler_managers: dict[str, HandlerManager] = {}
         self._handler_managers_proxy = MappingProxyType(self._handler_managers)
-        self._parent: Router | None = None
+        self._parent: Router[Any] | None = None
         self._config = config if config is not None else RouterConfig()
         self._filter: Filter = dummy_filter()
         self.middleware = MiddlewareManager(['router.outer', 'router.inner'])
@@ -57,7 +57,7 @@ class Router(Generic[FilterT]):
     def remove_filter(self) -> None:
         self._filter = dummy_filter()
 
-    def attach_router(self, router: Router) -> None:
+    def attach_router(self, router: Router[Any]) -> None:
         if router is self:
             raise rexc.RouterLoopError('Cannot attach router to itself.')
 
@@ -78,7 +78,7 @@ class Router(Generic[FilterT]):
         self._sub_routers[router.name] = router
         router._parent = self
 
-    def detach_router(self, router_name: str) -> Router:
+    def detach_router(self, router_name: str) -> Router[Any]:
         if not isinstance(router_name, str):
             raise TypeError('Router name must be a string.')
 
@@ -119,7 +119,7 @@ class Router(Generic[FilterT]):
         config: EventDispatchingConfig,
         execution_ctx: RouterExecutionContext,
         context: dict[str, Any],
-    ):
+    ) -> None:
         for i in self._handler_managers.values():
             manager_context = context | {i.config.manager_key: i}
 
@@ -139,10 +139,10 @@ class Router(Generic[FilterT]):
         config: EventDispatchingConfig,
         execution_ctx: RouterExecutionContext,
         context: dict[str, Any],
-    ):
+    ) -> None:
         r = await self.filter.execute(self.config.collect_filter_args(context), context)
         if not r and not isinstance(r, dict):
-            return r
+            return None
 
         return await self._propagate_event(event, config, execution_ctx, context)
 
@@ -152,7 +152,7 @@ class Router(Generic[FilterT]):
         config: EventDispatchingConfig,
         execution_ctx: RouterExecutionContext,
         context: dict[str, Any],
-    ):
+    ) -> Any:
         return await MiddlewareStorage.wrap_with_middlewares(
             partial(self._propagate_event_with_filter_inner, event, config, execution_ctx),
             self.middleware.get_middlewares_storage('router.inner') or [],
@@ -165,7 +165,7 @@ class Router(Generic[FilterT]):
         config: EventDispatchingConfig,
         execution_ctx: ExecutionContext,
         context: dict[str, Any],
-    ):
+    ) -> Any:
         execution_ctx = RouterExecutionContext(
             **(execution_ctx.shallow_asdict() | {'router': self}),
         )
@@ -181,13 +181,13 @@ class Router(Generic[FilterT]):
             _make_mdw_wrapper_factory(self.config.collect_outer_mdw_args),
         )(context)
 
-    def chain_to_root(self) -> Generator[Router, None, None]:
-        r = self
+    def chain_to_root(self) -> Generator[Router[Any], None, None]:
+        r: Router[Any] | None = self
         while r is not None:
             yield r
             r = r.parent
 
-    def chain_to_tails(self) -> Generator[Router, None, None]:
+    def chain_to_tails(self) -> Generator[Router[Any], None, None]:
         yield self
         for r in self._sub_routers.values():
             yield from r.chain_to_tails()
@@ -205,7 +205,7 @@ class Router(Generic[FilterT]):
         return tuple(reversed([i.name for i in self.chain_to_root()]))
 
     @property
-    def parent(self) -> Router | None:
+    def parent(self) -> Router[Any] | None:
         return self._parent
 
     @property
@@ -221,5 +221,5 @@ class Router(Generic[FilterT]):
         return self._handler_managers_proxy
 
     @property
-    def sub_routers(self) -> Mapping[str, Router]:
+    def sub_routers(self) -> Mapping[str, Router[Any]]:
         return self._sub_routers_proxy

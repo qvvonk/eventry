@@ -38,17 +38,17 @@ class DefaultHandlerManager(HandlerManager):
         self.middleware.set_middlewares_storage('handler.inner', MiddlewareStorage())
 
     @property
-    def manager_outer_middleware(self):
-        return partial(self.middleware, scope='manager.outer')
+    def manager_outer_middleware(self) -> MiddlewareStorage:
+        return self.middleware.get_middlewares_storage('manager.outer', raise_=True)
 
     @property
-    def manager_inner_middleware(self):
-        return partial(self.middleware, scope='manager.inner')
+    def manager_inner_middleware(self) -> MiddlewareStorage:
+        return self.middleware.get_middlewares_storage('manager.inner', raise_=True)
 
     @property
-    def handler_outer_middleware(self):
-        return partial(self.middleware, scope='handler.outer')
+    def handler_outer_middleware(self) -> MiddlewareStorage:
+        return self.middleware.get_middlewares_storage('handler.outer', raise_=True)
 
     @property
-    def handler_inner_middleware(self):
-        return partial(self.middleware, scope='handler.inner')
+    def handler_inner_middleware(self) -> MiddlewareStorage:
+        return self.middleware.get_middlewares_storage('handler.inner', raise_=True)

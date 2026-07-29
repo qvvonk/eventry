@@ -9,7 +9,7 @@ __all__ = [
 
 import asyncio
 import inspect
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 from types import MethodType, FunctionType
 from functools import partial
 from collections.abc import Mapping, Callable, Sequence, Awaitable
@@ -23,8 +23,6 @@ if TYPE_CHECKING:
 
 ReturnTypeT = TypeVar('ReturnTypeT')
 R = TypeVar('R')
-T = TypeVar('T')
-RT = TypeVar('RT')
 
 
 class CallableWrapper(Generic[ReturnTypeT]):
@@ -53,7 +51,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
 
         self._callable = _callable
         self._has_self = hasattr(_callable, '__self__')
-        _callable = _callable if isinstance(self._callable, FunctionType) else _callable.__func__
+        _callable = _callable if isinstance(_callable, FunctionType) else _callable.__func__
         _code = _callable.__code__
         self._posonly_c = max(0, _code.co_posonlyargcount - self._has_self)
         self._args_c = _code.co_argcount - self._has_self
@@ -174,7 +172,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
     ) -> Awaitable[ReturnTypeT]:
         pos_args, kwargs = self.collect_args(args, data)
         if self._is_async:
-            return self._callable(*pos_args, **kwargs)
+            return cast(Awaitable[ReturnTypeT], self._callable(*pos_args, **kwargs))
         if to_thread:
             return asyncio.to_thread(self._callable, *pos_args, **kwargs)
         return self._blocking_async_call(self._callable, pos_args, kwargs)

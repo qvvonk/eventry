@@ -36,7 +36,7 @@ class ExecutionContext:
 
 @dataclass(kw_only=True)
 class RouterExecutionContext(ExecutionContext):
-    router: Router
+    router: Router[Any]
 
 
 @dataclass(kw_only=True)
