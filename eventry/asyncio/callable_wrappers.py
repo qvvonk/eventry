@@ -201,7 +201,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
         __obj: Callable[..., Awaitable[ReturnTypeT]] | Callable[..., ReturnTypeT],
         /,
         *,
-        handler_id: str,
+        name: str,
         filter: Filter | None = None,
         as_task: bool = False,
         outer_middlewares: Sequence[MiddlewareCallable[Any] | Callable[..., Any]] | None = None,
@@ -213,7 +213,7 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
         inner_middlewares = inner_middlewares or []
 
         super().__init__(__obj)
-        self._handler_id = handler_id
+        self._name = name
         self._as_task = as_task
         self._filter = filter if filter is not None else dummy_filter()
         self._outer_middlewares = [
@@ -235,8 +235,8 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
         return self._as_task
 
     @property
-    def id(self) -> str:
-        return self._handler_id
+    def name(self) -> str:
+        return self._name
 
     @property
     def outer_middlewares(self) -> list[MiddlewareCallable[Any]]:

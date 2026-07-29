@@ -129,29 +129,26 @@ class HandlerManager(
 
         :raises ValueError: if a handler with the same ID already exists in the router network.
         """
-        if handler.id in self._handlers:
-            raise ValueError(f'Handler with ID {handler.id} already exists in this manager.')
-        self._handlers[handler.id] = handler
+        if handler.name in self._handlers:
+            raise ValueError(f'Handler with ID {handler.name} already exists in this manager.')
+        self._handlers[handler.name] = handler
 
     def __call__(
         self,
         filter: HandlerFilterT | None = None,
         /,
         *,
-        handler_id: str | None = None,
+        name: str | None = None,
         as_task: bool = False,
         inner_middlewares: Sequence[HandlerInnerMdwT] | None = None,
         outer_middlewares: Sequence[HandlerOuterMdwT] | None = None,
     ) -> Callable[[HandlerT], HandlerT]:
         def inner(handler: HandlerT) -> HandlerT:
-            handler_obj = Handler(
-                handler,
-                handler_id=handler_id or gen_handler_id(handler, list(self._handlers.keys())),
-                filter=convert_filters([filter])[0] if filter is not None else None,
-                as_task=as_task,
-                inner_middlewares=inner_middlewares,
-                outer_middlewares=outer_middlewares,
-            )
+            handler_obj = Handler(handler, name=name or gen_handler_name(handler, list(
+                self._handlers.keys())), filter=convert_filters([filter])[
+                0] if filter is not None else None, as_task=as_task,
+                                  outer_middlewares=outer_middlewares,
+                                  inner_middlewares=inner_middlewares)
             self._register_handler(handler_obj)
             return handler
 
@@ -205,7 +202,7 @@ class HandlerManager(
                     raise callback_error
                 logger.error(
                     f'An error occurred while executing error callback of handler '
-                    f'{handler.id!r} @ {h_exec_ctx.manager.name!r} @ '
+                    f'{handler.name!r} @ {h_exec_ctx.manager.name!r} @ '
                     f'{h_exec_ctx.router.full_name} '
                     f'for event {h_exec_ctx.event.name!r}.',
                     exc_info=handler_error,
@@ -217,7 +214,7 @@ class HandlerManager(
         except Exception as e:
             logger.error(
                 f'An error occurred while executing callback of handler '
-                f'{handler.id!r} @ {h_exec_ctx.manager.name!r} @ '
+                f'{handler.name!r} @ {h_exec_ctx.manager.name!r} @ '
                 f'{h_exec_ctx.router.full_name} '
                 f'for event {h_exec_ctx.event.name!r}.',
                 exc_info=e,
@@ -329,7 +326,7 @@ HandlerManagerDefaultType = HandlerManager[
 HandlerManagerAnyType = HandlerManager[Any, Any, Any, Any, Any]
 
 
-def gen_handler_id(handler: Any, names: Sequence[str] = ()) -> str:
+def gen_handler_name(handler: Any, names: Sequence[str] = ()) -> str:
     r = handler.__qualname__ if inspect.isroutine(handler) else handler.__class__.__name__
     if r not in names:
         return r
