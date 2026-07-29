@@ -78,6 +78,30 @@ class HandlerManager(
             ['manager.outer', 'manager.inner', 'handler.outer', 'handler.inner'],
         )
 
+    @property
+    def handlers(self) -> MappingProxyType[str, Handler[Any]]:
+        """
+        A read-only mapping of handler IDs to their corresponding ``Handler`` instances,
+        registered in this manager.
+        """
+        return MappingProxyType(self._handlers)
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def event_filter(self) -> EventFilter | None:
+        return self._event_filter
+
+    @property
+    def config(self) -> HandlerManagerConfig:
+        return self._config
+
+    @property
+    def filter(self) -> Filter:
+        return self._filter
+
     def set_filter(self, filter: ManagerFilterT) -> None:
         self._filter = filter if isinstance(filter, Filter) else FilterFromFunction(filter)
 
@@ -132,30 +156,6 @@ class HandlerManager(
             return handler
 
         return inner
-
-    @property
-    def handlers(self) -> MappingProxyType[str, Handler[Any]]:
-        """
-        A read-only mapping of handler IDs to their corresponding ``Handler`` instances,
-        registered in this manager.
-        """
-        return MappingProxyType(self._handlers)
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @property
-    def event_filter(self) -> EventFilter | None:
-        return self._event_filter
-
-    @property
-    def config(self) -> HandlerManagerConfig:
-        return self._config
-
-    @property
-    def filter(self) -> Filter:
-        return self._filter
 
     async def _execute_handler(self, handler: Handler[Any], context: dict[str, Any]) -> Any:
         return await MiddlewareStorage.wrap_with_middlewares(
