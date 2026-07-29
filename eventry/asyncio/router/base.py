@@ -6,7 +6,7 @@ __all__ = [
     'RouterConfig',
 ]
 
-from typing import TYPE_CHECKING, Any, Self, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from copy import copy
 from types import MappingProxyType
 from functools import partial
@@ -31,6 +31,7 @@ if TYPE_CHECKING:
 
 
 FilterT = TypeVar('FilterT', bound=Any | Filter)
+R = TypeVar('R', bound='Router[Any]')
 
 
 class Router(Generic[FilterT]):
@@ -42,7 +43,7 @@ class Router(Generic[FilterT]):
             raise TypeError(f'Config must be an instance of `RouterConfig`, not {type(config)!r}.')
 
         self._name = name or self.__class__.__name__
-        self._sub_routers: dict[str, Router] = {}
+        self._sub_routers: dict[str, Router[Any]] = {}
         self._sub_routers_proxy = MappingProxyType(self._sub_routers)
         self._handler_managers: dict[str, HandlerManager] = {}
         self._handler_managers_proxy = MappingProxyType(self._handler_managers)
@@ -91,7 +92,7 @@ class Router(Generic[FilterT]):
         r._parent = None
         return r
 
-    def detach(self) -> Self:
+    def detach(self: R) -> R:
         if self.parent is not None:
             self.parent.detach_router(self.name)
         return self

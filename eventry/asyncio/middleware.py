@@ -40,9 +40,7 @@ MdwsType = Literal[
 ]
 
 
-WrappedT = TypeVar('WrappedT', bound='Callable[..., Any]')
-
-T = TypeVar('T')
+T = TypeVar('T', bound='Callable[..., Any]')
 
 
 class MiddlewareStorage(Sequence[MiddlewareCallable[Any]]):
@@ -80,8 +78,8 @@ class MiddlewareStorage(Sequence[MiddlewareCallable[Any]]):
     def wrap_with_middlewares(
         callable_to_wrap: Callable[..., Any] | CallableWrapper[Any],
         middlewares: Sequence[Callable[..., Any] | MiddlewareCallable[Any]],
-        wrapper_factory: Callable[[WrappedT, WrappedT | None], WrappedT],
-    ) -> WrappedT:
+        wrapper_factory: Callable[[T | Callable[..., Any], T | None], T],
+    ) -> T:
         current_call = wrapper_factory(callable_to_wrap, None)
         for middleware in reversed(middlewares):
             current_call = wrapper_factory(middleware, current_call)
@@ -161,14 +159,14 @@ class MiddlewareManager:
         return storage.__call__()
 
 
-_WRAPPED = Callable[[dict[str, Any]], Awaitable[Any]]
+_CALL = Callable[[dict[str, Any]], Awaitable[Any]]
 
 
 def _make_mdw_wrapper_factory(
     args_resolver: Callable[[dict[str, Any]], list[Any]] | None = None,
     next_call_arg_name: str = 'next_call',
-) -> Callable[[_WRAPPED, _WRAPPED | None], _WRAPPED]:
-    def wrapper_factory(to_wrap: _WRAPPED, prev_wrapped: _WRAPPED | None) -> _WRAPPED:
+) -> Callable[[_CALL, _CALL | None], _CALL]:
+    def wrapper_factory(to_wrap: _CALL, prev_wrapped: _CALL | None) -> _CALL:
         async def wrapped(context: dict[str, Any]) -> Any:
             if prev_wrapped is None:
                 return await to_wrap(context)
