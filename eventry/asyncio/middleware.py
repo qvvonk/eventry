@@ -98,29 +98,24 @@ class MiddlewareManager:
         self,
         type: MdwsType,
         raise_: Literal[False] = False,
-    ) -> MiddlewareStorage | None:
-        ...
+    ) -> MiddlewareStorage | None: ...
 
     @overload
     def get_middlewares_storage(
         self,
         type: MdwsType,
         raise_: Literal[True],
-    ) -> MiddlewareStorage:
-        ...
+    ) -> MiddlewareStorage: ...
 
     @overload
     def get_middlewares_storage(
         self,
         type: MdwsType,
         raise_: bool = False,
-    ) -> MiddlewareStorage | None:
-        ...
+    ) -> MiddlewareStorage | None: ...
 
     def get_middlewares_storage(
-        self,
-        type: MdwsType,
-        raise_: bool = False
+        self, type: MdwsType, raise_: bool = False
     ) -> MiddlewareStorage | None:
         try:
             mdw_type = MiddlewareType(type)
@@ -131,10 +126,9 @@ class MiddlewareManager:
 
         if not raise_:
             return self._storages.get(mdw_type)
-        else:
-            if mdw_type not in self._storages:
-                raise KeyError(f'No storage with type {mdw_type}.')
-            return self._storages[mdw_type]
+        if mdw_type not in self._storages:
+            raise KeyError(f'No storage with type {mdw_type}.')
+        return self._storages[mdw_type]
 
     def set_middlewares_storage(self, type: MdwsType, storage: MiddlewareStorage | None) -> None:
         if storage is not None and not isinstance(storage, MiddlewareStorage):

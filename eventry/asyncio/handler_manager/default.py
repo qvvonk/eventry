@@ -5,7 +5,6 @@ __all__ = ['DefaultHandlerManager']
 
 
 from typing import TYPE_CHECKING
-from functools import partial
 
 from eventry.asyncio.config import Kwargs, FromKwargs
 from eventry.asyncio.middleware import MiddlewareStorage

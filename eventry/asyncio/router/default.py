@@ -5,10 +5,12 @@ __all__ = [
     'DefaultRouter',
 ]
 
+from typing import Any
+
 from eventry.asyncio.config import Kwargs, FromKwargs
 from eventry.asyncio.middleware import MiddlewareStorage
 from eventry.asyncio.handler_manager import DefaultHandlerManager
-from typing import Any
+
 from .base import Router, RouterConfig
 
 
