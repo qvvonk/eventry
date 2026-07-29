@@ -25,6 +25,7 @@ repos:
         entry: pytest
         pass_filenames: false
         always_run: true
+        verbose: true
         stages: [pre-push]
 
       - id: tox
@@ -33,4 +34,5 @@ repos:
         entry: tox
         pass_filenames: false
         always_run: true
+        verbose: true
         stages: [pre-push]
