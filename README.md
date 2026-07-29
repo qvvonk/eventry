@@ -52,7 +52,8 @@ if __name__ == '__main__':
 
 
 ## Creating custom routers
-Eventry lets you create your custom routers. Here's an example:
+Eventry lets you create your custom routers.
+Note: unlike `DefaultRouter`, the base `Router` has no `HandlerManager`'s or `MiddlewareStorage`'s.
 
 ```python
 import asyncio
@@ -69,7 +70,6 @@ class ApplicationRouter(Router):
     def __init__(self, name: str = ''):
         super().__init__(name=name)
         
-        # Note, that base router does not have handler managers at all, so you need to register them.
         self.on_new_message = self.add_handler_manager(
             DefaultHandlerManager(name='on_message', event_filter='new_message')
         )
@@ -77,10 +77,6 @@ class ApplicationRouter(Router):
         self.on_new_order = self.add_handler_manager(
             DefaultHandlerManager(name='on_order', event_filter='new_order')
         )
-
-        # Base router also does not have any middleware storages.
-        self.middleware.set_middlewares_storage('router.outer', MiddlewareStorage())
-        self.middleware.set_middlewares_storage('router.inner', MiddlewareStorage())
 
     @property
     def outer_middleware(self) -> MiddlewareStorage:
