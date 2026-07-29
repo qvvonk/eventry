@@ -13,6 +13,13 @@ DATA = dict[str, Any]
 NEXT = Callable[[DATA], Awaitable[Any]]
 
 
+def make_filter(name: str):
+    def filter(event: ExtendedEvent) -> bool:
+        event['workflow'].append(name)
+        return True
+    return filter
+
+
 @router.outer_middleware()
 async def router_outer_middleware(next_call: NEXT, data: DATA, event: ExtendedEvent) -> None:
     event['workflow'] = ['router.outer']
@@ -78,9 +85,14 @@ async def handler_specific_inner_middleware(
 @router.on_event(
     outer_middlewares=[handler_specific_outer_middleware],
     inner_middlewares=[handler_specific_inner_middleware],
+    filter=make_filter('handler.filter')
 )
 async def handler(event: ExtendedEvent) -> None:
     event['workflow'].append('handler')
+
+
+router.set_filter(make_filter('router.filter'))
+router.on_event.set_filter(make_filter('manager.filter'))
 
 
 @pytest.mark.asyncio
@@ -91,13 +103,16 @@ async def test_event_workflow() -> None:
 
     assert event['workflow'] == [
         'router.outer',
+        'router.filter',
         'router.inner',
         #
         'manager.outer',
+        'manager.filter',
         'manager.inner',
         #
         'handler.outer',
         'handler_specific.outer',
+        'handler.filter',
         'handler.inner',
         'handler_specific.inner',
         #
