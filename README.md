@@ -7,6 +7,12 @@ or use the built-in default router for simpler use cases.
 It supports middleware and filters at every routing level: routers, handler managers, and individual handlers.
 
 
+## Installation
+```
+pip install eventry
+```
+
+
 ## Using built-in components
 For simple use cases you can use built-in `Dispatcher`, `DefaultRouter` and `DefaultHandlerManager`.
 
@@ -18,6 +24,7 @@ router = DefaultRouter(name='my_router')
 dp = Dispatcher(router)
 
 
+# Let's create some custom event.
 class MyEvent(ExtendedEvent, event_name='my_event'):
     def __init__(self, trigger: str):
         super().__init__()
