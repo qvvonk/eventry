@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from eventry.asyncio.config import Kwargs, FromKwargs
 from eventry.asyncio.middleware import MiddlewareStorage
-from eventry.asyncio.handler_manager.base import HandlerManager, HandlerManagerConfig
+from eventry.asyncio.handler_manager.base import HandlerManagerConfig, HandlerManagerDefaultType
 
 
 if TYPE_CHECKING:
@@ -23,7 +23,7 @@ config = HandlerManagerConfig(
 )
 
 
-class DefaultHandlerManager(HandlerManager):
+class DefaultHandlerManager(HandlerManagerDefaultType):
     def __init__(
         self,
         name: str,

@@ -4,6 +4,8 @@ from __future__ import annotations
 __all__ = [
     'HandlerManager',
     'HandlerManagerConfig',
+    'HandlerManagerDefaultType',
+    'HandlerManagerAnyType',
 ]
 
 import asyncio
@@ -36,9 +38,9 @@ if TYPE_CHECKING:
     EventFilter = EventFilterCallable | str
 
 
-ManagerOuterMdwT = TypeVar('ManagerOuterMdwT', bound=Callable[..., Any])
+# ManagerOuterMdwT = TypeVar('ManagerOuterMdwT', bound=Callable[..., Any])
 ManagerFilterT = TypeVar('ManagerFilterT', bound=Callable[..., Any])
-ManagerInnerMdwT = TypeVar('ManagerInnerMdwT', bound=Callable[..., Any])
+# ManagerInnerMdwT = TypeVar('ManagerInnerMdwT', bound=Callable[..., Any])
 HandlerOuterMdwT = TypeVar('HandlerOuterMdwT', bound=Callable[..., Any])
 HandlerFilterT = TypeVar('HandlerFilterT', bound=Callable[..., Any])
 HandlerInnerMdwT = TypeVar('HandlerInnerMdwT', bound=Callable[..., Any])
@@ -47,9 +49,9 @@ HandlerT = TypeVar('HandlerT', bound=Callable[..., Any])
 
 class HandlerManager(
     Generic[
-        ManagerOuterMdwT,
+        # ManagerOuterMdwT,
         ManagerFilterT,
-        ManagerInnerMdwT,
+        # ManagerInnerMdwT,
         HandlerOuterMdwT,
         HandlerFilterT,
         HandlerInnerMdwT,
@@ -312,6 +314,19 @@ class HandlerManager(
                 if callback_error is manager_error:
                     raise callback_error
                 logger.error('Error in manager callback', exc_info=callback_error)  # todo
+
+
+HandlerManagerDefaultType = HandlerManager[
+    # Callable[..., Any],
+    Callable[..., Any],
+    # Callable[..., Any],
+    Callable[..., Any],
+    Callable[..., Any],
+    Callable[..., Any],
+    Callable[..., Any],
+]
+
+HandlerManagerAnyType = HandlerManager[Any, Any, Any, Any, Any]
 
 
 def gen_handler_id(handler: Any, names: Sequence[str] = ()) -> str:

@@ -21,15 +21,13 @@ from eventry.asyncio.middleware import (
     _make_mdw_wrapper_factory,
 )
 from eventry.asyncio.execution_context import ExecutionContext, RouterExecutionContext
-from eventry.asyncio.handler_manager.base import HandlerManager
+from eventry.asyncio.handler_manager.base import HandlerManager, HandlerManagerDefaultType
 
 
 if TYPE_CHECKING:
     from eventry._event import Event
 
-    ManagerT = TypeVar('ManagerT', bound=HandlerManager)
-
-
+ManagerT = TypeVar('ManagerT', bound=HandlerManagerDefaultType)
 FilterT = TypeVar('FilterT', bound=Any | Filter)
 R = TypeVar('R', bound='Router[Any]')
 
@@ -45,7 +43,7 @@ class Router(Generic[FilterT]):
         self._name = name or self.__class__.__name__
         self._sub_routers: dict[str, Router[Any]] = {}
         self._sub_routers_proxy = MappingProxyType(self._sub_routers)
-        self._handler_managers: dict[str, HandlerManager] = {}
+        self._handler_managers: dict[str, HandlerManagerDefaultType] = {}
         self._handler_managers_proxy = MappingProxyType(self._handler_managers)
         self._parent: Router[Any] | None = None
         self._config = config if config is not None else RouterConfig()
@@ -111,7 +109,7 @@ class Router(Generic[FilterT]):
         self._handler_managers[manager.name] = manager
         return manager
 
-    def remove_handler_manager(self, name: str) -> HandlerManager | None:
+    def remove_handler_manager(self, name: str) -> HandlerManagerDefaultType | None:
         return self._handler_managers.pop(name)
 
     async def _propagate_event(
@@ -218,7 +216,7 @@ class Router(Generic[FilterT]):
         return self._filter
 
     @property
-    def handler_managers(self) -> Mapping[str, HandlerManager]:
+    def handler_managers(self) -> Mapping[str, HandlerManagerDefaultType]:
         return self._handler_managers_proxy
 
     @property
