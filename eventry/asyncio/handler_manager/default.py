@@ -15,21 +15,22 @@ if TYPE_CHECKING:
     from .base import EventFilter
 
 
-config = HandlerManagerConfig(
-    manager_outer_mdw_args=(FromKwargs('next_call'), Kwargs),
-    manager_inner_mdw_args=(FromKwargs('next_call'), Kwargs),
-    handler_outer_mdw_args=(FromKwargs('next_call'), Kwargs),
-    handler_inner_mdw_args=(FromKwargs('next_call'), Kwargs),
-)
-
-
 class DefaultHandlerManager(HandlerManagerDefaultType):
     def __init__(
         self,
         name: str,
         event_filter: EventFilter | None = None,
     ) -> None:
-        super().__init__(name=name, event_filter=event_filter, config=config)
+        super().__init__(
+            name=name,
+            event_filter=event_filter,
+            config=HandlerManagerConfig(
+                manager_outer_mdw_args=(FromKwargs('next_call'), Kwargs),
+                manager_inner_mdw_args=(FromKwargs('next_call'), Kwargs),
+                handler_outer_mdw_args=(FromKwargs('next_call'), Kwargs),
+                handler_inner_mdw_args=(FromKwargs('next_call'), Kwargs),
+            )
+        )
 
         self.middleware.set_middlewares_storage('manager.outer', MiddlewareStorage())
         self.middleware.set_middlewares_storage('manager.inner', MiddlewareStorage())

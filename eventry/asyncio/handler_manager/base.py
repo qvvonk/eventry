@@ -330,7 +330,7 @@ HandlerManagerAnyType = HandlerManager[Any, Any, Any, Any, Any]
 
 
 def gen_handler_id(handler: Any, names: Sequence[str] = ()) -> str:
-    r = handler.__qualname__ if inspect.isroutine(handler) else handler.__clas__.__name__
+    r = handler.__qualname__ if inspect.isroutine(handler) else handler.__class__.__name__
     if r not in names:
         return r
 

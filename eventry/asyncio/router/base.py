@@ -110,7 +110,7 @@ class Router(Generic[FilterT]):
         return manager
 
     def remove_handler_manager(self, name: str) -> HandlerManagerDefaultType | None:
-        return self._handler_managers.pop(name)
+        return self._handler_managers.pop(name, None)
 
     async def _propagate_event(
         self,
@@ -188,7 +188,7 @@ class Router(Generic[FilterT]):
 
     @property
     def full_name(self) -> str:
-        return '.'.join(f'{r.name!r}' for r in self.chain_to_root())
+        return '.'.join(f'{r.name!r}' for r in reversed(list(self.chain_to_root())))
 
     @property
     def path(self) -> tuple[str, ...]:
