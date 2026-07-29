@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from typing import Any
+from collections.abc import Callable
+
+import pytest
+
 from eventry.asyncio.callable_wrappers import CallableWrapper
 
 
@@ -25,3 +30,19 @@ def test_posonly_count():
 
     assert with_posonly._posonly_c == 2
     assert without_posonly._posonly_c == 0
+
+
+@pytest.mark.parametrize(
+    ['callable', 'args_count'],
+    [
+        pytest.param(lambda a, /: True, 1, id='1 posonly'),
+        pytest.param(lambda a=1, /: True, 1, id='1 posonly-default'),
+        pytest.param(lambda a: True, 1, id='1 pos'),
+        pytest.param(lambda a: True, 1, id='1 pos-default'),
+        pytest.param(lambda a=1: True, 1, id='1 kw-default'),
+        pytest.param(lambda *, a: True, 0, id='1 kwonly'),
+    ],
+)
+def test_args_count(callable: Callable[..., Any], args_count: int) -> None:
+    wrapped = CallableWrapper(callable)
+    assert wrapped._args_c == args_count

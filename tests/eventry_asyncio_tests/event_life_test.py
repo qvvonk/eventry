@@ -17,6 +17,7 @@ def make_filter(name: str):
     def filter(event: ExtendedEvent) -> bool:
         event['workflow'].append(name)
         return True
+
     return filter
 
 
