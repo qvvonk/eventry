@@ -83,9 +83,9 @@ async def handler_specific_inner_middleware(
 
 
 @router.on_event(
+    make_filter('handler.filter'),
     outer_middlewares=[handler_specific_outer_middleware],
     inner_middlewares=[handler_specific_inner_middleware],
-    filter=make_filter('handler.filter')
 )
 async def handler(event: ExtendedEvent) -> None:
     event['workflow'].append('handler')
