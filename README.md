@@ -7,7 +7,7 @@ or use the built-in default router for simpler use cases.
 It supports middleware and filters at every routing level: routers, handler managers, and individual handlers.
 
 
-## Using built-in components.
+## Using built-in components
 For simple use cases you can use built-in `Dispatcher`, `DefaultRouter` and `DefaultHandlerManager`.
 
 ```python
@@ -39,13 +39,93 @@ async def my_handler_with_filter(event: MyEvent):
 
 async def main():
     my_event = MyEvent('qvvonk')
-    await dp.propagate_event(my_event)  # only `my_handler` will be executed.
+    await dp.propagate_event(my_event)  # both handlers will be executed.
     
     event = ExtendedEvent()
-    await dp.propagate_event(event)  # both handlers will be executed.
+    await dp.propagate_event(event)  # only `my_handler` will be executed.
 
 
 if __name__ == '__main__':
     import asyncio
+    asyncio.run(main())
+```
+
+
+## Creating custom routers
+Eventry lets you create your custom routers. Here's an example:
+
+```python
+import asyncio
+
+from eventry.asyncio import (
+    Router, 
+    DefaultHandlerManager, 
+    MiddlewareStorage, 
+    ExtendedEvent
+)
+
+
+class ApplicationRouter(Router):
+    def __init__(self, name: str = ''):
+        super().__init__(name=name)
+        
+        # Note, that base router does not have handler managers at all, so you need to register them.
+        self.on_new_message = self.add_handler_manager(
+            DefaultHandlerManager(name='on_message', event_filter='new_message')
+        )
+        
+        self.on_new_order = self.add_handler_manager(
+            DefaultHandlerManager(name='on_order', event_filter='new_order')
+        )
+
+        # Base router also does not have any middleware storages.
+        self.middleware.set_middlewares_storage('router.outer', MiddlewareStorage())
+        self.middleware.set_middlewares_storage('router.inner', MiddlewareStorage())
+
+    @property
+    def outer_middleware(self) -> MiddlewareStorage:
+        return self.middleware.get_middlewares_storage('router.outer', raise_=True)
+
+    @property
+    def inner_middleware(self) -> MiddlewareStorage:
+        return self.middleware.get_middlewares_storage('router.inner', raise_=True)
+
+
+# Now lets create our custom events.
+class NewMessageEvent(ExtendedEvent, event_name='new_message'):
+    def __init__(self, message: str):
+        super().__init__()
+        self.message = message
+
+
+class NewOrderEvent(ExtendedEvent, event_name='new_order'):
+    def __init__(self, order_id: int):
+        super().__init__()
+        self.order_id = order_id
+
+
+# Now we can use new router and events in our application.
+from eventry.asyncio import Dispatcher
+
+
+router = ApplicationRouter(name='my_router')
+dp = Dispatcher(router)
+
+
+@router.on_new_message()
+async def print_message(event: NewMessageEvent) -> None:
+    print(event.message)
+
+
+@router.on_new_order()
+async def print_order_id(event: NewOrderEvent) -> None:
+    print(event.order_id)
+
+
+async def main():
+    await dp.propagate_event(NewMessageEvent('Hello World!'))
+    await dp.propagate_event(NewOrderEvent(12345))
+
+if __name__ == '__main__':
     asyncio.run(main())
 ```
