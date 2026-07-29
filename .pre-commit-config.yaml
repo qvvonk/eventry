@@ -1,9 +1,16 @@
 repos:
   - repo: local
     hooks:
-      - id: ruff check
+      - id: ruff
         language: unsupported
-        name: Ruff Check
+        name: Ruff
         files: '.+\.py$'
         entry: ruff check
+        verbose: true
+
+      - id: mypy
+        language: unsupported
+        name: Mypy
+        files: '.+\.py$'
+        entry: mypy
         verbose: true
