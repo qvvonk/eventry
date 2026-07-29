@@ -138,7 +138,7 @@ class Router(Generic[FilterT]):
         config: EventDispatchingConfig,
         execution_ctx: RouterExecutionContext,
         context: dict[str, Any],
-    ) -> None:
+    ) -> Any:
         r = await self.filter.execute(self.config.collect_filter_args(context), context)
         if not r and not isinstance(r, dict):
             return None
