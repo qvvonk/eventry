@@ -54,26 +54,8 @@ class MiddlewareStorage(Sequence[MiddlewareCallable[Any]]):
         self._middlewares.append(m)
         return middleware
 
-    @overload
-    def __call__(self, func: T, /) -> T:
-        pass
-
-    @overload
-    def __call__(self) -> Callable[[T], T]:
-        pass
-
-    @overload
-    def __call__(self, func: T, /) -> T:
-        pass
-
-    def __call__(self, func: T | None = None, /) -> T | Callable[[T], T]:
-        def inner(middleware: T) -> T:
-            self.register_middleware(middleware)
-            return middleware
-
-        if func is None:
-            return inner
-        return inner(func)
+    def __call__(self) -> T | Callable[[T], T]:
+        return self.register_middleware
 
     @overload
     def __getitem__(self, index: int) -> MiddlewareCallable[Any]: ...
@@ -82,8 +64,7 @@ class MiddlewareStorage(Sequence[MiddlewareCallable[Any]]):
     def __getitem__(self, index: slice) -> list[MiddlewareCallable[Any]]: ...
 
     def __getitem__(
-        self,
-        index: int | slice,
+        self, index: int | slice
     ) -> MiddlewareCallable[Any] | list[MiddlewareCallable[Any]]:
         return self._middlewares[index]
 
@@ -151,21 +132,21 @@ class MiddlewareManager:
         return storage.__call__()
 
 
-_CALLABLE = Callable[[dict[str, Any]], Awaitable[Any]]
+_WRAPPED = Callable[[dict[str, Any]], Awaitable[Any]]
 
 
 def _make_mdw_wrapper_factory(
-    args_call: Callable[[dict[str, Any]], list[Any]] | None = None,
+    args_resolver: Callable[[dict[str, Any]], list[Any]] | None = None,
     next_call_arg_name: str = 'next_call',
-) -> Callable[[_CALLABLE, _CALLABLE | None], _CALLABLE]:
-    def wrapper_factory(to_wrap: _CALLABLE, prev_wrapped: _CALLABLE | None) -> _CALLABLE:
+) -> Callable[[_WRAPPED, _WRAPPED | None], _WRAPPED]:
+    def wrapper_factory(to_wrap: _WRAPPED, prev_wrapped: _WRAPPED | None) -> _WRAPPED:
         async def wrapped(context: dict[str, Any]) -> Any:
             if prev_wrapped is None:
                 return await to_wrap(context)
 
             context.update({next_call_arg_name: prev_wrapped})
             call = to_wrap if isinstance(to_wrap, CallableWrapper) else CallableWrapper(to_wrap)
-            return await call(args_call(context) if args_call is not None else [], context)
+            return await call(args_resolver(context) if args_resolver is not None else [], context)
 
         return wrapped
 
