@@ -12,6 +12,7 @@ from types import MappingProxyType
 from functools import partial
 from collections.abc import Mapping, Generator
 
+from eventry.loggers import logger
 from eventry.asyncio.config import RouterConfig, EventDispatchingConfig
 from eventry.asyncio.filter import Filter, FilterFromFunction, dummy_filter
 from eventry.asyncio.exceptions import router as rexc
@@ -128,7 +129,7 @@ class Router(Generic[FilterT]):
 
         for r in self._sub_routers.values():
             subrouter_context = copy(context)
-            await r._propagate_event(event, config, execution_ctx, subrouter_context)
+            await r.propagate_event(event, config, execution_ctx, subrouter_context)
             if event.propagation_stopped:
                 return
 
@@ -165,11 +166,19 @@ class Router(Generic[FilterT]):
         self.config.update_ctx_with_filter_args(context)
         self.config.update_ctx_with_inner_mdw_args(context)
 
-        return await MiddlewareStorage.wrap_with_middlewares(
-            partial(self._propagate_event_with_filter, event, config, execution_ctx),
-            self.middleware.get_middlewares_storage('router.outer') or [],
-            _make_mdw_wrapper_factory(self.config.collect_outer_mdw_args),
-        )(context)
+        try:
+            return await MiddlewareStorage.wrap_with_middlewares(
+                partial(self._propagate_event_with_filter, event, config, execution_ctx),
+                self.middleware.get_middlewares_storage('router.outer') or [],
+                _make_mdw_wrapper_factory(self.config.collect_outer_mdw_args),
+            )(context)
+        except Exception as router_error:
+            try:
+                await config.on_error(execution_ctx, router_error)
+            except Exception as callback_error:
+                if callback_error is router_error:
+                    raise callback_error
+                logger.error('Error in router callback', exc_info=callback_error)  # todo
 
     def chain_to_root(self) -> Generator[Router[Any], None, None]:
         r: Router[Any] | None = self

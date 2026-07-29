@@ -20,8 +20,8 @@ class DefaultRouter(Router[Any]):
             name=name,
             config=RouterConfig(
                 outer_mdw_args=(FromKwargs('next_call'), Kwargs),
-                inner_mdw_args=(FromKwargs('next_call'), Kwargs)
-            )
+                inner_mdw_args=(FromKwargs('next_call'), Kwargs),
+            ),
         )
 
         self._manager = DefaultHandlerManager('DefaultHandlerManager', lambda *args: True)

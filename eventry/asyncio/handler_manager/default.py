@@ -29,7 +29,7 @@ class DefaultHandlerManager(HandlerManagerDefaultType):
                 manager_inner_mdw_args=(FromKwargs('next_call'), Kwargs),
                 handler_outer_mdw_args=(FromKwargs('next_call'), Kwargs),
                 handler_inner_mdw_args=(FromKwargs('next_call'), Kwargs),
-            )
+            ),
         )
 
         self.middleware.set_middlewares_storage('manager.outer', MiddlewareStorage())
