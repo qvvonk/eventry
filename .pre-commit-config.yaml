@@ -19,15 +19,6 @@ repos:
         verbose: true
         stages: [pre-push]
 
-      - id: pytest
-        language: unsupported
-        name: Pytest
-        entry: pytest
-        pass_filenames: false
-        always_run: true
-        verbose: true
-        stages: [pre-push]
-
       - id: tox
         language: unsupported
         name: Tox
