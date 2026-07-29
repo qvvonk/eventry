@@ -132,7 +132,7 @@ class Router(Generic[FilterT]):
             if event.propagation_stopped:
                 return
 
-    async def _propagate_event_with_filter_inner(
+    async def _propagate_event_with_filter(
         self,
         event: Event,
         config: EventDispatchingConfig,
@@ -143,17 +143,8 @@ class Router(Generic[FilterT]):
         if not r and not isinstance(r, dict):
             return None
 
-        return await self._propagate_event(event, config, execution_ctx, context)
-
-    async def _propagate_event_with_filter(
-        self,
-        event: Event,
-        config: EventDispatchingConfig,
-        execution_ctx: RouterExecutionContext,
-        context: dict[str, Any],
-    ) -> Any:
         return await MiddlewareStorage.wrap_with_middlewares(
-            partial(self._propagate_event_with_filter_inner, event, config, execution_ctx),
+            partial(self._propagate_event, event, config, execution_ctx),
             self.middleware.get_middlewares_storage('router.inner') or [],
             _make_mdw_wrapper_factory(self.config.collect_inner_mdw_args),
         )(context)

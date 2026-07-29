@@ -156,7 +156,7 @@ class MiddlewareManager:
             raise ValueError(
                 f'This manager does not contain middleware storage for {scope!r} scope.',
             ) from None
-        return storage.__call__()  # type: ignore  # todo
+        return storage.register_middleware
 
 
 _CALL = Callable[[dict[str, Any]], Awaitable[Any]]
