@@ -17,15 +17,21 @@ from collections.abc import Mapping, Iterator, MutableMapping
 
 
 if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
+
     from eventry.asyncio.event import Event
     from eventry.asyncio.router import Router
     from eventry.asyncio.dispatcher import Dispatcher
     from eventry.asyncio.callable_wrappers import Handler
     from eventry.asyncio.handler_manager.base import HandlerManagerAnyType
 
+    _T = TypeVar('_T', bound=DataclassInstance)
 
-_MISSING = object()
-_T = TypeVar('_T')
+
+class _MissingType: ...
+
+
+_MISSING = _MissingType()
 
 
 @dataclass
@@ -35,7 +41,7 @@ class CommonArgumentSlots:
     inner: list[Any] = field(default_factory=list)
 
     def copy(self: _T) -> _T:
-        return replace(self, **{k: copy(v) for k, v in asdict(self)})
+        return replace(self, **{k: copy(v) for k, v in asdict(self).items()})
 
 
 @dataclass
@@ -195,9 +201,9 @@ class DispatchingContext(MutableMapping[str, Any]):
         self,
         updates: Mapping[str, Any] | None = None,
         *,
-        router: Router[Any] | None | object = _MISSING,
-        manager: HandlerManagerAnyType | None | object = _MISSING,
-        handler: Handler[Any] | None | object = _MISSING,
+        router: Router[Any] | None | _MissingType = _MISSING,
+        manager: HandlerManagerAnyType | None | _MissingType = _MISSING,
+        handler: Handler[Any] | None | _MissingType = _MISSING,
         arguments: ArgumentSlots | None = None,
     ) -> DispatchingContext:
         data = self._data.copy()
@@ -215,8 +221,8 @@ class DispatchingContext(MutableMapping[str, Any]):
             event=self.event,
             dispatcher=self.dispatcher,
             data=data,
-            router=router if router is not _MISSING else self.router,
-            manager=manager if manager is not _MISSING else self.manager,
-            handler=handler if handler is not _MISSING else self._handler,
+            router=router if not isinstance(router, _MissingType) else self.router,
+            manager=manager if not isinstance(manager, _MissingType) else self.manager,
+            handler=handler if not isinstance(handler, _MissingType) else self._handler,
             arguments=self.args.copy() if arguments is None else arguments,
         )
