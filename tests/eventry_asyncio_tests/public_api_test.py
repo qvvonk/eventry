@@ -56,6 +56,17 @@ import pytest
             id='config',
         ),
         pytest.param(
+            ['eventry.asyncio', 'eventry.asyncio.dispatching_context'],
+            [
+                'DispatchingContext',
+                'HandlerArgumentSlots',
+                'ManagerArgumentSlots',
+                'RouterArgumentSlots',
+                'ArgumentSlots',
+            ],
+            id='dispatching_context',
+        ),
+        pytest.param(
             ['eventry.asyncio', 'eventry.asyncio.event'],
             ['Event', 'ExtendedEvent'],
             id='event',

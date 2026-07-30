@@ -34,7 +34,7 @@ class _MissingType: ...
 _MISSING = _MissingType()
 
 
-@dataclass
+@dataclass(slots=True)
 class BaseArgumentSlots:
     outer: list[Any] = field(default_factory=list)
     filter: list[Any] = field(default_factory=list)
@@ -46,20 +46,20 @@ class BaseArgumentSlots:
         )
 
 
-@dataclass
+@dataclass(slots=True)
 class RouterArgumentSlots(BaseArgumentSlots): ...
 
 
-@dataclass
+@dataclass(slots=True)
 class ManagerArgumentSlots(BaseArgumentSlots): ...
 
 
-@dataclass
+@dataclass(slots=True)
 class HandlerArgumentSlots(BaseArgumentSlots):
     call: list[Any] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class ArgumentSlots:
     router: RouterArgumentSlots = field(default_factory=RouterArgumentSlots)
     manager: ManagerArgumentSlots = field(default_factory=ManagerArgumentSlots)

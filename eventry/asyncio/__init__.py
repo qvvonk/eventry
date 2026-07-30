@@ -29,6 +29,11 @@ __all__ = [
     'MiddlewareManager',
     'MiddlewareStorage',
     'MiddlewareType',
+    'DispatchingContext',
+    'HandlerArgumentSlots',
+    'ManagerArgumentSlots',
+    'RouterArgumentSlots',
+    'ArgumentSlots',
 ]
 
 
@@ -58,3 +63,10 @@ from .router import Router, DefaultRouter
 from .dispatcher import Dispatcher
 from .middleware import MiddlewareType, MiddlewareManager, MiddlewareStorage
 from .handler_manager import HandlerManager, DefaultHandlerManager
+from .dispatching_context import (
+    ArgumentSlots,
+    DispatchingContext,
+    RouterArgumentSlots,
+    HandlerArgumentSlots,
+    ManagerArgumentSlots,
+)
