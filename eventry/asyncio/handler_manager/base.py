@@ -15,6 +15,7 @@ from types import MappingProxyType
 from functools import partial
 from collections.abc import Callable, Sequence
 
+from eventry._common import event_from_context
 from eventry.loggers import logger
 from eventry.asyncio.config import HandlerManagerConfig, EventDispatchingConfig
 from eventry.asyncio.filter import Filter, FilterFromFunction, dummy_filter, convert_filters
@@ -258,7 +259,12 @@ class HandlerManager(
         context: dict[str, Any],
     ) -> Any:
         return await MiddlewareStorage.wrap_with_middlewares(
-            partial(self._execute_handlers_inner, event, config, execution_ctx),
+            partial(
+                self._execute_handlers_inner,
+                event_from_context(event, context),
+                config,
+                execution_ctx,
+            ),
             self.middleware.get_middlewares_storage('manager.inner') or [],
             _make_mdw_wrapper_factory(
                 self.config.collect_manager_inner_mdw_args,
@@ -277,7 +283,9 @@ class HandlerManager(
         if r is False or r is None:
             return r
 
-        return await self._execute_handlers(event, config, execution_ctx, context)
+        return await self._execute_handlers(
+            event_from_context(event, context), config, execution_ctx, context
+        )
 
     async def propagate_event(
         self,
@@ -298,9 +306,15 @@ class HandlerManager(
         self.config.update_ctx_with_handler_args(context)
 
         manager_ctx = ManagerExecutionContext(manager=self, **execution_ctx.shallow_asdict())
+
         try:
             return await MiddlewareStorage.wrap_with_middlewares(
-                partial(self._execute_handlers_with_mgr_filter, event, config, manager_ctx),
+                partial(
+                    self._execute_handlers_with_mgr_filter,
+                    event_from_context(event, context),
+                    config,
+                    manager_ctx,
+                ),
                 self.middleware.get_middlewares_storage('manager.outer') or [],
                 _make_mdw_wrapper_factory(
                     self.config.collect_manager_outer_mdw_args,

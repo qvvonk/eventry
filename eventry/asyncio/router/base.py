@@ -12,6 +12,7 @@ from types import MappingProxyType
 from functools import partial
 from collections.abc import Mapping, Generator
 
+from eventry._common import event_from_context
 from eventry.loggers import logger
 from eventry.asyncio.config import RouterConfig, EventDispatchingConfig
 from eventry.asyncio.filter import Filter, FilterFromFunction, dummy_filter
@@ -123,13 +124,17 @@ class Router(Generic[FilterT]):
         for i in self._handler_managers.values():
             manager_context = context | {i.config.manager_key: i}
 
-            await i.propagate_event(event, config, execution_ctx, manager_context)
+            await i.propagate_event(
+                event_from_context(event, context), config, execution_ctx, manager_context
+            )
             if event.propagation_stopped:
                 return
 
         for r in self._sub_routers.values():
             subrouter_context = copy(context)
-            await r.propagate_event(event, config, execution_ctx, subrouter_context)
+            await r.propagate_event(
+                event_from_context(event, context), config, execution_ctx, subrouter_context
+            )
             if event.propagation_stopped:
                 return
 
@@ -145,7 +150,9 @@ class Router(Generic[FilterT]):
             return None
 
         return await MiddlewareStorage.wrap_with_middlewares(
-            partial(self._propagate_event, event, config, execution_ctx),
+            partial(
+                self._propagate_event, event_from_context(event, context), config, execution_ctx
+            ),
             self.middleware.get_middlewares_storage('router.inner') or [],
             _make_mdw_wrapper_factory(
                 self.config.collect_inner_mdw_args, self.config.inner_mdw_next_call_key
@@ -170,7 +177,12 @@ class Router(Generic[FilterT]):
 
         try:
             return await MiddlewareStorage.wrap_with_middlewares(
-                partial(self._propagate_event_with_filter, event, config, execution_ctx),
+                partial(
+                    self._propagate_event_with_filter,
+                    event_from_context(event, context),
+                    config,
+                    execution_ctx,
+                ),
                 self.middleware.get_middlewares_storage('router.outer') or [],
                 _make_mdw_wrapper_factory(
                     self.config.collect_outer_mdw_args, self.config.outer_mdw_next_call_key
