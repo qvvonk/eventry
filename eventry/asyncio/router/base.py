@@ -147,7 +147,9 @@ class Router(Generic[FilterT]):
         return await MiddlewareStorage.wrap_with_middlewares(
             partial(self._propagate_event, event, config, execution_ctx),
             self.middleware.get_middlewares_storage('router.inner') or [],
-            _make_mdw_wrapper_factory(self.config.collect_inner_mdw_args),
+            _make_mdw_wrapper_factory(
+                self.config.collect_inner_mdw_args, self.config.inner_mdw_next_call_key
+            ),
         )(context)
 
     async def propagate_event(
@@ -170,7 +172,9 @@ class Router(Generic[FilterT]):
             return await MiddlewareStorage.wrap_with_middlewares(
                 partial(self._propagate_event_with_filter, event, config, execution_ctx),
                 self.middleware.get_middlewares_storage('router.outer') or [],
-                _make_mdw_wrapper_factory(self.config.collect_outer_mdw_args),
+                _make_mdw_wrapper_factory(
+                    self.config.collect_outer_mdw_args, self.config.outer_mdw_next_call_key
+                ),
             )(context)
         except Exception as router_error:
             try:

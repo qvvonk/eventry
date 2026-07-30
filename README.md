@@ -47,13 +47,14 @@ async def my_handler_with_filter(event: MyEvent):
 async def main():
     my_event = MyEvent('qvvonk')
     await dp.propagate_event(my_event)  # both handlers will be executed.
-    
+
     event = ExtendedEvent()
     await dp.propagate_event(event)  # only `my_handler` will be executed.
 
 
 if __name__ == '__main__':
     import asyncio
+
     asyncio.run(main())
 ```
 
@@ -65,22 +66,17 @@ Note: unlike `DefaultRouter`, the base `Router` has no `HandlerManager`'s or `Mi
 ```python
 import asyncio
 
-from eventry.asyncio import (
-    Router, 
-    DefaultHandlerManager, 
-    MiddlewareStorage, 
-    ExtendedEvent
-)
+from eventry.asyncio import Router, DefaultHandlerManager, MiddlewareStorage, ExtendedEvent
 
 
 class ApplicationRouter(Router):
     def __init__(self, name: str = ''):
         super().__init__(name=name)
-        
+
         self.on_new_message = self.add_handler_manager(
             DefaultHandlerManager(name='on_message', event_filter='new_message')
         )
-        
+
         self.on_new_order = self.add_handler_manager(
             DefaultHandlerManager(name='on_order', event_filter='new_order')
         )
@@ -128,6 +124,7 @@ async def print_order_id(event: NewOrderEvent) -> None:
 async def main():
     await dp.propagate_event(NewMessageEvent('Hello World!'))
     await dp.propagate_event(NewOrderEvent(12345))
+
 
 if __name__ == '__main__':
     asyncio.run(main())

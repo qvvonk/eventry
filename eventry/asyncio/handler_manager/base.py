@@ -144,11 +144,14 @@ class HandlerManager(
         outer_middlewares: Sequence[HandlerOuterMdwT] | None = None,
     ) -> Callable[[HandlerT], HandlerT]:
         def inner(handler: HandlerT) -> HandlerT:
-            handler_obj = Handler(handler, name=name or gen_handler_name(handler, list(
-                self._handlers.keys())), filter=convert_filters([filter])[
-                0] if filter is not None else None, as_task=as_task,
-                                  outer_middlewares=outer_middlewares,
-                                  inner_middlewares=inner_middlewares)
+            handler_obj = Handler(
+                handler,
+                name=name or gen_handler_name(handler, list(self._handlers.keys())),
+                filter=convert_filters([filter])[0] if filter is not None else None,
+                as_task=as_task,
+                outer_middlewares=outer_middlewares,
+                inner_middlewares=inner_middlewares,
+            )
             self._register_handler(handler_obj)
             return handler
 
