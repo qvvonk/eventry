@@ -221,7 +221,7 @@ class DispatchingContext(MutableMapping[str, Any]):
         )
 
     @classmethod
-    def from_mapping(cls, data: Mapping[str, Any]) -> DispatchingContext:
+    def from_mapping(cls, data: MutableMapping[str, Any]) -> DispatchingContext:
         if isinstance(data, DispatchingContext):
             return data
 
@@ -230,11 +230,11 @@ class DispatchingContext(MutableMapping[str, Any]):
                 raise ValueError(f'{i!r} not found.')
 
         return DispatchingContext(
-            event=data[cls._EVENT_KEY],
-            dispatcher=data[cls._DISPATCHER_KEY],
-            router=data[cls._ROUTER_KEY],
-            manager=data.get(cls._MANAGER_KEY),
-            handler=data.get(cls._HANDLER_KEY),
-            arguments=data.get(cls._ARGUMENTS_KEY),
-            data=data
+            event=data.pop(cls._EVENT_KEY),
+            dispatcher=data.pop(cls._DISPATCHER_KEY),
+            router=data.pop(cls._ROUTER_KEY),
+            manager=data.pop(cls._MANAGER_KEY, None),
+            handler=data.pop(cls._HANDLER_KEY, None),
+            arguments=data.pop(cls._ARGUMENTS_KEY, None),
+            data=data,
         )
