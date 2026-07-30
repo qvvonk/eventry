@@ -77,3 +77,6 @@ class Dispatcher:
             context=context,
         )
         await router.propagate_event(event, config, execution_context, context)
+
+    def __repr__(self) -> str:
+        return f'Dispatcher({self.router!r})'

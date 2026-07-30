@@ -207,6 +207,9 @@ class Router(Generic[FilterT]):
         for r in self._sub_routers.values():
             yield from r.chain_to_tails()
 
+    def __repr__(self) -> str:
+        return f'Router({self.name!r})'
+
     @property
     def name(self) -> str:
         return self._name
