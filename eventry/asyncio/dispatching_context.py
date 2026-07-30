@@ -182,18 +182,6 @@ class DispatchingContext(MutableMapping[str, Any]):
     def __copy__(self) -> DispatchingContext:
         return self.fork()
 
-    def __repr__(self) -> str:
-        return (
-            f'{type(self).__name__}('
-            f'event={self.event!r}, '
-            f'dispatcher={self.dispatcher!r}, '
-            f'router={self.router!r}, '
-            f'manager={self.manager!r}, '
-            f'handler={self.handler!r}, '
-            f'data={self._data!r}, '
-            f'arguments={self.args!r})'
-        )
-
     def copy(self) -> DispatchingContext:
         return self.fork()
 
