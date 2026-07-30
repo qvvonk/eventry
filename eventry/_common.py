@@ -7,4 +7,4 @@ from eventry._event import Event
 
 
 def event_from_context(event: Event, context: Mapping[str, Any]) -> Event:
-    return context['event'] if event in context else event
+    return context['event'] if 'event' in context else event
