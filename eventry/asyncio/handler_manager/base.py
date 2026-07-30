@@ -15,7 +15,6 @@ from types import MappingProxyType
 from functools import partial
 from collections.abc import Callable, Sequence
 
-from eventry._common import event_from_context
 from eventry.loggers import logger
 from eventry.asyncio.config import HandlerManagerConfig, EventDispatchingConfig
 from eventry.asyncio.filter import Filter, FilterFromFunction, dummy_filter, convert_filters
@@ -25,11 +24,7 @@ from eventry.asyncio.middleware import (
     _make_mdw_wrapper_factory,
 )
 from eventry.asyncio.callable_wrappers import Handler
-from eventry.asyncio.execution_context import (
-    RouterExecutionContext,
-    HandlerExecutionContext,
-    ManagerExecutionContext,
-)
+from eventry.asyncio.dispatching_context import DispatchingContext
 
 
 if TYPE_CHECKING:
@@ -158,172 +153,123 @@ class HandlerManager(
 
         return inner
 
-    async def _execute_handler(self, handler: Handler[Any], context: dict[str, Any]) -> Any:
+    async def _handler(self, handler: Handler[Any], ctx: DispatchingContext) -> Any:
+        await handler(ctx.args.handler.call, ctx)
+
+    async def _execute_handler(self, handler: Handler[Any], ctx: DispatchingContext) -> Any:
         return await MiddlewareStorage.wrap_with_middlewares(
-            partial(handler, self.config.collect_handler_args(context)),
+            partial(self._handler, handler),
             list(self.middleware.get_middlewares_storage('handler.inner') or [])
             + handler.inner_middlewares,
             _make_mdw_wrapper_factory(
-                self.config.collect_handler_inner_mdw_args,
-                self.config.handler_inner_mdw_next_call_key,
+                ctx.args.handler.inner, self.config.handler_inner_mdw_next_call_key
             ),
-        )(context)
+        )(ctx)
 
     async def _execute_handler_with_filter_inner(
         self,
         handler: Handler[Any],
-        context: dict[str, Any],
+        ctx: DispatchingContext,
     ) -> Any:
-        r = await handler.filter.execute(self.config.collect_handler_filter_args(context), context)
+        r = await handler.filter.execute(ctx.args.handler.filter, ctx)
         if not r and not isinstance(r, dict):
             return r
 
-        return await self._execute_handler(handler, context)
+        return await self._execute_handler(handler, ctx)
 
     async def _execute_handler_with_filter(
         self,
         handler: Handler[Any],
-        config: EventDispatchingConfig,
-        execution_ctx: ManagerExecutionContext,
-        context: dict[str, Any],
+        cfg: EventDispatchingConfig,
+        ctx: DispatchingContext,
     ) -> Any:
-        h_exec_ctx = HandlerExecutionContext(handler=handler, **execution_ctx.shallow_asdict())
         try:
             handler_result = await MiddlewareStorage.wrap_with_middlewares(
                 partial(self._execute_handler_with_filter_inner, handler),
                 list(self.middleware.get_middlewares_storage('handler.outer') or [])
                 + handler.outer_middlewares,
                 _make_mdw_wrapper_factory(
-                    self.config.collect_handler_outer_mdw_args,
+                    ctx.args.handler.outer,
                     self.config.handler_outer_mdw_next_call_key,
                 ),
-            )(context)
+            )(ctx)
         except Exception as handler_error:
             try:
-                await config.on_error(h_exec_ctx, handler_error)
+                await cfg.on_error(ctx, handler_error)
             except Exception as callback_error:
                 if callback_error is handler_error:
                     raise callback_error
                 logger.error(
                     f'An error occurred while executing error callback of handler '
-                    f'{handler.name!r} @ {h_exec_ctx.manager.name!r} @ '
-                    f'{h_exec_ctx.router.full_name} '
-                    f'for event {h_exec_ctx.event.name!r}.',
+                    f'{handler.name!r} @ {self.name!r} @ {ctx.router.full_name} '
+                    f'for event {ctx.event.name!r}.',
                     exc_info=handler_error,
                 )
             return
 
         try:
-            await config.on_handler(h_exec_ctx, handler_result)
+            await cfg.on_handler(ctx, handler_result)
         except Exception as e:
             logger.error(
                 f'An error occurred while executing callback of handler '
-                f'{handler.name!r} @ {h_exec_ctx.manager.name!r} @ '
-                f'{h_exec_ctx.router.full_name} '
-                f'for event {h_exec_ctx.event.name!r}.',
+                f'{handler.name!r} @ {self.name!r} @ {ctx.router.full_name} '
+                f'for event {ctx.event.name!r}.',
                 exc_info=e,
             )
 
     async def _execute_handlers_inner(
-        self,
-        event: Event,
-        config: EventDispatchingConfig,
-        execution_ctx: ManagerExecutionContext,
-        context: dict[str, Any],
+        self, cfg: EventDispatchingConfig, ctx: DispatchingContext
     ) -> Any:
         for i in self.handlers.values():
-            if i.as_task:
-                asyncio.create_task(
-                    self._execute_handler_with_filter(
-                        i,
-                        config,
-                        execution_ctx,
-                        context | {self.config.handler_key: i},
-                    ),
-                )
-            else:
-                await self._execute_handler_with_filter(
-                    i,
-                    config,
-                    execution_ctx,
-                    context | {self.config.handler_key: i},
-                )
-            if event.propagation_stopped:
+            handler_ctx = ctx.fork(handler=i)
+            coro = self._execute_handler_with_filter(i, cfg, handler_ctx)
+            asyncio.create_task(coro) if i.as_task else await coro
+            if handler_ctx.event.propagation_stopped:
                 return
 
-    async def _execute_handlers(
-        self,
-        event: Event,
-        config: EventDispatchingConfig,
-        execution_ctx: ManagerExecutionContext,
-        context: dict[str, Any],
-    ) -> Any:
+    async def _execute_handlers(self, cfg: EventDispatchingConfig, ctx: DispatchingContext) -> Any:
         return await MiddlewareStorage.wrap_with_middlewares(
-            partial(
-                self._execute_handlers_inner,
-                event_from_context(event, context),
-                config,
-                execution_ctx,
-            ),
+            partial(self._execute_handlers_inner, cfg),
             self.middleware.get_middlewares_storage('manager.inner') or [],
             _make_mdw_wrapper_factory(
-                self.config.collect_manager_inner_mdw_args,
+                ctx.args.manager.inner,
                 self.config.manager_inner_mdw_next_call_key,
             ),
-        )(context)
+        )(ctx)
 
     async def _execute_handlers_with_mgr_filter(
-        self,
-        event: Event,
-        config: EventDispatchingConfig,
-        execution_ctx: ManagerExecutionContext,
-        context: dict[str, Any],
+        self, cfg: EventDispatchingConfig, ctx: DispatchingContext
     ) -> Any:
-        r = await self.filter.execute(self.config.collect_manager_filter_args(context), context)
+        r = await self.filter.execute(ctx.args.manager.filter, ctx)
         if r is False or r is None:
             return r
 
-        return await self._execute_handlers(
-            event_from_context(event, context), config, execution_ctx, context
-        )
+        return await self._execute_handlers(cfg, ctx)
 
-    async def propagate_event(
-        self,
-        event: Event,
-        config: EventDispatchingConfig,
-        execution_ctx: RouterExecutionContext,
-        context: dict[str, Any],
-    ) -> Any:
-        if not self.check_event(event):
+    async def propagate_event(self, cfg: EventDispatchingConfig, ctx: DispatchingContext) -> Any:
+        if not self.check_event(ctx.event):
             return None
 
-        self.config.update_ctx_with_manager_outer_mdw_args(context)
-        self.config.update_ctx_with_manager_filter_args(context)
-        self.config.update_ctx_with_manager_inner_mdw_args(context)
-        self.config.update_ctx_with_handler_outer_mdw_args(context)
-        self.config.update_ctx_with_handler_filter_args(context)
-        self.config.update_ctx_with_handler_inner_mdw_args(context)
-        self.config.update_ctx_with_handler_args(context)
-
-        manager_ctx = ManagerExecutionContext(manager=self, **execution_ctx.shallow_asdict())
+        ctx.args.manager.outer = list(self.config.manager_outer_mdw_args)
+        ctx.args.manager.filter = list(self.config.manager_filter_args)
+        ctx.args.manager.inner = list(self.config.manager_inner_mdw_args)
+        ctx.args.handler.outer = list(self.config.handler_outer_mdw_args)
+        ctx.args.handler.filter = list(self.config.handler_filter_args)
+        ctx.args.handler.inner = list(self.config.handler_inner_mdw_args)
+        ctx.args.handler.call = list(self.config.handler_args)
 
         try:
             return await MiddlewareStorage.wrap_with_middlewares(
-                partial(
-                    self._execute_handlers_with_mgr_filter,
-                    event_from_context(event, context),
-                    config,
-                    manager_ctx,
-                ),
+                partial(self._execute_handlers_with_mgr_filter, cfg),
                 self.middleware.get_middlewares_storage('manager.outer') or [],
                 _make_mdw_wrapper_factory(
-                    self.config.collect_manager_outer_mdw_args,
+                    ctx.args.manager.outer,
                     self.config.manager_outer_mdw_next_call_key,
                 ),
-            )(context)
+            )(ctx)
         except Exception as manager_error:
             try:
-                await config.on_error(manager_ctx, manager_error)
+                await cfg.on_error(ctx, manager_error)
             except Exception as callback_error:
                 if callback_error is manager_error:
                     raise callback_error

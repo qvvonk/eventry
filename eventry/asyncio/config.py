@@ -9,10 +9,6 @@ __all__ = [
     'default_handler_callback',
     'Context',
     'FromContext',
-    'ExecutionContext',
-    'RouterExecutionContext',
-    'HandlerExecutionContext',
-    'ManagerExecutionContext',
 ]
 
 from typing import Any
@@ -22,32 +18,24 @@ from collections.abc import Callable, Awaitable
 from eventry._config import RouterConfig, HandlerManagerConfig
 from eventry.loggers import logger
 from eventry._argument_sources import Context, FromContext
-from eventry.asyncio.execution_context import (
-    ExecutionContext,
-    RouterExecutionContext,
-    HandlerExecutionContext,
-    ManagerExecutionContext,
-)
+from eventry.asyncio.dispatching_context import DispatchingContext
 
 
-async def default_error_callback(ctx: RouterExecutionContext, exc: Exception) -> None:
-    if not isinstance(ctx, RouterExecutionContext):
-        return
-
-    if isinstance(ctx, HandlerExecutionContext):
+async def default_error_callback(ctx: DispatchingContext, exc: Exception) -> None:
+    if ctx.handler is not None and ctx.manager is not None:
         logger.error(
             f'An error occurred while executing handler '
             f'{ctx.handler.name!r} @ {ctx.manager.name!r} @ {ctx.router.full_name}.'
             f'for event {ctx.event.name!r}.',
             exc_info=exc,
         )
-    elif isinstance(ctx, ManagerExecutionContext):
+    elif ctx.manager is not None:
         logger.error(
             f'An error occurred while executing handlers of manager '
             f'{ctx.manager.name!r} @ {ctx.router.full_name}.',
             exc_info=exc,
         )
-    else:
+    elif ctx.router is not None:
         logger.error(
             f'An error occurred while executing handlers of router {ctx.router.full_name}.',
             exc_info=exc,
@@ -60,7 +48,5 @@ async def default_handler_callback(*_: Any) -> None:
 
 @dataclass(kw_only=True)
 class EventDispatchingConfig:
-    on_error: Callable[[RouterExecutionContext, Exception], Awaitable[Any]] = (
-        default_error_callback
-    )
-    on_handler: Callable[[HandlerExecutionContext, Any], Awaitable[Any]] = default_handler_callback
+    on_error: Callable[[DispatchingContext, Exception], Awaitable[Any]] = default_error_callback
+    on_handler: Callable[[DispatchingContext, Any], Awaitable[Any]] = default_handler_callback

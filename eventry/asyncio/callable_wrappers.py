@@ -167,7 +167,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
     def __call__(
         self,
         args: Sequence[Any] = (),
-        data: dict[str, Any] | None = None,
+        data: Mapping[str, Any] | None = None,
         to_thread: bool = True,
     ) -> Awaitable[ReturnTypeT]:
         pos_args, kwargs = self.collect_args(args, data)

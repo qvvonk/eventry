@@ -10,9 +10,10 @@ __all__ = [
 
 from typing import Any, Literal, TypeVar, overload
 from enum import Enum
-from collections.abc import Callable, Iterator, Sequence, Awaitable
+from collections.abc import Callable, Iterator, Sequence, Awaitable, MutableMapping
 
 from .callable_wrappers import CallableWrapper, MiddlewareCallable
+from .dispatching_context import DispatchingContext
 
 
 class MiddlewareType(Enum):
@@ -159,21 +160,23 @@ class MiddlewareManager:
         return storage.register_middleware
 
 
-_CALL = Callable[[dict[str, Any]], Awaitable[Any]]
+_CALL = Callable[[MutableMapping[str, Any]], Awaitable[Any]]
 
 
 def _make_mdw_wrapper_factory(
-    args_resolver: Callable[[dict[str, Any]], list[Any]] | None = None,
+    args: Sequence[Any] | None = None,
     next_call_arg_name: str = 'next_call',
 ) -> Callable[[_CALL, _CALL | None], _CALL]:
     def wrapper_factory(to_wrap: _CALL, prev_wrapped: _CALL | None) -> _CALL:
-        async def wrapped(context: dict[str, Any]) -> Any:
+        async def wrapped(context: MutableMapping[str, Any]) -> Any:
+            if not isinstance(context, DispatchingContext):
+                context = DispatchingContext(data=context)  # todo!!!
             if prev_wrapped is None:
                 return await to_wrap(context)
 
             context.update({next_call_arg_name: prev_wrapped})
             call = to_wrap if isinstance(to_wrap, CallableWrapper) else CallableWrapper(to_wrap)
-            return await call(args_resolver(context) if args_resolver is not None else [], context)
+            return await call(args or (), context)
 
         return wrapped
 

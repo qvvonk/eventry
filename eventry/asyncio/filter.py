@@ -19,7 +19,7 @@ __all__ = [
 
 from typing import Any, TypeAlias
 from abc import ABC
-from collections.abc import Callable, Iterable, Sequence, Awaitable
+from collections.abc import Callable, Iterable, Sequence, Awaitable, MutableMapping
 
 from .callable_wrappers import CallableWrapper
 
@@ -80,7 +80,7 @@ class Filter:
 
         return NotFilter(self)
 
-    async def execute(self, args: Sequence[Any], data: dict[str, Any]) -> bool:
+    async def execute(self, args: Sequence[Any], data: MutableMapping[str, Any]) -> bool:
         result = await self._call_wrapper(args, data)
         if isinstance(result, dict):
             data.update(result)
@@ -105,7 +105,7 @@ class AndFilter(LogicalFilter):
             i if isinstance(i, Filter) else FilterFromFunction(i) for i in filters
         ]
 
-    async def execute(self, args: Sequence[Any], data: dict[str, Any]) -> bool:
+    async def execute(self, args: Sequence[Any], data: MutableMapping[str, Any]) -> bool:
         for i in self._filters:
             if not (result := await i.execute(args, data)):
                 return False
@@ -127,7 +127,7 @@ class OrFilter(LogicalFilter):
             i if isinstance(i, Filter) else FilterFromFunction(i) for i in filters
         ]
 
-    async def execute(self, args: Sequence[Any], data: dict[str, Any]) -> bool:
+    async def execute(self, args: Sequence[Any], data: MutableMapping[str, Any]) -> bool:
         for i in self._filters:
             if result := await i.execute(args, data):
                 if isinstance(result, dict):
@@ -147,7 +147,7 @@ class NotFilter(LogicalFilter):
         super().__init__()
         self._filter: Filter = filter if isinstance(filter, Filter) else FilterFromFunction(filter)
 
-    async def execute(self, args: Sequence[Any], data: dict[str, Any]) -> bool:
+    async def execute(self, args: Sequence[Any], data: MutableMapping[str, Any]) -> bool:
         return not (await self._filter.execute(args, data))
 
 

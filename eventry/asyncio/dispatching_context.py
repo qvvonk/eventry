@@ -11,7 +11,7 @@ __all__ = [
 
 
 from typing import TYPE_CHECKING, Any, TypeVar
-from dataclasses import field, asdict, replace, dataclass
+from dataclasses import field, fields, dataclass
 from copy import copy
 from collections.abc import Mapping, Iterator, MutableMapping
 
@@ -35,29 +35,31 @@ _MISSING = _MissingType()
 
 
 @dataclass
-class CommonArgumentSlots:
+class BaseArgumentSlots:
     outer: list[Any] = field(default_factory=list)
     filter: list[Any] = field(default_factory=list)
     inner: list[Any] = field(default_factory=list)
 
     def copy(self: _T) -> _T:
-        return replace(self, **{k: copy(v) for k, v in asdict(self).items()})
+        return self.__class__(
+            **{f.name: copy(getattr(self, f.name)) for f in fields(self) if f.init}
+        )
 
 
 @dataclass
-class RouterArgumentSlots(CommonArgumentSlots): ...
+class RouterArgumentSlots(BaseArgumentSlots): ...
 
 
 @dataclass
-class ManagerArgumentSlots(CommonArgumentSlots): ...
+class ManagerArgumentSlots(BaseArgumentSlots): ...
 
 
 @dataclass
-class HandlerArgumentSlots(CommonArgumentSlots):
+class HandlerArgumentSlots(BaseArgumentSlots):
     call: list[Any] = field(default_factory=list)
 
 
-@dataclass(slots=True)
+@dataclass
 class ArgumentSlots:
     router: RouterArgumentSlots = field(default_factory=RouterArgumentSlots)
     manager: ManagerArgumentSlots = field(default_factory=ManagerArgumentSlots)
@@ -92,8 +94,8 @@ class DispatchingContext(MutableMapping[str, Any]):
         *,
         event: Event,
         dispatcher: Dispatcher,
+        router: Router[Any],
         data: Mapping[str, Any] | None = None,
-        router: Router[Any] | None = None,
         manager: HandlerManagerAnyType | None = None,
         handler: Handler[Any] | None = None,
         arguments: ArgumentSlots | None = None,
@@ -120,7 +122,7 @@ class DispatchingContext(MutableMapping[str, Any]):
         return self._dispatcher
 
     @property
-    def router(self) -> Router[Any] | None:
+    def router(self) -> Router[Any]:
         return self._router
 
     @property
@@ -140,7 +142,7 @@ class DispatchingContext(MutableMapping[str, Any]):
             return self.event
         if key == self._DISPATCHER_KEY:
             return self.dispatcher
-        if key == self._ROUTER_KEY and self.router is not None:
+        if key == self._ROUTER_KEY:
             return self.router
         if key == self._MANAGER_KEY and self.manager is not None:
             return self.manager
@@ -164,8 +166,7 @@ class DispatchingContext(MutableMapping[str, Any]):
     def __iter__(self) -> Iterator[str]:
         yield self._EVENT_KEY
         yield self._DISPATCHER_KEY
-        if self.router is not None:
-            yield self._ROUTER_KEY
+        yield self._ROUTER_KEY
         if self.manager is not None:
             yield self._MANAGER_KEY
         if self.handler is not None:
@@ -173,8 +174,7 @@ class DispatchingContext(MutableMapping[str, Any]):
         yield from self._data
 
     def __len__(self) -> int:
-        metadata_length = 2
-        metadata_length += self.router is not None
+        metadata_length = 3
         metadata_length += self.manager is not None
         metadata_length += self.handler is not None
         return metadata_length + len(self._data)
@@ -201,7 +201,7 @@ class DispatchingContext(MutableMapping[str, Any]):
         self,
         updates: Mapping[str, Any] | None = None,
         *,
-        router: Router[Any] | None | _MissingType = _MISSING,
+        router: Router[Any] | _MissingType = _MISSING,
         manager: HandlerManagerAnyType | None | _MissingType = _MISSING,
         handler: Handler[Any] | None | _MissingType = _MISSING,
         arguments: ArgumentSlots | None = None,

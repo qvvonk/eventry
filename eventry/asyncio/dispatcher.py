@@ -10,9 +10,9 @@ __all__ = [
 from typing import Any
 
 from eventry.asyncio.event import Event
-from eventry.asyncio.config import Context, EventDispatchingConfig
+from eventry.asyncio.config import EventDispatchingConfig
 from eventry.asyncio.router.base import Router
-from eventry.asyncio.execution_context import ExecutionContext
+from eventry.asyncio.dispatching_context import DispatchingContext
 
 
 class Dispatcher:
@@ -64,19 +64,13 @@ class Dispatcher:
             raise ValueError('Router is not set.')
 
         config = config if config is not None else self.config
-        context = {
-            **self.event_context,
-            **event.context_injection(),
-            **(additional_context or {}),
-            'event': event,  # todo: name from dispatcher config
-            'context': Context,  # todo: name from dispatcher
-        }
-        execution_context = ExecutionContext(
-            event=event,
+        context = DispatchingContext(
             dispatcher=self,
-            context=context,
+            router=router,
+            event=event,
+            data={**self.event_context, **event.context_injection(), **(additional_context or {})},
         )
-        await router.propagate_event(event, config, execution_context, context)
+        await router.propagate_event(config, context)
 
     def __repr__(self) -> str:
         return f'Dispatcher({self.router!r})'
