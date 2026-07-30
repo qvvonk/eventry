@@ -7,7 +7,7 @@ __all__ = [
 
 from typing import Any
 
-from eventry.asyncio.config import Kwargs, FromKwargs
+from eventry.asyncio.config import Context, FromContext
 from eventry.asyncio.middleware import MiddlewareStorage
 from eventry.asyncio.handler_manager import DefaultHandlerManager
 
@@ -19,8 +19,8 @@ class DefaultRouter(Router[Any]):
         super().__init__(
             name=name,
             config=RouterConfig(
-                outer_mdw_args=(FromKwargs('next_call'), Kwargs),
-                inner_mdw_args=(FromKwargs('next_call'), Kwargs),
+                outer_mdw_args=(FromContext('next_call'), Context),
+                inner_mdw_args=(FromContext('next_call'), Context),
             ),
         )
 

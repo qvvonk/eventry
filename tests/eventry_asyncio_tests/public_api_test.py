@@ -45,8 +45,8 @@ import pytest
         pytest.param(
             ['eventry.asyncio', 'eventry.asyncio.config'],
             [
-                'Kwargs',
-                'FromKwargs',
+                'Context',
+                'FromContext',
                 'EventDispatchingConfig',
                 'RouterConfig',
                 'HandlerManagerConfig',

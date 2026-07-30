@@ -10,7 +10,7 @@ __all__ = [
 from typing import Any
 
 from eventry.asyncio.event import Event
-from eventry.asyncio.config import Kwargs, EventDispatchingConfig
+from eventry.asyncio.config import Context, EventDispatchingConfig
 from eventry.asyncio.router.base import Router
 from eventry.asyncio.execution_context import ExecutionContext
 
@@ -69,7 +69,7 @@ class Dispatcher:
             **event.context_injection(),
             **(additional_context or {}),
             'event': event,  # todo: name from dispatcher config
-            'context': Kwargs,  # todo: name from dispatcher
+            'context': Context,  # todo: name from dispatcher
         }
         execution_context = ExecutionContext(
             event=event,

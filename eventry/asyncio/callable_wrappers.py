@@ -14,7 +14,7 @@ from types import MethodType, FunctionType
 from functools import partial
 from collections.abc import Mapping, Callable, Sequence, Awaitable
 
-from eventry._argument_sources import Kwargs, FromKwargs
+from eventry._argument_sources import Context, FromContext
 
 
 if TYPE_CHECKING:
@@ -90,7 +90,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
 
         r_args = []
         for index, arg in enumerate(args):
-            if type(arg) is not FromKwargs:
+            if type(arg) is not FromContext:
                 r_args.append(arg)
             elif arg not in kwargs:
                 raise KeyError(
@@ -156,11 +156,11 @@ class CallableWrapper(Generic[ReturnTypeT]):
                     r_kwargs[name] = kwargs[name]
 
         for index, i in enumerate(r_args):
-            if i is Kwargs:
+            if i is Context:
                 r_args[index] = original_kwargs
 
         for k, v in r_kwargs.items():
-            if v is Kwargs:
+            if v is Context:
                 r_kwargs[k] = original_kwargs
         return r_args, r_kwargs
 

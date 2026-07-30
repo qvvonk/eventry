@@ -7,8 +7,8 @@ __all__ = [
     'EventDispatchingConfig',
     'default_error_callback',
     'default_handler_callback',
-    'Kwargs',
-    'FromKwargs',
+    'Context',
+    'FromContext',
     'ExecutionContext',
     'RouterExecutionContext',
     'HandlerExecutionContext',
@@ -21,7 +21,7 @@ from collections.abc import Callable, Awaitable
 
 from eventry._config import RouterConfig, HandlerManagerConfig
 from eventry.loggers import logger
-from eventry._argument_sources import Kwargs, FromKwargs
+from eventry._argument_sources import Context, FromContext
 from eventry.asyncio.execution_context import (
     ExecutionContext,
     RouterExecutionContext,

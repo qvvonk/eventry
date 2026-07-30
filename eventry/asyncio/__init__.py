@@ -22,8 +22,8 @@ __all__ = [
     'convert_filters',
     'Event',
     'ExtendedEvent',
-    'Kwargs',
-    'FromKwargs',
+    'Context',
+    'FromContext',
     'default_error_callback',
     'default_handler_callback',
     'MiddlewareManager',
@@ -38,8 +38,8 @@ __all__ = [
 
 from .event import Event, ExtendedEvent
 from .config import (
-    Kwargs,
-    FromKwargs,
+    Context,
+    FromContext,
     RouterConfig,
     HandlerManagerConfig,
     EventDispatchingConfig,

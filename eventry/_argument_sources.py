@@ -4,7 +4,7 @@ from typing import final
 
 
 @final
-class FromKwargs(str):
+class FromContext(str):
     def __repr__(self) -> str:
         text = super().__repr__()
         return f'{self.__class__.__name__}({text})'
@@ -14,12 +14,12 @@ class FromKwargs(str):
 
 
 @final
-class KwargsType:
+class ContextType:
     def __repr__(self) -> str:
         return self.__class__.__name__
 
     def __str__(self) -> str:
-        return 'Kwargs'
+        return 'Context'
 
 
-Kwargs = KwargsType()
+Context = ContextType()
