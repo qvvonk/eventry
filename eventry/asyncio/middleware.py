@@ -169,8 +169,7 @@ def _make_mdw_wrapper_factory(
 ) -> Callable[[_CALL, _CALL | None], _CALL]:
     def wrapper_factory(to_wrap: _CALL, prev_wrapped: _CALL | None) -> _CALL:
         async def wrapped(context: MutableMapping[str, Any]) -> Any:
-            if not isinstance(context, DispatchingContext):
-                context = DispatchingContext(data=context)  # todo!!!
+            context = DispatchingContext.from_mapping(context)
             if prev_wrapped is None:
                 return await to_wrap(context)
 

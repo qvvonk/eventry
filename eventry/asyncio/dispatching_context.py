@@ -79,6 +79,7 @@ class DispatchingContext(MutableMapping[str, Any]):
     _ROUTER_KEY = 'router'
     _MANAGER_KEY = 'manager'
     _HANDLER_KEY = 'handler'
+    _ARGUMENTS_KEY = 'argument_slots'
     _RESERVED_KEYS = frozenset(
         {
             _EVENT_KEY,
@@ -86,6 +87,7 @@ class DispatchingContext(MutableMapping[str, Any]):
             _ROUTER_KEY,
             _MANAGER_KEY,
             _HANDLER_KEY,
+            _ARGUMENTS_KEY,
         },
     )
 
@@ -144,6 +146,8 @@ class DispatchingContext(MutableMapping[str, Any]):
             return self.dispatcher
         if key == self._ROUTER_KEY:
             return self.router
+        if key == self._ARGUMENTS_KEY:
+            return self.args
         if key == self._MANAGER_KEY and self.manager is not None:
             return self.manager
         if key == self._HANDLER_KEY and self.handler is not None:
@@ -167,6 +171,7 @@ class DispatchingContext(MutableMapping[str, Any]):
         yield self._EVENT_KEY
         yield self._DISPATCHER_KEY
         yield self._ROUTER_KEY
+        yield self._ARGUMENTS_KEY
         if self.manager is not None:
             yield self._MANAGER_KEY
         if self.handler is not None:
@@ -174,7 +179,7 @@ class DispatchingContext(MutableMapping[str, Any]):
         yield from self._data
 
     def __len__(self) -> int:
-        metadata_length = 3
+        metadata_length = 4
         metadata_length += self.manager is not None
         metadata_length += self.handler is not None
         return metadata_length + len(self._data)
@@ -213,4 +218,23 @@ class DispatchingContext(MutableMapping[str, Any]):
             manager=manager if not isinstance(manager, _MissingType) else self.manager,
             handler=handler if not isinstance(handler, _MissingType) else self._handler,
             arguments=self.args.copy() if arguments is None else arguments,
+        )
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> DispatchingContext:
+        if isinstance(data, DispatchingContext):
+            return data
+
+        for i in [cls._DISPATCHER_KEY, cls._ROUTER_KEY, cls._EVENT_KEY]:
+            if i not in data:
+                raise ValueError(f'{i!r} not found.')
+
+        return DispatchingContext(
+            event=data[cls._EVENT_KEY],
+            dispatcher=data[cls._DISPATCHER_KEY],
+            router=data[cls._ROUTER_KEY],
+            manager=data.get(cls._MANAGER_KEY),
+            handler=data.get(cls._HANDLER_KEY),
+            arguments=data.get(cls._ARGUMENTS_KEY),
+            data=data
         )
