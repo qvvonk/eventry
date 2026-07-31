@@ -26,8 +26,8 @@ class DefaultRouter(Router[Any]):
 
         self._manager = DefaultHandlerManager('DefaultHandlerManager', lambda *args: True)
         self._handler_managers['DefaultHandlerManager'] = self._manager
-        self.middleware.set_middlewares_storage('router.outer', MiddlewareStorage())
-        self.middleware.set_middlewares_storage('router.inner', MiddlewareStorage())
+        self.middleware['router.outer'] = MiddlewareStorage()
+        self.middleware['router.inner'] = MiddlewareStorage()
 
     @property
     def on_event(self) -> DefaultHandlerManager:
@@ -35,8 +35,8 @@ class DefaultRouter(Router[Any]):
 
     @property
     def outer_middleware(self) -> MiddlewareStorage:
-        return self.middleware.get_middlewares_storage('router.outer', raise_=True)
+        return self.middleware['router.outer']
 
     @property
     def inner_middleware(self) -> MiddlewareStorage:
-        return self.middleware.get_middlewares_storage('router.inner', raise_=True)
+        return self.middleware['router.inner']

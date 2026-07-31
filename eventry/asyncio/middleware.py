@@ -8,7 +8,7 @@ __all__ = [
 ]
 
 
-from typing import Any, Literal, TypeVar, overload
+from typing import Any, Literal, TypeVar, TypeAlias, overload
 from enum import Enum
 from collections.abc import Callable, Iterator, Sequence, Awaitable, MutableMapping
 
@@ -25,7 +25,7 @@ class MiddlewareType(Enum):
     HANDLER_INNER = 'handler.inner'
 
 
-MdwsType = Literal[
+MdwsType: TypeAlias = Literal[
     'router.outer',
     'router.inner',
     'manager.outer',
@@ -92,42 +92,13 @@ class MiddlewareManager:
         self._allowed_types = {MiddlewareType(i) for i in allowed_types}
         self._storages: dict[MiddlewareType, MiddlewareStorage] = {}
 
-    @overload
-    def get_middlewares_storage(
-        self,
-        type: MdwsType,
-        raise_: Literal[False] = False,
-    ) -> MiddlewareStorage | None: ...
-
-    @overload
-    def get_middlewares_storage(
-        self,
-        type: MdwsType,
-        raise_: Literal[True],
-    ) -> MiddlewareStorage: ...
-
-    @overload
-    def get_middlewares_storage(
-        self,
-        type: MdwsType,
-        raise_: bool = False,
-    ) -> MiddlewareStorage | None: ...
-
-    def get_middlewares_storage(
-        self, type: MdwsType, raise_: bool = False
-    ) -> MiddlewareStorage | None:
+    def get_middlewares_storage(self, type: MdwsType) -> MiddlewareStorage | None:
         try:
             mdw_type = MiddlewareType(type)
         except ValueError:
-            if raise_:
-                raise ValueError('Invalid storage type.')
             return None
 
-        if not raise_:
-            return self._storages.get(mdw_type)
-        if mdw_type not in self._storages:
-            raise KeyError(f'No storage with type {mdw_type}.')
-        return self._storages[mdw_type]
+        return self._storages.get(mdw_type)
 
     def set_middlewares_storage(self, type: MdwsType, storage: MiddlewareStorage | None) -> None:
         if storage is not None and not isinstance(storage, MiddlewareStorage):
@@ -158,6 +129,15 @@ class MiddlewareManager:
                 f'This manager does not contain middleware storage for {scope!r} scope.',
             ) from None
         return storage.register_middleware
+
+    def __getitem__(self, item: MdwsType) -> MiddlewareStorage:
+        storage = self.get_middlewares_storage(item)
+        if storage is None:
+            raise KeyError(f'Middleware storage {item!r} does not exist.')
+        return storage
+
+    def __setitem__(self, type: MdwsType, storage: MiddlewareStorage | None) -> None:
+        return self.set_middlewares_storage(type, storage)
 
 
 _CALL = Callable[[MutableMapping[str, Any]], Awaitable[Any]]

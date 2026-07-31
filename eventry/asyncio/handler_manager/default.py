@@ -32,23 +32,23 @@ class DefaultHandlerManager(HandlerManagerDefaultType):
             ),
         )
 
-        self.middleware.set_middlewares_storage('manager.outer', MiddlewareStorage())
-        self.middleware.set_middlewares_storage('manager.inner', MiddlewareStorage())
-        self.middleware.set_middlewares_storage('handler.outer', MiddlewareStorage())
-        self.middleware.set_middlewares_storage('handler.inner', MiddlewareStorage())
+        self.middleware['manager.outer'] = MiddlewareStorage()
+        self.middleware['manager.inner'] = MiddlewareStorage()
+        self.middleware['handler.outer'] = MiddlewareStorage()
+        self.middleware['handler.inner'] = MiddlewareStorage()
 
     @property
     def manager_outer_middleware(self) -> MiddlewareStorage:
-        return self.middleware.get_middlewares_storage('manager.outer', raise_=True)
+        return self.middleware['manager.outer']
 
     @property
     def manager_inner_middleware(self) -> MiddlewareStorage:
-        return self.middleware.get_middlewares_storage('manager.inner', raise_=True)
+        return self.middleware['manager.inner']
 
     @property
     def handler_outer_middleware(self) -> MiddlewareStorage:
-        return self.middleware.get_middlewares_storage('handler.outer', raise_=True)
+        return self.middleware['handler.outer']
 
     @property
     def handler_inner_middleware(self) -> MiddlewareStorage:
-        return self.middleware.get_middlewares_storage('handler.inner', raise_=True)
+        return self.middleware['handler.inner']
