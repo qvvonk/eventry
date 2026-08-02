@@ -74,8 +74,8 @@ class ArgumentSlots:
 
 
 class PropagationState:
-    def __init__(self):
-        self.stopped = False
+    def __init__(self) -> None:
+        self.stopped: bool = False
 
 
 class DispatchingContext(MutableMapping[str, Any]):
@@ -85,7 +85,7 @@ class DispatchingContext(MutableMapping[str, Any]):
     _MANAGER_KEY = 'manager'
     _HANDLER_KEY = 'handler'
     _ARGUMENTS_KEY = 'argument_slots'
-    _PROPAGATION_STOPPED_KEY = '_propagation_stopped'
+    _PROPAGATION_STATE_KEY = '_propagation_state'
     _RESERVED_KEYS = frozenset(
         {
             _EVENT_KEY,
@@ -94,7 +94,7 @@ class DispatchingContext(MutableMapping[str, Any]):
             _MANAGER_KEY,
             _HANDLER_KEY,
             _ARGUMENTS_KEY,
-            _PROPAGATION_STOPPED_KEY,
+            _PROPAGATION_STATE_KEY,
         },
     )
 
@@ -104,7 +104,7 @@ class DispatchingContext(MutableMapping[str, Any]):
         event: Event,
         dispatcher: Dispatcher,
         router: Router[Any],
-        propagation_state: PropagationState,
+        propagation_state: PropagationState | None = None,
         data: Mapping[str, Any] | None = None,
         manager: HandlerManagerAnyType | None = None,
         handler: Handler[Any] | None = None,
@@ -122,7 +122,7 @@ class DispatchingContext(MutableMapping[str, Any]):
         self._manager = manager
         self._handler = handler
         self._arguments = arguments if arguments is not None else ArgumentSlots()
-        self._propagation_state = propagation_state
+        self._propagation_state = propagation_state or PropagationState()
 
     @property
     def event(self) -> Event:
@@ -161,8 +161,8 @@ class DispatchingContext(MutableMapping[str, Any]):
             return self.router
         if key == self._ARGUMENTS_KEY:
             return self.args
-        if key == self._PROPAGATION_STOPPED_KEY:
-            return self.propagation_stopped
+        if key == self._PROPAGATION_STATE_KEY:
+            return self._propagation_state
         if key == self._MANAGER_KEY and self.manager is not None:
             return self.manager
         if key == self._HANDLER_KEY and self.handler is not None:
@@ -187,7 +187,7 @@ class DispatchingContext(MutableMapping[str, Any]):
         yield self._DISPATCHER_KEY
         yield self._ROUTER_KEY
         yield self._ARGUMENTS_KEY
-        yield self._PROPAGATION_STOPPED_KEY
+        yield self._PROPAGATION_STATE_KEY
         if self.manager is not None:
             yield self._MANAGER_KEY
         if self.handler is not None:
@@ -249,7 +249,7 @@ class DispatchingContext(MutableMapping[str, Any]):
             cls._DISPATCHER_KEY,
             cls._ROUTER_KEY,
             cls._EVENT_KEY,
-            cls._PROPAGATION_STOPPED_KEY
+            cls._PROPAGATION_STATE_KEY,
         ]:
             if i not in data:
                 raise ValueError(f'{i!r} not found.')
@@ -258,7 +258,7 @@ class DispatchingContext(MutableMapping[str, Any]):
             event=data.pop(cls._EVENT_KEY),
             dispatcher=data.pop(cls._DISPATCHER_KEY),
             router=data.pop(cls._ROUTER_KEY),
-            propagation_state=data.pop(cls._PROPAGATION_STOPPED_KEY),
+            propagation_state=data.pop(cls._PROPAGATION_STATE_KEY),
             manager=data.pop(cls._MANAGER_KEY, None),
             handler=data.pop(cls._HANDLER_KEY, None),
             arguments=data.pop(cls._ARGUMENTS_KEY, None),
