@@ -73,7 +73,7 @@ class ArgumentSlots:
         )
 
 
-class PropagationState:
+class _PropagationState:
     def __init__(self) -> None:
         self.stopped: bool = False
 
@@ -104,7 +104,7 @@ class DispatchingContext(MutableMapping[str, Any]):
         event: Event,
         dispatcher: Dispatcher,
         router: Router[Any],
-        propagation_state: PropagationState | None = None,
+        propagation_state: _PropagationState | None = None,
         data: Mapping[str, Any] | None = None,
         manager: HandlerManagerAnyType | None = None,
         handler: Handler[Any] | None = None,
@@ -122,7 +122,9 @@ class DispatchingContext(MutableMapping[str, Any]):
         self._manager = manager
         self._handler = handler
         self._arguments = arguments if arguments is not None else ArgumentSlots()
-        self._propagation_state = propagation_state or PropagationState()
+        self._propagation_state = propagation_state \
+            if propagation_state is not None \
+            else _PropagationState()
 
     @property
     def event(self) -> Event:
