@@ -6,9 +6,9 @@ __all__ = ['DefaultHandlerManager']
 
 from typing import TYPE_CHECKING
 
-from eventry.asyncio.config import Context, FromContext
+from eventry.asyncio.config import DEFAULT_HANDLER_MANAGER_CONFIG
 from eventry.asyncio.middleware import MiddlewareStorage
-from eventry.asyncio.handler_manager.base import HandlerManagerConfig, HandlerManagerDefaultType
+from eventry.asyncio.handler_manager.base import HandlerManagerDefaultType
 
 
 if TYPE_CHECKING:
@@ -22,14 +22,7 @@ class DefaultHandlerManager(HandlerManagerDefaultType):
         event_filter: EventFilter | None = None,
     ) -> None:
         super().__init__(
-            name=name,
-            event_filter=event_filter,
-            config=HandlerManagerConfig(
-                manager_outer_mdw_args=(FromContext('next_call'), Context),
-                manager_inner_mdw_args=(FromContext('next_call'), Context),
-                handler_outer_mdw_args=(FromContext('next_call'), Context),
-                handler_inner_mdw_args=(FromContext('next_call'), Context),
-            ),
+            name=name, event_filter=event_filter, config=DEFAULT_HANDLER_MANAGER_CONFIG
         )
 
         self.middleware['manager.outer'] = MiddlewareStorage()

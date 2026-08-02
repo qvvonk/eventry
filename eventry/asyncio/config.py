@@ -9,13 +9,20 @@ __all__ = [
     'default_handler_callback',
     'Context',
     'FromContext',
+    'DEFAULT_HANDLER_MANAGER_CONFIG',
+    'DEFAULT_ROUTER_CONFIG',
 ]
 
 from typing import Any
 from dataclasses import dataclass
 from collections.abc import Callable, Awaitable
 
-from eventry._config import RouterConfig, HandlerManagerConfig
+from eventry._config import (
+    DEFAULT_ROUTER_CONFIG,
+    DEFAULT_HANDLER_MANAGER_CONFIG,
+    RouterConfig,
+    HandlerManagerConfig,
+)
 from eventry.loggers import logger
 from eventry._argument_sources import Context, FromContext
 from eventry.asyncio.dispatching_context import DispatchingContext

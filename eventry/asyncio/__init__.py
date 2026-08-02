@@ -34,11 +34,15 @@ __all__ = [
     'ManagerArgumentSlots',
     'RouterArgumentSlots',
     'ArgumentSlots',
+    'DEFAULT_HANDLER_MANAGER_CONFIG',
+    'DEFAULT_ROUTER_CONFIG',
 ]
 
 
 from .event import Event, ExtendedEvent
 from .config import (
+    DEFAULT_ROUTER_CONFIG,
+    DEFAULT_HANDLER_MANAGER_CONFIG,
     Context,
     FromContext,
     RouterConfig,

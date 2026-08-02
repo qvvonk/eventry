@@ -31,7 +31,15 @@ R = TypeVar('R', bound='Router[Any]')
 
 
 class Router(Generic[FilterT]):
+    """
+    Base class for routers.
+    """
+
     def __init__(self, name: str = '', config: RouterConfig | None = None) -> None:
+        """
+        :param name: Router name.
+        :param config: Router config.
+        """
         if not isinstance(name, str):
             raise TypeError(f'Router name must be a string, not {type(config)!r}.')
 

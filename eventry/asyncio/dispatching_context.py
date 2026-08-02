@@ -122,9 +122,9 @@ class DispatchingContext(MutableMapping[str, Any]):
         self._manager = manager
         self._handler = handler
         self._arguments = arguments if arguments is not None else ArgumentSlots()
-        self._propagation_state = propagation_state \
-            if propagation_state is not None \
-            else _PropagationState()
+        self._propagation_state = (
+            propagation_state if propagation_state is not None else _PropagationState()
+        )
 
     @property
     def event(self) -> Event:

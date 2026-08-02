@@ -4,11 +4,13 @@ from typing import Any
 from dataclasses import dataclass
 from collections.abc import Sequence
 
+from eventry._argument_sources import Context, FromContext
+
 
 _NEXT_CALL_KEY = 'next_call'
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class RouterConfig:
     outer_mdw_args: Sequence[Any] = ()
     filter_args: Sequence[Any] = ()
@@ -18,7 +20,7 @@ class RouterConfig:
     inner_mdw_next_call_key = _NEXT_CALL_KEY
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True, frozen=True)
 class HandlerManagerConfig:
     manager_outer_mdw_args: Sequence[Any] = ()
     manager_filter_args: Sequence[Any] = ()
@@ -33,3 +35,16 @@ class HandlerManagerConfig:
     manager_inner_mdw_next_call_key = _NEXT_CALL_KEY
     handler_outer_mdw_next_call_key = _NEXT_CALL_KEY
     handler_inner_mdw_next_call_key = _NEXT_CALL_KEY
+
+
+DEFAULT_HANDLER_MANAGER_CONFIG = HandlerManagerConfig(
+    manager_outer_mdw_args=(FromContext(_NEXT_CALL_KEY), Context),
+    manager_inner_mdw_args=(FromContext(_NEXT_CALL_KEY), Context),
+    handler_outer_mdw_args=(FromContext(_NEXT_CALL_KEY), Context),
+    handler_inner_mdw_args=(FromContext(_NEXT_CALL_KEY), Context),
+)
+
+DEFAULT_ROUTER_CONFIG = RouterConfig(
+    outer_mdw_args=(FromContext(_NEXT_CALL_KEY), Context),
+    inner_mdw_args=(FromContext(_NEXT_CALL_KEY), Context),
+)
