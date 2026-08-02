@@ -53,7 +53,7 @@ class Dispatcher:
         router: Router[Any] | None = None,
         additional_context: dict[str, Any] | None = None,
         config: DispatchingConfig | None = None,
-    ) -> None:
+    ) -> DispatchingContext:
         if not isinstance(event, Event):
             raise TypeError(
                 f'Event must be an instance of Event, not {event.__class__.__name__!r}.',
@@ -71,6 +71,7 @@ class Dispatcher:
             data={**self.event_context, **event.context_injection(), **(additional_context or {})},
         )
         await router.propagate_event(config, context)
+        return context
 
     def __repr__(self) -> str:
         return f'Dispatcher({self.router!r})'

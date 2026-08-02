@@ -130,3 +130,25 @@ async def test_event_workflow() -> None:
         'router.inner.end',
         'router.outer.end',
     ]
+
+
+router_without_handler = DefaultRouter()
+router_with_handler = DefaultRouter()
+
+
+@router_with_handler.on_event()
+async def handler1():
+    return
+
+
+@pytest.mark.asyncio
+async def test_event_handled_state():
+    event = ExtendedEvent()
+    dp_without_handler = Dispatcher(router_without_handler)
+    dp_with_handler = Dispatcher(router_with_handler)
+
+    ctx_without_handler = await dp_without_handler.propagate_event(event)
+    ctx_with_handler = await dp_with_handler.propagate_event(event)
+
+    assert ctx_without_handler.handled is False
+    assert ctx_with_handler.handled is True
