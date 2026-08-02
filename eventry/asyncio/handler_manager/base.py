@@ -246,11 +246,8 @@ class HandlerManager(
 
             if handler.as_task:
                 task = asyncio.create_task(coro)
-                task.add_done_callback(
-                    lambda t: asyncio.create_task(
-                        self._handler_callback(handler=handler, cfg=cfg, ctx=handler_ctx, task=t)
-                    )
-                )
+                cb = partial(self._handler_callback, handler=handler, cfg=cfg, ctx=handler_ctx)
+                task.add_done_callback(lambda t, cb=cb: asyncio.create_task(cb(task=t)))
                 self._handler_tasks.add(task)
 
             else:
