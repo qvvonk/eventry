@@ -190,7 +190,7 @@ class DispatchingContext(MutableMapping[str, Any]):
         yield from self._data
 
     def __len__(self) -> int:
-        metadata_length = 4
+        metadata_length = 5
         metadata_length += self.manager is not None
         metadata_length += self.handler is not None
         return metadata_length + len(self._data)
