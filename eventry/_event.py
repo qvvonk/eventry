@@ -39,28 +39,9 @@ class Event(EventBase, event_name='event'):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self._propagation_stopped = False
-
-    def stop_propagation(self) -> None:
-        """
-        Stop further propagation of this event.
-
-        Once called, the dispatcher will no longer deliver the event
-        to subsequent handlers.
-        """
-        self._propagation_stopped = True
 
     def context_injection(self) -> dict[str, Any]:
         return {}
-
-    @property
-    def propagation_stopped(self) -> bool:
-        """
-        Check whether the event propagation has been stopped.
-
-        :return: ``True`` if propagation has been stopped, otherwise ``False``.
-        """
-        return self._propagation_stopped
 
 
 class ExtendedEvent(Event):

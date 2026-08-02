@@ -114,13 +114,13 @@ class Router(Generic[FilterT]):
         for i in self._handler_managers.values():
             manager_ctx = ctx.fork(manager=i)
             (await i.propagate_event(cfg, manager_ctx),)
-            if manager_ctx.event.propagation_stopped:
+            if manager_ctx.propagation_stopped:
                 return
 
         for r in self._sub_routers.values():
             subrouter_ctx = ctx.fork(router=r)
             await r.propagate_event(cfg, subrouter_ctx)
-            if subrouter_ctx.event.propagation_stopped:
+            if subrouter_ctx.propagation_stopped:
                 return
 
     async def _propagate_event_with_filter(

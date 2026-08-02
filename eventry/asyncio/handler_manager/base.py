@@ -248,7 +248,7 @@ class HandlerManager(
                 task = asyncio.create_task(coro)
                 cb = partial(self._handler_callback, handler=handler, cfg=cfg, ctx=handler_ctx)
                 task.add_done_callback(
-                    lambda t, c=cb: asyncio.create_task(c(task=t)) # type: ignore[misc]
+                    lambda t, c=cb: asyncio.create_task(c(task=t))  # type: ignore[misc]
                 )
 
                 self._handler_tasks.add(task)
@@ -263,7 +263,7 @@ class HandlerManager(
                     handler=handler, ctx=handler_ctx, cfg=cfg, exception=exception, result=result
                 )
 
-            if handler_ctx.event.propagation_stopped:
+            if handler_ctx.propagation_stopped:
                 return
 
     async def _execute_handlers(self, cfg: DispatchingConfig, ctx: DispatchingContext) -> Any:
