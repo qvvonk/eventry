@@ -3,14 +3,14 @@ from __future__ import annotations
 
 __all__ = [
     'Dispatcher',
-    'EventDispatchingConfig',
+    'DispatchingConfig',
 ]
 
 
 from typing import Any
 
 from eventry.asyncio.event import Event
-from eventry.asyncio.config import EventDispatchingConfig
+from eventry.asyncio.config import DispatchingConfig
 from eventry.asyncio.router.base import Router
 from eventry.asyncio.dispatching_context import DispatchingContext
 
@@ -22,11 +22,11 @@ class Dispatcher:
         self,
         router: Router[Any] | None = None,
         event_context: dict[str, Any] | None = None,
-        config: EventDispatchingConfig | None = None,
+        config: DispatchingConfig | None = None,
     ) -> None:
         self.router = router
         self._event_context = event_context or {}
-        self._config = config if config is not None else EventDispatchingConfig()
+        self._config = config if config is not None else DispatchingConfig()
 
     @property
     def router(self) -> Router[Any] | None:
@@ -43,7 +43,7 @@ class Dispatcher:
         return self._event_context
 
     @property
-    def config(self) -> EventDispatchingConfig:
+    def config(self) -> DispatchingConfig:
         return self._config
 
     async def propagate_event(
@@ -52,7 +52,7 @@ class Dispatcher:
         *,
         router: Router[Any] | None = None,
         additional_context: dict[str, Any] | None = None,
-        config: EventDispatchingConfig | None = None,
+        config: DispatchingConfig | None = None,
     ) -> None:
         if not isinstance(event, Event):
             raise TypeError(

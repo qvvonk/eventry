@@ -15,7 +15,7 @@ import pytest
         ),
         pytest.param(
             ['eventry.asyncio', 'eventry.asyncio.dispatcher'],
-            ['Dispatcher', 'EventDispatchingConfig'],
+            ['Dispatcher', 'DispatchingConfig'],
             id='dispatcher',
         ),
         pytest.param(
@@ -47,7 +47,7 @@ import pytest
             [
                 'Context',
                 'FromContext',
-                'EventDispatchingConfig',
+                'DispatchingConfig',
                 'RouterConfig',
                 'HandlerManagerConfig',
                 'default_error_callback',

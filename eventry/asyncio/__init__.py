@@ -9,7 +9,7 @@ __all__ = [
     'DefaultRouter',
     'RouterConfig',
     'Dispatcher',
-    'EventDispatchingConfig',
+    'DispatchingConfig',
     'Filter',
     'FilterFromFunction',
     'LogicalFilter',
@@ -42,8 +42,8 @@ from .config import (
     Context,
     FromContext,
     RouterConfig,
+    DispatchingConfig,
     HandlerManagerConfig,
-    EventDispatchingConfig,
     default_error_callback,
     default_handler_callback,
 )

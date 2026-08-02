@@ -13,7 +13,7 @@ from functools import partial
 from collections.abc import Mapping, Generator
 
 from eventry.loggers import logger
-from eventry.asyncio.config import RouterConfig, EventDispatchingConfig
+from eventry.asyncio.config import RouterConfig, DispatchingConfig
 from eventry.asyncio.filter import Filter, FilterFromFunction, dummy_filter
 from eventry.asyncio.exceptions import router as rexc
 from eventry.asyncio.middleware import (
@@ -110,7 +110,7 @@ class Router(Generic[FilterT]):
     def remove_handler_manager(self, name: str) -> HandlerManagerDefaultType | None:
         return self._handler_managers.pop(name, None)
 
-    async def _propagate_event(self, cfg: EventDispatchingConfig, ctx: DispatchingContext) -> None:
+    async def _propagate_event(self, cfg: DispatchingConfig, ctx: DispatchingContext) -> None:
         for i in self._handler_managers.values():
             manager_ctx = ctx.fork(manager=i)
             (await i.propagate_event(cfg, manager_ctx),)
@@ -125,7 +125,7 @@ class Router(Generic[FilterT]):
 
     async def _propagate_event_with_filter(
         self,
-        cfg: EventDispatchingConfig,
+        cfg: DispatchingConfig,
         ctx: DispatchingContext,
     ) -> Any:
         r = await self.filter.execute(ctx.args.router.filter, ctx)
@@ -138,7 +138,7 @@ class Router(Generic[FilterT]):
             _make_mdw_wrapper_factory(ctx.args.router.inner, self.config.inner_mdw_next_call_key),
         )(ctx)
 
-    async def propagate_event(self, cfg: EventDispatchingConfig, ctx: DispatchingContext) -> Any:
+    async def propagate_event(self, cfg: DispatchingConfig, ctx: DispatchingContext) -> Any:
         ctx.args.router.outer = list(self.config.outer_mdw_args)
         ctx.args.router.filter = list(self.config.filter_args)
         ctx.args.router.inner = list(self.config.inner_mdw_args)

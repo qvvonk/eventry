@@ -16,7 +16,7 @@ from functools import partial
 from collections.abc import Callable, Sequence
 
 from eventry.loggers import logger
-from eventry.asyncio.config import HandlerManagerConfig, EventDispatchingConfig
+from eventry.asyncio.config import DispatchingConfig, HandlerManagerConfig
 from eventry.asyncio.filter import Filter, FilterFromFunction, dummy_filter, convert_filters
 from eventry.asyncio.middleware import (
     MiddlewareManager,
@@ -198,7 +198,7 @@ class HandlerManager(
     async def _handler_callback(
         self,
         handler: Handler[Any],
-        cfg: EventDispatchingConfig,
+        cfg: DispatchingConfig,
         ctx: DispatchingContext,
         task: asyncio.Task[Any] | None = None,
         exception: Exception | None = None,
@@ -238,11 +238,12 @@ class HandlerManager(
             )
 
     async def _execute_handlers_inner(
-        self, cfg: EventDispatchingConfig, ctx: DispatchingContext
+        self, cfg: DispatchingConfig, ctx: DispatchingContext
     ) -> Any:
         for handler in self.handlers.values():
             handler_ctx = ctx.fork(handler=handler)
             coro = self._execute_handler_with_filter(handler, handler_ctx)
+
             if handler.as_task:
                 task = asyncio.create_task(coro)
                 task.add_done_callback(
@@ -265,7 +266,7 @@ class HandlerManager(
             if handler_ctx.event.propagation_stopped:
                 return
 
-    async def _execute_handlers(self, cfg: EventDispatchingConfig, ctx: DispatchingContext) -> Any:
+    async def _execute_handlers(self, cfg: DispatchingConfig, ctx: DispatchingContext) -> Any:
         return await MiddlewareStorage.wrap_with_middlewares(
             partial(self._execute_handlers_inner, cfg),
             self.middleware.get_middlewares_storage('manager.inner') or [],
@@ -276,7 +277,7 @@ class HandlerManager(
         )(ctx)
 
     async def _execute_handlers_with_mgr_filter(
-        self, cfg: EventDispatchingConfig, ctx: DispatchingContext
+        self, cfg: DispatchingConfig, ctx: DispatchingContext
     ) -> Any:
         r = await self.filter.execute(ctx.args.manager.filter, ctx)
         if r is False or r is None:
@@ -284,7 +285,7 @@ class HandlerManager(
 
         return await self._execute_handlers(cfg, ctx)
 
-    async def propagate_event(self, cfg: EventDispatchingConfig, ctx: DispatchingContext) -> Any:
+    async def propagate_event(self, cfg: DispatchingConfig, ctx: DispatchingContext) -> Any:
         if not self.check_event(ctx.event):
             return None
 

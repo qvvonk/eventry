@@ -4,7 +4,7 @@ from __future__ import annotations
 __all__ = [
     'RouterConfig',
     'HandlerManagerConfig',
-    'EventDispatchingConfig',
+    'DispatchingConfig',
     'default_error_callback',
     'default_handler_callback',
     'Context',
@@ -46,7 +46,7 @@ async def default_handler_callback(*_: Any) -> None:
     return
 
 
-@dataclass(kw_only=True)
-class EventDispatchingConfig:
+@dataclass(kw_only=True, frozen=True)
+class DispatchingConfig:
     on_error: Callable[[DispatchingContext, Exception], Awaitable[Any]] = default_error_callback
     on_handler: Callable[[DispatchingContext, Any], Awaitable[Any]] = default_handler_callback
