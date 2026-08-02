@@ -76,6 +76,7 @@ class ArgumentSlots:
 class _PropagationState:
     def __init__(self) -> None:
         self.stopped: bool = False
+        self.handled: bool = False
 
 
 class DispatchingContext(MutableMapping[str, Any]):
@@ -85,7 +86,7 @@ class DispatchingContext(MutableMapping[str, Any]):
     _MANAGER_KEY = 'manager'
     _HANDLER_KEY = 'handler'
     _ARGUMENTS_KEY = 'argument_slots'
-    _PROPAGATION_STATE_KEY = '_propagation_state'
+    _PROPAGATION_STATE_KEY = '_eventry_propagation_state'
     _RESERVED_KEYS = frozenset(
         {
             _EVENT_KEY,
@@ -153,6 +154,10 @@ class DispatchingContext(MutableMapping[str, Any]):
     @property
     def propagation_stopped(self) -> bool:
         return self._propagation_state.stopped
+
+    @property
+    def handled(self) -> bool:
+        return self._propagation_state.handled
 
     def __getitem__(self, key: str) -> Any:
         if key == self._EVENT_KEY:
@@ -241,6 +246,9 @@ class DispatchingContext(MutableMapping[str, Any]):
 
     def stop_propagation(self) -> None:
         self._propagation_state.stopped = True
+
+    def set_handled(self) -> None:
+        self._propagation_state.handled = True
 
     @classmethod
     def from_mapping(cls, data: MutableMapping[str, Any]) -> DispatchingContext:

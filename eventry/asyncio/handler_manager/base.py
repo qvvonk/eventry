@@ -213,6 +213,7 @@ class HandlerManager(
                 exception = e
 
         if exception is None:
+            ctx.set_handled()
             try:
                 await cfg.on_handler(ctx, result)
             except Exception as e:
