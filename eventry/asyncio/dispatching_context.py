@@ -73,6 +73,11 @@ class ArgumentSlots:
         )
 
 
+class PropagationState:
+    def __init__(self):
+        self.stopped = False
+
+
 class DispatchingContext(MutableMapping[str, Any]):
     _EVENT_KEY = 'event'
     _DISPATCHER_KEY = 'dispatcher'
@@ -80,7 +85,7 @@ class DispatchingContext(MutableMapping[str, Any]):
     _MANAGER_KEY = 'manager'
     _HANDLER_KEY = 'handler'
     _ARGUMENTS_KEY = 'argument_slots'
-    _PROPAGATION_STOPPED_KEY = 'propagation_stopped'
+    _PROPAGATION_STOPPED_KEY = '_propagation_stopped'
     _RESERVED_KEYS = frozenset(
         {
             _EVENT_KEY,
@@ -99,11 +104,11 @@ class DispatchingContext(MutableMapping[str, Any]):
         event: Event,
         dispatcher: Dispatcher,
         router: Router[Any],
+        propagation_state: PropagationState,
         data: Mapping[str, Any] | None = None,
         manager: HandlerManagerAnyType | None = None,
         handler: Handler[Any] | None = None,
         arguments: ArgumentSlots | None = None,
-        propagation_stopped: bool = False,
     ) -> None:
         self._data = dict(data) if data is not None else {}
         reserved_keys = self._data.keys() & self._RESERVED_KEYS
@@ -117,7 +122,7 @@ class DispatchingContext(MutableMapping[str, Any]):
         self._manager = manager
         self._handler = handler
         self._arguments = arguments if arguments is not None else ArgumentSlots()
-        self._propagation_stopped = propagation_stopped
+        self._propagation_state = propagation_state
 
     @property
     def event(self) -> Event:
@@ -145,7 +150,7 @@ class DispatchingContext(MutableMapping[str, Any]):
 
     @property
     def propagation_stopped(self) -> bool:
-        return self._propagation_stopped
+        return self._propagation_state.stopped
 
     def __getitem__(self, key: str) -> Any:
         if key == self._EVENT_KEY:
@@ -224,6 +229,7 @@ class DispatchingContext(MutableMapping[str, Any]):
         return type(self)(
             event=self.event,
             dispatcher=self.dispatcher,
+            propagation_state=self._propagation_state,
             data=data,
             router=router if not isinstance(router, _MissingType) else self.router,
             manager=manager if not isinstance(manager, _MissingType) else self.manager,
@@ -232,14 +238,19 @@ class DispatchingContext(MutableMapping[str, Any]):
         )
 
     def stop_propagation(self) -> None:
-        self._propagation_stopped = True
+        self._propagation_state.stopped = True
 
     @classmethod
     def from_mapping(cls, data: MutableMapping[str, Any]) -> DispatchingContext:
         if isinstance(data, DispatchingContext):
             return data
 
-        for i in [cls._DISPATCHER_KEY, cls._ROUTER_KEY, cls._EVENT_KEY]:
+        for i in [
+            cls._DISPATCHER_KEY,
+            cls._ROUTER_KEY,
+            cls._EVENT_KEY,
+            cls._PROPAGATION_STOPPED_KEY
+        ]:
             if i not in data:
                 raise ValueError(f'{i!r} not found.')
 
@@ -247,9 +258,9 @@ class DispatchingContext(MutableMapping[str, Any]):
             event=data.pop(cls._EVENT_KEY),
             dispatcher=data.pop(cls._DISPATCHER_KEY),
             router=data.pop(cls._ROUTER_KEY),
+            propagation_state=data.pop(cls._PROPAGATION_STOPPED_KEY),
             manager=data.pop(cls._MANAGER_KEY, None),
             handler=data.pop(cls._HANDLER_KEY, None),
             arguments=data.pop(cls._ARGUMENTS_KEY, None),
             data=data,
-            propagation_stopped=data.pop(cls._PROPAGATION_STOPPED_KEY, False),
         )
