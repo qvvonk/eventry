@@ -6,6 +6,7 @@ __all__ = [
     'RouterConfig',
 ]
 
+import asyncio
 from typing import Any, Generic, TypeVar
 from types import MappingProxyType
 from functools import partial
@@ -168,6 +169,14 @@ class Router(Generic[FilterT]):
         yield self
         for r in self._sub_routers.values():
             yield from r.chain_to_tails()
+
+    def handler_tasks(self) -> Generator[asyncio.Task[Any], None, None]:
+        for mgr in self.handler_managers.values():
+            for task in mgr.handler_tasks:
+                yield task
+
+        for router in self.sub_routers.values():
+            yield from router.handler_tasks()
 
     def __repr__(self) -> str:
         return f'Router({self.name!r})'

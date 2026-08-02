@@ -25,7 +25,7 @@ async def default_error_callback(ctx: DispatchingContext, exc: Exception) -> Non
     if ctx.handler is not None and ctx.manager is not None:
         logger.error(
             f'An error occurred while executing handler '
-            f'{ctx.handler.name!r} @ {ctx.manager.name!r} @ {ctx.router.full_name}.'
+            f'{ctx.handler.name!r} @ {ctx.manager.name!r} @ {ctx.router.full_name} '
             f'for event {ctx.event.name!r}.',
             exc_info=exc,
         )

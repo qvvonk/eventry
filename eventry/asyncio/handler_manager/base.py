@@ -73,6 +73,7 @@ class HandlerManager(
         self.middleware = MiddlewareManager(
             ['manager.outer', 'manager.inner', 'handler.outer', 'handler.inner'],
         )
+        self._handler_tasks: set[asyncio.Task[Any]] = set()
 
     @property
     def handlers(self) -> MappingProxyType[str, Handler[Any]]:
@@ -97,6 +98,10 @@ class HandlerManager(
     @property
     def filter(self) -> Filter:
         return self._filter
+
+    @property
+    def handler_tasks(self) -> set[asyncio.Task[Any]]:
+        return self._handler_tasks
 
     def set_filter(self, filter: ManagerFilterT) -> None:
         self._filter = filter if isinstance(filter, Filter) else FilterFromFunction(filter)
@@ -154,7 +159,7 @@ class HandlerManager(
         return inner
 
     async def _handler(self, handler: Handler[Any], ctx: DispatchingContext) -> Any:
-        await handler(ctx.args.handler.call, ctx)
+        return await handler(ctx.args.handler.call, ctx)
 
     async def _execute_handler(self, handler: Handler[Any], ctx: DispatchingContext) -> Any:
         return await MiddlewareStorage.wrap_with_middlewares(
@@ -178,40 +183,55 @@ class HandlerManager(
         return await self._execute_handler(handler, ctx)
 
     async def _execute_handler_with_filter(
+        self, handler: Handler[Any], ctx: DispatchingContext
+    ) -> Any:
+        return await MiddlewareStorage.wrap_with_middlewares(
+            partial(self._execute_handler_with_filter_inner, handler),
+            list(self.middleware.get_middlewares_storage('handler.outer') or [])
+            + handler.outer_middlewares,
+            _make_mdw_wrapper_factory(
+                ctx.args.handler.outer,
+                self.config.handler_outer_mdw_next_call_key,
+            ),
+        )(ctx)
+
+    async def _handler_callback(
         self,
         handler: Handler[Any],
         cfg: EventDispatchingConfig,
         ctx: DispatchingContext,
-    ) -> Any:
-        try:
-            handler_result = await MiddlewareStorage.wrap_with_middlewares(
-                partial(self._execute_handler_with_filter_inner, handler),
-                list(self.middleware.get_middlewares_storage('handler.outer') or [])
-                + handler.outer_middlewares,
-                _make_mdw_wrapper_factory(
-                    ctx.args.handler.outer,
-                    self.config.handler_outer_mdw_next_call_key,
-                ),
-            )(ctx)
-        except Exception as handler_error:
+        task: asyncio.Task[Any] | None = None,
+        exception: Exception | None = None,
+        result: Any = None,
+    ) -> None:
+        if task is not None:
+            self._handler_tasks.discard(task)
+
             try:
-                await cfg.on_error(ctx, handler_error)
-            except Exception as callback_error:
-                if callback_error is handler_error:
-                    raise callback_error
+                result = task.result()
+            except Exception as e:
+                exception = e
+
+        if exception is None:
+            try:
+                await cfg.on_handler(ctx, result)
+            except Exception as e:
                 logger.error(
-                    f'An error occurred while executing error callback of handler '
+                    f'An error occurred while executing callback of handler '
                     f'{handler.name!r} @ {self.name!r} @ {ctx.router.full_name} '
                     f'for event {ctx.event.name!r}.',
-                    exc_info=handler_error,
+                    exc_info=e,
                 )
             return
 
         try:
-            await cfg.on_handler(ctx, handler_result)
+            await cfg.on_error(ctx, exception)
         except Exception as e:
+            if e is exception and task is None:
+                raise
+
             logger.error(
-                f'An error occurred while executing callback of handler '
+                f'An error occurred while executing error callback of handler '
                 f'{handler.name!r} @ {self.name!r} @ {ctx.router.full_name} '
                 f'for event {ctx.event.name!r}.',
                 exc_info=e,
@@ -220,10 +240,28 @@ class HandlerManager(
     async def _execute_handlers_inner(
         self, cfg: EventDispatchingConfig, ctx: DispatchingContext
     ) -> Any:
-        for i in self.handlers.values():
-            handler_ctx = ctx.fork(handler=i)
-            coro = self._execute_handler_with_filter(i, cfg, handler_ctx)
-            asyncio.create_task(coro) if i.as_task else await coro
+        for handler in self.handlers.values():
+            handler_ctx = ctx.fork(handler=handler)
+            coro = self._execute_handler_with_filter(handler, handler_ctx)
+            if handler.as_task:
+                task = asyncio.create_task(coro)
+                task.add_done_callback(
+                    lambda t: asyncio.create_task(
+                        self._handler_callback(handler=handler, cfg=cfg, ctx=handler_ctx, task=t)
+                    )
+                )
+                self._handler_tasks.add(task)
+
+            else:
+                exception, result = None, None
+                try:
+                    result = await coro
+                except Exception as e:
+                    exception = e
+                await self._handler_callback(
+                    handler=handler, ctx=handler_ctx, cfg=cfg, exception=exception, result=result
+                )
+
             if handler_ctx.event.propagation_stopped:
                 return
 
