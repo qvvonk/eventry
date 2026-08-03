@@ -13,7 +13,7 @@ __all__ = [
 from typing import TYPE_CHECKING, Any, TypeVar
 from dataclasses import field, fields, dataclass
 from copy import copy
-from collections.abc import Mapping, Iterator, MutableMapping
+from collections.abc import Mapping, Iterator, Sequence, MutableMapping
 
 
 if TYPE_CHECKING:
@@ -36,9 +36,9 @@ _MISSING = _MissingType()
 
 @dataclass(slots=True)
 class BaseArgumentSlots:
-    outer: list[Any] = field(default_factory=list)
-    filter: list[Any] = field(default_factory=list)
-    inner: list[Any] = field(default_factory=list)
+    outer: Sequence[Any] = ()
+    filter: Sequence[Any] = ()
+    inner: Sequence[Any] = ()
 
     def copy(self: _T) -> _T:
         return self.__class__(
@@ -56,7 +56,7 @@ class ManagerArgumentSlots(BaseArgumentSlots): ...
 
 @dataclass(slots=True)
 class HandlerArgumentSlots(BaseArgumentSlots):
-    call: list[Any] = field(default_factory=list)
+    call: Sequence[Any] = ()
 
 
 @dataclass(slots=True)
