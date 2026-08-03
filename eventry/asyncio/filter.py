@@ -13,7 +13,8 @@ __all__ = [
     'any_of',
     'all_of',
     'not_',
-    'dummy_filter',
+    'TrueFilter',
+    'FalseFilter',
 ]
 
 
@@ -163,8 +164,14 @@ class FilterFromFunction(LogicalFilter):
         super().__init__()
 
 
-def dummy_filter() -> FilterFromFunction:
-    return FilterFromFunction(lambda *args: True)
+class TrueFilter(Filter):
+    async def execute(self, args: Sequence[Any], data: MutableMapping[str, Any]) -> bool:
+        return True
+
+
+class FalseFilter(Filter):
+    async def execute(self, args: Sequence[Any], data: MutableMapping[str, Any]) -> bool:
+        return False
 
 
 def convert_filters(filters: Iterable[CallableFilter | Filter]) -> list[Filter]:

@@ -14,7 +14,7 @@ from collections.abc import Mapping, Generator
 
 from eventry.loggers import logger
 from eventry.asyncio.config import RouterConfig, DispatchingConfig
-from eventry.asyncio.filter import Filter, FilterFromFunction, dummy_filter
+from eventry.asyncio.filter import Filter, FilterFromFunction
 from eventry.asyncio.exceptions import router as rexc
 from eventry.asyncio.middleware import (
     MiddlewareManager,
@@ -53,14 +53,14 @@ class Router(Generic[FilterT]):
         self._handler_managers_proxy = MappingProxyType(self._handler_managers)
         self._parent: Router[Any] | None = None
         self._config = config if config is not None else RouterConfig()
-        self._filter: Filter = dummy_filter()
+        self._filter: Filter | None = None
         self.middleware = MiddlewareManager(['router.outer', 'router.inner'])
 
-    def set_filter(self, filter: FilterT) -> None:
+    def set_filter(self, filter: FilterT | None) -> None:
+        if filter is None:
+            self._filter = None
+            return
         self._filter = filter if isinstance(filter, Filter) else FilterFromFunction(filter)
-
-    def remove_filter(self) -> None:
-        self._filter = dummy_filter()
 
     def attach_router(self, router: Router[Any]) -> None:
         if router is self:
@@ -136,9 +136,10 @@ class Router(Generic[FilterT]):
         cfg: DispatchingConfig,
         ctx: DispatchingContext,
     ) -> Any:
-        r = await self.filter.execute(ctx.args.router.filter, ctx)
-        if not r and not isinstance(r, dict):
-            return None
+        if self.filter is not None:
+            r = await self.filter.execute(ctx.args.router.filter, ctx)
+            if not r and not isinstance(r, dict):
+                return None
 
         return await MiddlewareStorage.wrap_with_middlewares(
             partial(self._propagate_event, cfg),
@@ -210,7 +211,7 @@ class Router(Generic[FilterT]):
         return self._config
 
     @property
-    def filter(self) -> Filter:
+    def filter(self) -> Filter | None:
         return self._filter
 
     @property

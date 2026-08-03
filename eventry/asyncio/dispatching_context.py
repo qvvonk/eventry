@@ -137,6 +137,7 @@ class DispatchingContext(MutableMapping[str, Any]):
 
     def is_filtered_handler(self, handler: Handler[Any]) -> bool:
         return handler in self._propagation_state.filtered_handlers
+
     # ------- ------------- -------
 
     @property

@@ -36,6 +36,8 @@ __all__ = [
     'ArgumentSlots',
     'DEFAULT_HANDLER_MANAGER_CONFIG',
     'DEFAULT_ROUTER_CONFIG',
+    'TrueFilter',
+    'FalseFilter',
 ]
 
 
@@ -56,6 +58,8 @@ from .filter import (
     OrFilter,
     AndFilter,
     NotFilter,
+    TrueFilter,
+    FalseFilter,
     LogicalFilter,
     FilterFromFunction,
     not_,

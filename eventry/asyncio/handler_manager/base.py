@@ -17,7 +17,7 @@ from collections.abc import Callable, Sequence
 
 from eventry.loggers import logger
 from eventry.asyncio.config import DispatchingConfig, HandlerManagerConfig
-from eventry.asyncio.filter import Filter, FilterFromFunction, dummy_filter, convert_filters
+from eventry.asyncio.filter import Filter, FilterFromFunction, convert_filters
 from eventry.asyncio.middleware import (
     MiddlewareManager,
     MiddlewareStorage,
@@ -69,7 +69,7 @@ class HandlerManager(
         self._event_filter = event_filter
         self._name = name
         self._config = config or HandlerManagerConfig()
-        self._filter: Filter = dummy_filter()
+        self._filter: Filter | None = None
         self.middleware = MiddlewareManager(
             ['manager.outer', 'manager.inner', 'handler.outer', 'handler.inner'],
         )
@@ -96,18 +96,18 @@ class HandlerManager(
         return self._config
 
     @property
-    def filter(self) -> Filter:
+    def filter(self) -> Filter | None:
         return self._filter
 
     @property
     def handler_tasks(self) -> set[asyncio.Task[Any]]:
         return self._handler_tasks
 
-    def set_filter(self, filter: ManagerFilterT) -> None:
+    def set_filter(self, filter: ManagerFilterT | None) -> None:
+        if filter is None:
+            self._filter = None
+            return
         self._filter = filter if isinstance(filter, Filter) else FilterFromFunction(filter)
-
-    def remove_filter(self) -> None:
-        self._filter = dummy_filter()
 
     def check_event(self, event: Event) -> bool:
         if self.event_filter is None:
@@ -176,9 +176,10 @@ class HandlerManager(
         handler: Handler[Any],
         ctx: DispatchingContext,
     ) -> Any:
-        r = await handler.filter.execute(ctx.args.handler.filter, ctx)
-        if not r and not isinstance(r, dict):
-            return r
+        if handler.filter is not None:
+            r = await handler.filter.execute(ctx.args.handler.filter, ctx)
+            if not r and not isinstance(r, dict):
+                return r
 
         ctx.add_filtered_handler(handler)
         return await self._execute_handler(handler, ctx)
@@ -288,9 +289,10 @@ class HandlerManager(
     async def _execute_handlers_with_mgr_filter(
         self, cfg: DispatchingConfig, ctx: DispatchingContext
     ) -> Any:
-        r = await self.filter.execute(ctx.args.manager.filter, ctx)
-        if r is False or r is None:
-            return r
+        if self.filter is not None:
+            r = await self.filter.execute(ctx.args.manager.filter, ctx)
+            if r is False or r is None:
+                return r
 
         return await self._execute_handlers(cfg, ctx)
 

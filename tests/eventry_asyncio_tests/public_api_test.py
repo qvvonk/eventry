@@ -39,6 +39,8 @@ import pytest
                 'any_of',
                 'all_of',
                 'not_',
+                'TrueFilter',
+                'FalseFilter',
             ],
             id='filter',
         ),

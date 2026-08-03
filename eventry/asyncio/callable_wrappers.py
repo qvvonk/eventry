@@ -207,15 +207,13 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
         outer_middlewares: Sequence[MiddlewareCallable[Any] | Callable[..., Any]] | None = None,
         inner_middlewares: Sequence[MiddlewareCallable[Any] | Callable[..., Any]] | None = None,
     ):
-        from eventry.asyncio.filter import dummy_filter
-
         outer_middlewares = outer_middlewares or []
         inner_middlewares = inner_middlewares or []
 
         super().__init__(__obj)
         self._name = name
         self._as_task = as_task
-        self._filter = filter if filter is not None else dummy_filter()
+        self._filter = filter
         self._outer_middlewares = [
             i if isinstance(i, MiddlewareCallable) else MiddlewareCallable(i)
             for i in outer_middlewares
@@ -226,8 +224,11 @@ class Handler(CallableWrapper[ReturnTypeT], Generic[ReturnTypeT]):
             for i in inner_middlewares
         ]
 
+    def set_filter(self, filter: Filter | None) -> None:
+        self._filter = filter
+
     @property
-    def filter(self) -> Filter:
+    def filter(self) -> Filter | None:
         return self._filter
 
     @property
