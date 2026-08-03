@@ -121,7 +121,7 @@ class Router(Generic[FilterT]):
     async def _propagate_event(self, cfg: DispatchingConfig, ctx: DispatchingContext) -> None:
         for i in self._handler_managers.values():
             manager_ctx = ctx.fork(manager=i)
-            (await i.propagate_event(cfg, manager_ctx),)
+            await i.propagate_event(cfg, manager_ctx)
             if manager_ctx.propagation_stopped:
                 return
 
