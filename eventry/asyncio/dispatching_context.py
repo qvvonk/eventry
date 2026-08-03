@@ -11,7 +11,7 @@ __all__ = [
 
 
 from typing import TYPE_CHECKING, Any, TypeVar
-from dataclasses import field, fields, dataclass
+from dataclasses import field, dataclass
 from copy import copy
 from collections.abc import Mapping, Iterator, Sequence, MutableMapping
 
@@ -40,23 +40,39 @@ class BaseArgumentSlots:
     filter: Sequence[Any] = ()
     inner: Sequence[Any] = ()
 
-    def copy(self: _T) -> _T:
-        return self.__class__(
-            **{f.name: copy(getattr(self, f.name)) for f in fields(self) if f.init}
+    def copy(self) -> BaseArgumentSlots:
+        return BaseArgumentSlots(
+            outer=copy(self.outer), filter=copy(self.filter), inner=copy(self.inner)
         )
 
 
 @dataclass(slots=True)
-class RouterArgumentSlots(BaseArgumentSlots): ...
+class RouterArgumentSlots(BaseArgumentSlots):
+    def copy(self) -> RouterArgumentSlots:
+        return RouterArgumentSlots(
+            outer=copy(self.outer), filter=copy(self.filter), inner=copy(self.inner)
+        )
 
 
 @dataclass(slots=True)
-class ManagerArgumentSlots(BaseArgumentSlots): ...
+class ManagerArgumentSlots(BaseArgumentSlots):
+    def copy(self) -> ManagerArgumentSlots:
+        return ManagerArgumentSlots(
+            outer=copy(self.outer), filter=copy(self.filter), inner=copy(self.inner)
+        )
 
 
 @dataclass(slots=True)
 class HandlerArgumentSlots(BaseArgumentSlots):
     call: Sequence[Any] = ()
+
+    def copy(self) -> HandlerArgumentSlots:
+        return HandlerArgumentSlots(
+            outer=copy(self.outer),
+            filter=copy(self.filter),
+            inner=copy(self.inner),
+            call=copy(self.call),
+        )
 
 
 @dataclass(slots=True)

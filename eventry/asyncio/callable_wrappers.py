@@ -12,6 +12,7 @@ import inspect
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 from types import MethodType, FunctionType
 from functools import partial
+from collections import ChainMap
 from collections.abc import Mapping, Callable, Sequence, Awaitable
 
 from eventry._argument_sources import Context, FromContext
@@ -76,8 +77,9 @@ class CallableWrapper(Generic[ReturnTypeT]):
         kwargs: Mapping[str, Any] | None = None,
     ) -> tuple[list[Any], dict[str, Any]]:
         args = self._partial_args + list(args)
-        original_kwargs = kwargs or {}
-        kwargs = self._partial_kwargs | dict(kwargs or {})
+        kwargs = original_kwargs = kwargs if kwargs is not None else {}
+        if self._partial_kwargs:
+            kwargs = ChainMap(self._partial_kwargs, original_kwargs)
 
         if len(args) > self._args_c and not self._has_varargs:
             raise ValueError(
@@ -87,6 +89,9 @@ class CallableWrapper(Generic[ReturnTypeT]):
                 f'but {len(args)} were given.\n'
                 f'Passed args: {args}.',
             )
+
+        if not self._total_args_c and not self._has_varargs and not self._has_varkw:
+            return [], {}
 
         r_args = []
         for index, arg in enumerate(args):
