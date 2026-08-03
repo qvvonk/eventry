@@ -180,6 +180,7 @@ class HandlerManager(
         if not r and not isinstance(r, dict):
             return r
 
+        ctx.add_filtered_handler(handler)
         return await self._execute_handler(handler, ctx)
 
     async def _execute_handler_with_filter(
@@ -212,8 +213,15 @@ class HandlerManager(
             except Exception as e:
                 exception = e
 
+        is_filtered = ctx.is_filtered_handler(handler)
+        ctx.discard_filtered_handler(handler)
+
         if exception is None:
+            if not is_filtered:
+                return
+
             ctx.set_handled()
+
             try:
                 await cfg.on_handler(ctx, result)
             except Exception as e:

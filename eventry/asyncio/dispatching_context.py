@@ -77,6 +77,7 @@ class _PropagationState:
     def __init__(self) -> None:
         self.stopped: bool = False
         self.handled: bool = False
+        self.filtered_handlers: set[Handler[Any]] = set()
 
 
 class DispatchingContext(MutableMapping[str, Any]):
@@ -126,6 +127,17 @@ class DispatchingContext(MutableMapping[str, Any]):
         self._propagation_state = (
             propagation_state if propagation_state is not None else _PropagationState()
         )
+
+    # ------- todo: temp API -------
+    def add_filtered_handler(self, handler: Handler[Any]) -> None:
+        self._propagation_state.filtered_handlers.add(handler)
+
+    def discard_filtered_handler(self, handler: Handler[Any]) -> None:
+        self._propagation_state.filtered_handlers.discard(handler)
+
+    def is_filtered_handler(self, handler: Handler[Any]) -> bool:
+        return handler in self._propagation_state.filtered_handlers
+    # ------- ------------- -------
 
     @property
     def event(self) -> Event:
