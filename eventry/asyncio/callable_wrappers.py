@@ -79,7 +79,9 @@ class CallableWrapper(Generic[ReturnTypeT]):
         args = self._partial_args + list(args)
         kwargs = original_kwargs = kwargs if kwargs is not None else {}
         if self._partial_kwargs:
-            kwargs = ChainMap(self._partial_kwargs, original_kwargs)
+            kwargs = ChainMap(self._partial_kwargs, original_kwargs)  # type: ignore[arg-type]  #->
+            # original_kwargs marked as not mutable Mapping, but we are not editing kwargs in this
+            # function
 
         if len(args) > self._args_c and not self._has_varargs:
             raise ValueError(
