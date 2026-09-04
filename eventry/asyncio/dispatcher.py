@@ -26,7 +26,7 @@ class Dispatcher:
         config: DispatchingConfig | None = None,
     ) -> None:
         self.router = router
-        self._event_context = event_context or {}
+        self._event_context = event_context if event_context is not None else {}
         self._event_context_proxy = MappingProxyType(self._event_context)
         self._config = config if config is not None else DispatchingConfig()
 
