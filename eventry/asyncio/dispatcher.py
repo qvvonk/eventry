@@ -6,8 +6,9 @@ __all__ = [
     'DispatchingConfig',
 ]
 
-
 from typing import Any
+from types import MappingProxyType
+from collections.abc import Mapping
 
 from eventry.asyncio.event import Event
 from eventry.asyncio.config import DispatchingConfig
@@ -21,11 +22,12 @@ class Dispatcher:
     def __init__(
         self,
         router: Router[Any] | None = None,
-        event_context: dict[str, Any] | None = None,
+        event_context: Mapping[str, Any] | None = None,
         config: DispatchingConfig | None = None,
     ) -> None:
         self.router = router
         self._event_context = event_context or {}
+        self._event_context_proxy = MappingProxyType(self._event_context)
         self._config = config if config is not None else DispatchingConfig()
 
     @property
@@ -39,8 +41,8 @@ class Dispatcher:
         self._router = router
 
     @property
-    def event_context(self) -> dict[str, Any]:
-        return self._event_context
+    def event_context(self) -> Mapping[str, Any]:
+        return self._event_context_proxy
 
     @property
     def config(self) -> DispatchingConfig:
