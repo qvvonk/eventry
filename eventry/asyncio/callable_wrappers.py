@@ -184,6 +184,15 @@ class CallableWrapper(Generic[ReturnTypeT]):
             return asyncio.to_thread(self._callable, *pos_args, **kwargs)
         return self._blocking_async_call(self._callable, pos_args, kwargs)
 
+    def call_sync(
+        self, args: Sequence[Any] = (), data: Mapping[str, Any] | None = None
+    ) -> ReturnTypeT:
+        if self._is_async:
+            raise ValueError('Wrapped callable is async and cannot be called synchronously.')
+
+        pos_args, kwargs = self.collect_args(args, data)
+        return self._callable(*pos_args, **kwargs)
+
     async def _blocking_async_call(
         self,
         _call: Callable[..., R],
