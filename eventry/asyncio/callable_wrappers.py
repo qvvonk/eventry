@@ -191,7 +191,7 @@ class CallableWrapper(Generic[ReturnTypeT]):
             raise ValueError('Wrapped callable is async and cannot be called synchronously.')
 
         pos_args, kwargs = self.collect_args(args, data)
-        return self._callable(*pos_args, **kwargs)
+        return self._callable(*pos_args, **kwargs)  # type: ignore[no-any-return]
 
     async def _blocking_async_call(
         self,
